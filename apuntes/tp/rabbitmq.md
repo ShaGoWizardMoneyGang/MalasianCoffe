@@ -22,4 +22,6 @@
     - Nosotros potencialmente vamos a querer prefetch = 1 para que solo tenga 1 tarea en cada momento cada nodo.
     - La queue podria llegar a llenarse si todos los clientes estan ocupados. Estrategia de peso?
 - **Exchanges**: Paso intermedio (opcional) entre el producer y consumer. Determina que hacer con le paquete (a quien enviarlo o si dropearlo).
-
+- **Topicos**: Son exchanges que tiene filtros por tipos con regex.
+    - Solo le llegan mensajes a los que el filtro les matchea.
+        - Solo le llegan mensajes a los que el filtro les matchea.
