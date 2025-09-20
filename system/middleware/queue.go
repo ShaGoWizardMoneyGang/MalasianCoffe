@@ -7,7 +7,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type Options struct {
+type ChannelOptions struct {
 	// Donde hablo con rabbit
 	daemonAddress string
 	/*	q, err := ch.QueueDeclare(
@@ -20,13 +20,13 @@ type Options struct {
 	*/
 }
 
-func OptionsDefault() Options {
-	return Options{
+func ChannelOptionsDefault() ChannelOptions {
+	return ChannelOptions{
 		daemonAddress: "amqp://guest:guest@localhost:5672/",
 	}
 }
 
-func CreateQueue(name string, options Options) (*MessageMiddlewareQueue, error) {
+func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, error) {
 
 	conn, err := amqp.Dial(options.daemonAddress)
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 )
 
 func TestWorkingQueue1To1(t *testing.T) {
-	options := OptionsDefault()
+	options := ChannelOptionsDefault()
 	queue, err := CreateQueue("TestWorkingQueue1To1", options)
 	if err != nil {
 		panic("Creation of the queue not sucessful.")
