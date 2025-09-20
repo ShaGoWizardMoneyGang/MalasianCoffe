@@ -55,7 +55,8 @@ func CreateQueue(name string, options Options) (*MessageMiddlewareQueue, error) 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to declare queue: %w", err)
 	}
-	if q.Name == name {
+	if q.Name != name {
+		fmt.Printf("Nombre de la cola: %s recibida por parametro y nombre de la cola creada: %s", name, q.Name)
 		panic("Queue name does not match received name")
 	}
 
