@@ -93,3 +93,71 @@ Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessag
 func (q *MessageMiddlewareQueue) StartConsuming() (messageQueue MessageQueue, error *MessageMiddlewareError) {
 	return &q.consumeChannel, nil
 }
+
+/*
+Si se estaba consumiendo desde la cola/exchange, se detiene la escucha. Si
+no se estaba consumiendo de la cola/exchange, no tiene efecto, ni levanta
+Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
+*/
+func (q *MessageMiddlewareQueue) StopConsuming() (error MessageMiddlewareError) {
+	err := (*q.channel).Cancel(q.queueName, false)
+	if err != nil {
+		return MessageMiddlewareDisconnectedError
+	}
+	return 0
+}
+
+/*
+Envía un mensaje a la cola o al tópico con el que se inicializó el exchange.
+Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
+Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
+*/
+func (q *MessageMiddlewareQueue) Send(message []byte) (error MessageMiddlewareError) {
+	err := (*q.channel).Publish(
+		"",          // exchange
+		q.queueName, // routing key
+		false,       // mandatory
+		false,       // immediate
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body:        message,
+		})
+	if err != nil {
+		return MessageMiddlewareMessageError
+	}
+	return 0
+}
+
+/*
+Se desconecta de la cola o exchange al que estaba conectado.
+Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareCloseError.
+*/
+func (q *MessageMiddlewareQueue) Close() (error MessageMiddlewareError) {
+	err := (*q.channel).Close()
+	if err != nil {
+		return MessageMiddlewareDisconnectedError
+	}
+	return 0
+}
+
+/*
+Se fuerza la eliminación remota de la cola o exchange.
+Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareDeleteError.
+*/
+func (q *MessageMiddlewareQueue) Delete() (error MessageMiddlewareError) {
+	lost_messages, err := (*q.channel).QueueDelete(
+		q.queueName,
+		false,
+		false,
+		false,
+	)
+
+	// TODO: Cambiar por log
+	fmt.Printf("Mensajes perdidos: %d\n", lost_messages)
+
+	if err != nil {
+		return MessageMiddlewareDeleteError
+	}
+
+	return 0
+}

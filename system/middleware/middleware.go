@@ -41,7 +41,7 @@ type MessageMiddleware interface {
 	   Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 	   Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 	*/
-	StartConsuming() (messageQueue MessageQueue, error *MessageMiddlewareError)
+	StartConsuming() (messageQueue MessageQueue, error MessageMiddlewareError)
 
 	/*
 	   Si se estaba consumiendo desde la cola/exchange, se detiene la escucha. Si
