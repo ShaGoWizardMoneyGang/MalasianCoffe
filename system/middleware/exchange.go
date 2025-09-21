@@ -33,10 +33,10 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 	if err != nil {
 		return nil, fmt.Errorf(`failed to connect to RabbitMQ: %w. Is the daemon active?
 		Try running:
-		
-		sudo systemctl rabbitmq start 
+
+		sudo systemctl start rabbitmq
 		or
-		sudo rc-service start rabbitmq`, err)
+		sudo rc-service rabbitmq start`, err)
 	}
 
 	ch, err := conn.Channel()

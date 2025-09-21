@@ -32,10 +32,10 @@ func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, 
 	if err != nil {
 		return nil, fmt.Errorf(`failed to connect to RabbitMQ: %w. Is the daemon active?
 		Try running:
-		
-		sudo systemctl rabbitmq start 
+
+		sudo systemctl start rabbitmq
 		or
-		sudo rc-service start rabbitmq`, err)
+		sudo rc-service rabbitmq start`, err)
 	}
 
 	ch, err := conn.Channel()
@@ -120,9 +120,11 @@ func (q *MessageMiddlewareQueue) Send(message []byte) (error MessageMiddlewareEr
 		false,       // mandatory
 		false,       // immediate
 		amqp.Publishing{
+			// DeliveryMode: amqp.Persistent,
 			ContentType: "text/plain",
 			Body:        message,
 		})
+
 	if err != nil {
 		return MessageMiddlewareMessageError
 	}
