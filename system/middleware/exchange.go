@@ -10,6 +10,7 @@ import (
 type ExchangeOptions struct {
 	// Donde hablo con rabbit
 	daemonAddress string
+	routeKeys     []string
 	/*	q, err := ch.QueueDeclare(
 		"",    // name
 		false, // durable
@@ -23,6 +24,7 @@ type ExchangeOptions struct {
 func OptionsDefault() ExchangeOptions {
 	return ExchangeOptions{
 		daemonAddress: "amqp://guest:guest@localhost:5672/",
+		routeKeys:     []string{"info"},
 	}
 }
 
@@ -42,8 +44,21 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 		return nil, fmt.Errorf("Failed to connect to the channel: %w", err)
 	}
 
+	err = ch.ExchangeDeclare(
+		name,
+		"direct", // porque si
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to declare exchange: %w", err)
+	}
+
 	q, err := ch.QueueDeclare(
-		name,  // name
+		"",    // name
 		false, // durable
 		false, // delete when unused
 		false, // exclusive
@@ -54,9 +69,18 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 	if err != nil {
 		return nil, fmt.Errorf("Failed to declare queue: %w", err)
 	}
-	if q.Name != name {
-		fmt.Printf("Nombre de la cola: %s recibida por parametro y nombre de la cola creada: %s", name, q.Name)
-		panic("Queue name does not match received name")
+
+	for _, key := range options.routeKeys {
+		err := ch.QueueBind(
+			q.Name, //cola anonima
+			key,    // key, puedo tener mas de una por eso el for
+			name,   // nombre del exchange
+			false,
+			nil,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to bind queue: %w", err)
+		}
 	}
 
 	// Channel es donde van a llegar los mensajes a la cola
@@ -75,7 +99,8 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 
 	// Aca obtenemos channel
 	return &MessageMiddlewareExchange{
-		queueName:      name,
+		exchangeName:   name,
+		routeKeys:      options.routeKeys,
 		channel:        ch,
 		consumeChannel: &consumeChannel,
 	}, nil
@@ -90,8 +115,8 @@ cada mensaje de datos o de control.
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 */
-func (q *MessageMiddlewareExchange) StartConsuming() (messageQueue MessageQueue, error *MessageMiddlewareError) {
-	return &q.consumeChannel, nil
+func (q *MessageMiddlewareExchange) StartConsuming() (messageQueue MessageQueue, error MessageMiddlewareError) {
+	return &q.consumeChannel, 0
 }
 
 /*
