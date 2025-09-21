@@ -14,3 +14,10 @@ test: test-server
 
 lint:
 	./.github/scripts/check_go_version.sh
+
+download-dataset:
+	curl -C - -L https://www.kaggle.com/api/v1/datasets/download/geraldooizx/g-coffee-shop-transaction-202307-to-202506 -o dataset/dataset.zip
+	unzip -n dataset/dataset.zip -d dataset/
+# Delete unused dataset files
+	rm -rf dataset/vouchers
+	rm -rf dataset/payment_methods
