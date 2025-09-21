@@ -11,3 +11,6 @@ test-server:
 	GOCACHE=off cd system/ ; go test -v ./...
 
 test: test-server
+
+lint:
+	./.github/scripts/check_go_version.sh

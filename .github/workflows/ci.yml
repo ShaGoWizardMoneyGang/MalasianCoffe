@@ -6,6 +6,14 @@ on:
     types: [opened, reopened, synchronize, labeled, unlabeled]
 
 jobs:
+  lints:
+    name: project lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: general sanity checks
+        run: |
+          make lint
 
   build-server:
     name: build-server
