@@ -1,4 +1,4 @@
-module system
+module malasian_coffe
 
 go 1.24.6
 
