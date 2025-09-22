@@ -20,6 +20,7 @@ type MessageMiddlewareQueue struct {
 	queueName      string
 	channel        MiddlewareChannel
 	consumeChannel ConsumeChannel
+	consumerTag    string
 }
 
 type MessageMiddlewareExchange struct {
@@ -27,6 +28,7 @@ type MessageMiddlewareExchange struct {
 	routeKeys      []string
 	channel        MiddlewareChannel
 	consumeChannel ConsumeChannel
+	consumerTag    string
 }
 
 type MessageQueue *ConsumeChannel

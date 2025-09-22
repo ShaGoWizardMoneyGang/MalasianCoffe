@@ -4,6 +4,7 @@ package middleware
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -59,16 +60,16 @@ func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, 
 		fmt.Printf("Nombre de la cola: %s recibida por parametro y nombre de la cola creada: %s", name, q.Name)
 		panic("Queue name does not match received name")
 	}
-
+	consumerTag := "ctag-" + name + "-" + uuid.New().String()
 	// Channel es donde van a llegar los mensajes a la cola
 	consumeChannel, err := ch.Consume(
-		q.Name, // queue
-		"",     // consumer
-		true,   // auto-ack
-		false,  // exclusive
-		false,  // no-local/fix fmt.Errorf call has arguments but no formatting directives
-		false,  // no-wait
-		nil,    // args
+		q.Name,      // queue
+		consumerTag, // consumer
+		true,        // auto-ack
+		false,       // exclusive
+		false,       // no-local/fix fmt.Errorf call has arguments but no formatting directives
+		false,       // no-wait
+		nil,         // args
 	)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to consume queue: %w", err)
@@ -79,6 +80,7 @@ func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, 
 		queueName:      name,
 		channel:        ch,
 		consumeChannel: &consumeChannel,
+		consumerTag:    consumerTag,
 	}, nil
 
 }
@@ -101,7 +103,7 @@ no se estaba consumiendo de la cola/exchange, no tiene efecto, ni levanta
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 */
 func (q *MessageMiddlewareQueue) StopConsuming() (error MessageMiddlewareError) {
-	err := (*q.channel).Cancel(q.queueName, false)
+	err := (*q.channel).Cancel(q.consumerTag, false) // LE PUSE EL CONSUMER TAG
 	if err != nil {
 		return MessageMiddlewareDisconnectedError
 	}
