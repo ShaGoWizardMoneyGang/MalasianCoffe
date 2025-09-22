@@ -70,6 +70,7 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 	if err != nil {
 		return nil, fmt.Errorf("Failed to declare queue: %w", err)
 	}
+	fmt.Printf("[CreateExchange] Exchange %s declarado, cola %s creada\n", name, q.Name)
 
 	for _, key := range options.routeKeys {
 		err := ch.QueueBind(
@@ -82,8 +83,11 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 		if err != nil {
 			return nil, fmt.Errorf("Failed to bind queue: %w", err)
 		}
+		fmt.Printf("[CreateExchange] Cola %s bindeada a exchange %s con routingKey=%s\n", q.Name, name, key)
 	}
 	consumerTag := "ctag-" + name + "-" + uuid.New().String()
+	fmt.Printf("[CreateExchange] ConsumerTag asignado: %s\n", consumerTag)
+
 	// Channel es donde van a llegar los mensajes a la cola
 	consumeChannel, err := ch.Consume(
 		q.Name,      // queue
@@ -133,6 +137,8 @@ func (_q *MessageMiddlewareExchange) StopConsuming() (error MessageMiddlewareErr
 	if err != nil {
 		return MessageMiddlewareDisconnectedError
 	}
+	fmt.Printf("[StopConsuming] Cancelando consumer %s...\n", _q.consumerTag)
+
 	return 0
 }
 
@@ -143,6 +149,8 @@ Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessag
 */
 func (_q *MessageMiddlewareExchange) Send(message []byte) (error MessageMiddlewareError) {
 	for _, key := range _q.routeKeys {
+		fmt.Printf("[Send] Publicando mensaje '%s' en exchange=%s, routingKey=%s\n",
+			string(message), _q.exchangeName, key)
 		err := (*_q.channel).Publish(
 			_q.exchangeName, // exchange
 			key,             // routing key

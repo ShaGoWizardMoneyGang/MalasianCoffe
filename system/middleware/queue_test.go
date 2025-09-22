@@ -55,6 +55,65 @@ func TestWorkingQueue1To1(t *testing.T) {
 	<-finish
 }
 
+func TestDirectExchange1To1(t *testing.T) {
+	opts := OptionsDefault()
+	opts.routeKeys = []string{"info", "log", "labubu"}
+
+	exchange, err := CreateExchange("TestDirectExchange1To1", opts)
+	if err != nil {
+		t.Fatalf("Creation of the exchange not successful: %v", err)
+	}
+
+	finish := make(chan bool)
+	started := make(chan bool)
+
+	expected := len(opts.routeKeys)
+
+	go func() {
+		fmt.Println("[Test] Goroutine iniciada")
+
+		msgs, _ := exchange.StartConsuming()
+
+		hasStarted := false
+		received := 0
+
+		for m := range *(*(msgs)) {
+			if !hasStarted {
+				hasStarted = <-started
+			}
+
+			text := string(m.Body)
+			fmt.Printf("Received package %s\n", text)
+
+			if text != "TestMessage" {
+				panic("The sent message does not match with the received message.")
+			}
+
+			received = received + 1   // Una vez que recibo todo lo que espero corto
+			if received == expected { // PORQUE NO HAY WHILE EN GO ME HACE MAL
+				_ = exchange.StopConsuming()
+				break
+			}
+		}
+
+		finish <- true
+	}()
+
+	payload := []byte("TestMessage")
+
+	sendErr := exchange.Send(payload)
+
+	if sendErr != 0 {
+		t.Fatalf("Error: failed to send a message to the exchange (err=%v)", sendErr)
+	}
+
+	started <- true
+
+	<-finish
+
+	exchange.Close()
+}
+
 // func TestWorkingQueue1ToN(t *testing.T) {
 // 	options := OptionsDefault()
 // 	queue, err := CreateQueue("TestWorkingQueue1ToN", options)
