@@ -4,6 +4,7 @@ package middleware
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -82,16 +83,16 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 			return nil, fmt.Errorf("Failed to bind queue: %w", err)
 		}
 	}
-
+	consumerTag := "ctag-" + name + "-" + uuid.New().String()
 	// Channel es donde van a llegar los mensajes a la cola
 	consumeChannel, err := ch.Consume(
-		q.Name, // queue
-		"",     // consumer
-		true,   // auto-ack
-		false,  // exclusive
-		false,  // no-local/fix fmt.Errorf call has arguments but no formatting directives
-		false,  // no-wait
-		nil,    // args
+		q.Name,      // queue
+		consumerTag, // consumer ES ACA LA TECA ESTO ME LO TENGO QUE GUARDAR
+		true,        // auto-ack
+		false,       // exclusive
+		false,       // no-local/fix fmt.Errorf call has arguments but no formatting directives
+		false,       // no-wait
+		nil,         // args
 	)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to consume queue: %w", err)
@@ -103,6 +104,7 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 		routeKeys:      options.routeKeys,
 		channel:        ch,
 		consumeChannel: &consumeChannel,
+		consumerTag:    consumerTag,
 	}, nil
 
 }
@@ -115,8 +117,8 @@ cada mensaje de datos o de control.
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 */
-func (q *MessageMiddlewareExchange) StartConsuming() (messageQueue MessageQueue, error MessageMiddlewareError) {
-	return &q.consumeChannel, 0
+func (_q *MessageMiddlewareExchange) StartConsuming() (messageQueue MessageQueue, error MessageMiddlewareError) {
+	return &_q.consumeChannel, 0
 }
 
 /*
@@ -124,8 +126,10 @@ Si se estaba consumiendo desde la cola/exchange, se detiene la escucha. Si
 no se estaba consumiendo de la cola/exchange, no tiene efecto, ni levanta
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 */
-func (q *MessageMiddlewareExchange) StopConsuming() (error MessageMiddlewareError) {
-	err := (*q.channel).Cancel(q.queueName, false)
+func (_q *MessageMiddlewareExchange) StopConsuming() (error MessageMiddlewareError) {
+	// Aca necesito de alguna manera obtener que quiero cancelar
+	// el nombre del exchange no es valido dentro del cancel
+	err := (*_q.channel).Cancel(_q.consumerTag, false)
 	if err != nil {
 		return MessageMiddlewareDisconnectedError
 	}
@@ -137,18 +141,20 @@ Envía un mensaje a la cola o al tópico con el que se inicializó el exchange.
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 */
-func (q *MessageMiddlewareExchange) Send(message []byte) (error MessageMiddlewareError) {
-	err := (*q.channel).Publish(
-		"",          // exchange
-		q.queueName, // routing key
-		false,       // mandatory
-		false,       // immediate
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        message,
-		})
-	if err != nil {
-		return MessageMiddlewareMessageError
+func (_q *MessageMiddlewareExchange) Send(message []byte) (error MessageMiddlewareError) {
+	for _, key := range _q.routeKeys {
+		err := (*_q.channel).Publish(
+			_q.exchangeName, // exchange
+			key,             // routing key
+			false,           // mandatory
+			false,           // immediate
+			amqp.Publishing{
+				ContentType: "text/plain",
+				Body:        message,
+			})
+		if err != nil {
+			return MessageMiddlewareMessageError
+		}
 	}
 	return 0
 }
@@ -157,8 +163,8 @@ func (q *MessageMiddlewareExchange) Send(message []byte) (error MessageMiddlewar
 Se desconecta de la cola o exchange al que estaba conectado.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareCloseError.
 */
-func (q *MessageMiddlewareExchange) Close() (error MessageMiddlewareError) {
-	err := (*q.channel).Close()
+func (_q *MessageMiddlewareExchange) Close() (error MessageMiddlewareError) {
+	err := (*_q.channel).Close()
 	if err != nil {
 		return MessageMiddlewareDisconnectedError
 	}
@@ -169,16 +175,14 @@ func (q *MessageMiddlewareExchange) Close() (error MessageMiddlewareError) {
 Se fuerza la eliminación remota de la cola o exchange.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareDeleteError.
 */
-func (q *MessageMiddlewareExchange) Delete() (error MessageMiddlewareError) {
-	lost_messages, err := (*q.channel).QueueDelete(
-		q.queueName,
-		false,
-		false,
+func (_q *MessageMiddlewareExchange) Delete() (error MessageMiddlewareError) {
+	// claro aca el tema es: tengo que borrar la cola tambien??? si la tengo que borrar
+	// tendria que guardarla en algun lado para poder obtener el name.
+	err := (*_q.channel).ExchangeDelete(
+		_q.exchangeName,
+		true,
 		false,
 	)
-
-	// TODO: Cambiar por log
-	fmt.Printf("Mensajes perdidos: %d\n", lost_messages)
 
 	if err != nil {
 		return MessageMiddlewareDeleteError
