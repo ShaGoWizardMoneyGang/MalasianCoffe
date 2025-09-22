@@ -1,8 +1,9 @@
 # TODO(fabri): emprolijar
 build: build-server build-client
 
+DATADIR=../dataset/
 build-client:
-	cd client; go run main.go
+	cd client; go run main.go ${DATADIR}
 
 build-server:
 	cd system; go run main.go
