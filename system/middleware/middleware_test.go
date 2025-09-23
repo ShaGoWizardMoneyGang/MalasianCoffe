@@ -121,7 +121,7 @@ func TestWorkingQueue1ToN(t *testing.T) {
 	}
 
 	N := 3  //consumidores
-	M := 12 //mensajes
+	M := 18 //mensajes
 
 	// LOCURA: el tipo de canal struct sirve cuando no me interesa mandar datos, sino un aviso de che loco aca paso algo
 
@@ -179,6 +179,7 @@ func TestWorkingQueue1ToN(t *testing.T) {
 
 	_ = q.Close()
 
+	// verifico que hayan llegado entre todos los consumers exactamente M mensajes
 	total := 0
 	for _, cantidad := range distribucion {
 		total += cantidad
@@ -186,6 +187,82 @@ func TestWorkingQueue1ToN(t *testing.T) {
 	if total != M {
 		panic("No llegaron los M mensajes enviados")
 	}
+	// verifico que haya llegado al menos 1 mensaje a cada consumidor
+	for _, cantidadMensajes := range distribucion {
+		if cantidadMensajes == 0 {
+			panic("Hay un consumer que NO recibio nada")
+		}
+	}
+	fmt.Printf("Disstribucion de los mensajes = %+v", distribucion)
+}
+
+func TestDirectExchange1ToN(t *testing.T) {
+	opts := OptionsDefault()
+	opts.routeKeys = []string{"info"} // uso 1 sola para que no sea todo doble
+	ex, err := CreateExchange("TestDirectExchange1ToN", opts)
+	if err != nil {
+		panic("Creation of the exchange not sucessful.")
+	}
+
+	N := 3  //consumidores
+	M := 18 //mensajes
+
+	// LOCURA: el tipo de canal struct sirve cuando no me interesa mandar datos, sino un aviso de che loco aca paso algo
+	//canal para avisar que un consumidor esta listo
+	// buffer de tamaño N, hago hasta N escrituras
+	ready := make(chan struct{}, N)
+	//canal para saber si se arranco
+	start := make(chan struct{})
+	// aviso por cada mensaje recibido
+	// este es de tipo string porque voy a mandar el id del consumer
+	// buffer de tamaño M, hago hasta M escrituras
+	lecturaDeMensaje := make(chan string, M)
+
+	// para cada consumidor go routine
+	for i := range N {
+		id := fmt.Sprintf("consumidor%d", i+1)
+		go func(id string) {
+			msgs, _ := ex.StartConsuming()
+			ready <- struct{}{}
+			<-start
+			for range *(*(msgs)) {
+				lecturaDeMensaje <- id
+			}
+		}(id)
+	}
+
+	for range N {
+		<-ready
+	}
+	close(start)
+
+	// mando M mensajes
+	for range M {
+		payload := []byte("TestMessage")
+		sendErr := ex.Send(payload)
+		if sendErr != 0 {
+			panic("Error: failed to send a message to the exchange")
+		}
+
+	}
+
+	distribucion := map[string]int{}
+	for range M {
+		distribucion[<-lecturaDeMensaje]++
+	}
+
+	_ = ex.StopConsuming()
+	_ = ex.Close()
+
+	// verifico que hayan llegado entre todos los consumers exactamente M mensajes
+	total := 0
+	for _, cantidad := range distribucion {
+		total += cantidad
+	}
+	if total != M {
+		panic("No llegaron los M mensajes enviados")
+	}
+	// verifico que haya llegado al menos 1 mensaje a cada consumidor
 	for _, cantidadMensajes := range distribucion {
 		if cantidadMensajes == 0 {
 			panic("Hay un consumer que NO recibio nada")
