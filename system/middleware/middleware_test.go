@@ -89,8 +89,8 @@ func TestDirectExchange1To1(t *testing.T) {
 				panic("The sent message does not match with the received message.")
 			}
 
-			received = received + 1   // Una vez que recibo todo lo que espero corto
-			if received == expected { // PORQUE NO HAY WHILE EN GO ME HACE MAL
+			received = received + 1
+			if received == expected {
 				_ = exchange.StopConsuming()
 				break
 			}
@@ -115,85 +115,77 @@ func TestDirectExchange1To1(t *testing.T) {
 }
 
 func TestWorkingQueue1ToN(t *testing.T) {
-	q, err := CreateQueue("TestWorkingQueue1ToN", ChannelOptionsDefault())
+	queue, err := CreateQueue("TestWorkingQueue1ToN", ChannelOptionsDefault())
 	if err != nil {
 		panic("Creation of the queue not sucessful.")
 	}
 
-	N := 3  //consumidores
-	M := 18 //mensajes
+	N := 3  // Consumidores
+	M := 18 // Mensajes
 
-	// LOCURA: el tipo de canal struct sirve cuando no me interesa mandar datos, sino un aviso de che loco aca paso algo
-
-	//canal para avisar que un consumidor esta listo
-	// buffer de tamaño N, hago hasta N escrituras
+	// Consumidor listo
 	ready := make(chan struct{}, N)
-	//canal para saber si se arranco
+	// Sincronizacion para consumir
 	start := make(chan struct{})
-	// aviso por cada mensaje recibido
-	// este es de tipo string porque voy a mandar el id del consumer
-	// buffer de tamaño M, hago hasta M escrituras
-	lecturaDeMensaje := make(chan string, M)
+	// Aviso de consumicion
+	consumer := make(chan string, M)
 
-	// para cada consumidor se lanza una go routine
+	// Go routine para cada consumidor
 	for i := range N {
-		// para mas facil lectura
 		id := fmt.Sprintf("consumidor%d", i+1)
-		//
 		go func(id string) {
-			msgs, _ := q.StartConsuming()
-			//aviso que ya arranque a consumir
+			msgs, _ := queue.StartConsuming()
+			// Aviso de consumidor listo
 			ready <- struct{}{}
-			// espero a que todos arranquen
+			// Sincronizacion de arranque
 			<-start
-			// consumo todo y por cada mensaje mando mi id al canal
+			// Se consumen todos los mensajes y se envía cada consumición
 			for range *(*(msgs)) {
-				lecturaDeMensaje <- id
+				consumer <- id
 			}
 		}(id)
 	}
 
-	// esperar a que estén listos
+	// Se espera a que todos estén listos para arrancar
 	for range N {
 		<-ready
 	}
-	//cuando tengo a todos ready, todas las go routines se desbloquean en el <-start
+	// Cuando están todos listos, arrancan en <-start
 	close(start)
 
-	// publico los M mensajes
+	// Se publican los M mensajes
 	for range M {
 		payload := []byte("TestMessage")
-		sendErr := q.Send(payload)
+		sendErr := queue.Send(payload)
 		if sendErr != 0 {
 			panic("Error: failed to send a message to the queue")
 		}
 
 	}
 
-	// me guardo quien va recibiendo mensajes
-	distribucion := map[string]int{}
+	// Guardo quién va recibiendo mensajes
+	distribution := map[string]int{}
 	for range M {
-		//en este map voy sumando cuando got tiene un id
-		distribucion[<-lecturaDeMensaje]++
+		distribution[<-consumer]++
 	}
 
-	_ = q.Close()
+	_ = queue.Close()
 
-	// verifico que hayan llegado entre todos los consumers exactamente M mensajes
+	// Verifico que hayan llegado entre todos los consumers exactamente M mensajes
 	total := 0
-	for _, cantidad := range distribucion {
-		total += cantidad
+	for _, c := range distribution {
+		total += c
 	}
 	if total != M {
 		panic("No llegaron los M mensajes enviados")
 	}
-	// verifico que haya llegado al menos 1 mensaje a cada consumidor
-	for _, cantidadMensajes := range distribucion {
-		if cantidadMensajes == 0 {
+	// Verifico que haya llegado al menos 1 mensaje a cada consumidor
+	for _, c := range distribution {
+		if c == 0 {
 			panic("Hay un consumer que NO recibio nada")
 		}
 	}
-	fmt.Printf("Disstribucion de los mensajes = %+v", distribucion)
+	fmt.Printf("Disstribucion de los mensajes = %+v", distribution)
 }
 
 func TestDirectExchange1ToN(t *testing.T) {
@@ -204,39 +196,40 @@ func TestDirectExchange1ToN(t *testing.T) {
 		panic("Creation of the exchange not sucessful.")
 	}
 
-	N := 3  //consumidores
-	M := 18 //mensajes
+	N := 3  // Consumidores
+	M := 18 // Mensajes
 
-	// LOCURA: el tipo de canal struct sirve cuando no me interesa mandar datos, sino un aviso de che loco aca paso algo
-	//canal para avisar que un consumidor esta listo
-	// buffer de tamaño N, hago hasta N escrituras
+	// Consumidor listo
 	ready := make(chan struct{}, N)
-	//canal para saber si se arranco
+	// Sincronizacion para consumir
 	start := make(chan struct{})
-	// aviso por cada mensaje recibido
-	// este es de tipo string porque voy a mandar el id del consumer
-	// buffer de tamaño M, hago hasta M escrituras
-	lecturaDeMensaje := make(chan string, M)
+	// Aviso de consumicion
+	consumer := make(chan string, M)
 
-	// para cada consumidor go routine
+	// Go routine para cada consumidor
 	for i := range N {
 		id := fmt.Sprintf("consumidor%d", i+1)
 		go func(id string) {
 			msgs, _ := ex.StartConsuming()
+			// Aviso de consumidor listo
 			ready <- struct{}{}
+			// Sincronizacion de arranque
 			<-start
+			// Se consumen todos los mensajes y se envía cada consumición
 			for range *(*(msgs)) {
-				lecturaDeMensaje <- id
+				consumer <- id
 			}
 		}(id)
 	}
 
+	// Se espera a que todos estén listos para arrancar
 	for range N {
 		<-ready
 	}
+	// Cuando están todos listos, arrancan en <-start
 	close(start)
 
-	// mando M mensajes
+	// Se publican los M mensajes
 	for range M {
 		payload := []byte("TestMessage")
 		sendErr := ex.Send(payload)
@@ -246,27 +239,27 @@ func TestDirectExchange1ToN(t *testing.T) {
 
 	}
 
-	distribucion := map[string]int{}
+	// Guardo quién va recibiendo mensajes
+	distribution := map[string]int{}
 	for range M {
-		distribucion[<-lecturaDeMensaje]++
+		distribution[<-consumer]++
 	}
 
-	_ = ex.StopConsuming()
 	_ = ex.Close()
 
-	// verifico que hayan llegado entre todos los consumers exactamente M mensajes
+	// Verifico que hayan llegado entre todos los consumers exactamente M mensajes
 	total := 0
-	for _, cantidad := range distribucion {
-		total += cantidad
+	for _, c := range distribution {
+		total += c
 	}
 	if total != M {
 		panic("No llegaron los M mensajes enviados")
 	}
-	// verifico que haya llegado al menos 1 mensaje a cada consumidor
-	for _, cantidadMensajes := range distribucion {
-		if cantidadMensajes == 0 {
+	// Verifico que haya llegado al menos 1 mensaje a cada consumidor
+	for _, c := range distribution {
+		if c == 0 {
 			panic("Hay un consumer que NO recibio nada")
 		}
 	}
-	fmt.Printf("Disstribucion de los mensajes = %+v", distribucion)
+	fmt.Printf("Disstribucion de los mensajes = %+v", distribution)
 }
