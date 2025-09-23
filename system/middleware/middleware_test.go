@@ -61,7 +61,7 @@ func TestDirectExchange1To1(t *testing.T) {
 
 	exchange, err := CreateExchange("TestDirectExchange1To1", opts)
 	if err != nil {
-		t.Fatalf("Creation of the exchange not successful: %v", err)
+		panic("Creation of the exchange not sucessful.")
 	}
 
 	finish := make(chan bool)
@@ -104,7 +104,7 @@ func TestDirectExchange1To1(t *testing.T) {
 	sendErr := exchange.Send(payload)
 
 	if sendErr != 0 {
-		t.Fatalf("Error: failed to send a message to the exchange (err=%v)", sendErr)
+		panic("Error: failed to send a message to the exchange")
 	}
 
 	started <- true
@@ -114,52 +114,82 @@ func TestDirectExchange1To1(t *testing.T) {
 	exchange.Close()
 }
 
-// func TestWorkingQueue1ToN(t *testing.T) {
-// 	options := OptionsDefault()
-// 	queue, err := CreateQueue("TestWorkingQueue1ToN", options)
-// 	if err != nil {
-// 		panic("Creation of the queue not sucessful.")
+func TestWorkingQueue1ToN(t *testing.T) {
+	q, err := CreateQueue("TestWorkingQueue1ToN", ChannelOptionsDefault())
+	if err != nil {
+		panic("Creation of the queue not sucessful.")
+	}
 
-// 	}
+	N := 3  //consumidores
+	M := 12 //mensajes
 
-// 	// We create a consumer on a different go routine
-// 	finish := make(chan bool)
-// 	started := make(chan bool)
-// 	go func() {
-// 		msgs, _ := queue.StartConsuming()
+	// LOCURA: el tipo de canal struct sirve cuando no me interesa mandar datos, sino un aviso de che loco aca paso algo
 
-// 		hasStarted := false
-// 		for message := range *(*(msgs)) {
-// 			// Starts reading messages
-// 			if hasStarted == false {
-// 				hasStarted = <-started
-// 			}
+	//canal para avisar que un consumidor esta listo
+	// buffer de tamaño N, hago hasta N escrituras
+	ready := make(chan struct{}, N)
+	//canal para saber si se arranco
+	start := make(chan struct{})
+	// aviso por cada mensaje recibido
+	// este es de tipo string porque voy a mandar el id del consumer
+	// buffer de tamaño M, hago hasta M escrituras
+	lecturaDeMensaje := make(chan string, M)
 
-// 			text := string(message.Body)
-// 			fmt.Printf("Received package %s\n", text)
+	// para cada consumidor se lanza una go routine
+	for i := range N {
+		// para mas facil lectura
+		id := fmt.Sprintf("consumidor%d", i+1)
+		//
+		go func(id string) {
+			msgs, _ := q.StartConsuming()
+			//aviso que ya arranque a consumir
+			ready <- struct{}{}
+			// espero a que todos arranquen
+			<-start
+			// consumo todo y por cada mensaje mando mi id al canal
+			for range *(*(msgs)) {
+				lecturaDeMensaje <- id
+			}
+		}(id)
+	}
 
-// 			if text != "TestMessage" {
-// 				panic("The sent message does not match with the received message.")
-// 			}
+	// esperar a que estén listos
+	for range N {
+		<-ready
+	}
+	//cuando tengo a todos ready, todas las go routines se desbloquean en el <-start
+	close(start)
 
-// 		}
+	// publico los M mensajes
+	for range M {
+		payload := []byte("TestMessage")
+		sendErr := q.Send(payload)
+		if sendErr != 0 {
+			panic("Error: failed to send a message to the queue")
+		}
 
-// 		finish <- true
-// 	}()
+	}
 
-// 	info := []byte("TestMessage")
-// 	new_err := queue.Send(info)
+	// me guardo quien va recibiendo mensajes
+	distribucion := map[string]int{}
+	for range M {
+		//en este map voy sumando cuando got tiene un id
+		distribucion[<-lecturaDeMensaje]++
+	}
 
-// 	// Already packet sent to the receiver
-// 	started <- true
+	_ = q.Close()
 
-// 	if new_err != 0 {
-// 		panic("Error: failed to send a message to the queue")
-// 	}
-
-// 	// We close the queue in order for the go routine to end
-// 	queue.Close()
-
-// 	// We wait for the go routine to finish
-// 	<-finish
-// }
+	total := 0
+	for _, cantidad := range distribucion {
+		total += cantidad
+	}
+	if total != M {
+		panic("No llegaron los M mensajes enviados")
+	}
+	for _, cantidadMensajes := range distribucion {
+		if cantidadMensajes == 0 {
+			panic("Hay un consumer que NO recibio nada")
+		}
+	}
+	fmt.Printf("Disstribucion de los mensajes = %+v", distribucion)
+}
