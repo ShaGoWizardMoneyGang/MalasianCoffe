@@ -40,7 +40,7 @@ var (
 			layout := "2006-01-02 15:04:05" // Go's reference layout
 			t, _ := time.Parse(layout, data[5])
 			if t.Year() >= 2024 && t.Year() <= 2025 {
-				final += data[1] + "," + data[2] + "," + data[5] + "\n"
+				final += data[1] + "," + data[4] + "," + data[5] + "\n"
 			}
 		}
 		return final
