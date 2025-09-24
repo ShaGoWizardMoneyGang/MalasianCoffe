@@ -71,7 +71,7 @@ func TestFilterMapperQuery2b(t *testing.T) {
 
 	// Create a new worker using the filter mapper options
 	worker := FilterMapper{
-		Function: filterFunction2a,
+		Function: filterFunction2b,
 	}
 
 	// Process the packet using the worker
@@ -81,6 +81,33 @@ func TestFilterMapperQuery2b(t *testing.T) {
 	// Validate the result
 	expected := packet.Packet{
 		Payload: []byte("8,10.0,2025-05-01 10:51:41\n3,24.0,2024-07-01 10:53:42\n"),
+	}
+	if result != string(expected.Payload) {
+		t.Fatalf("unexpected result: got %+v", result)
+	}
+}
+
+func TestFilterMapperQuery3Store(t *testing.T) {
+	// Mock data for testing
+	data := []byte("1,G Coffee @ USJ 89q,Jalan Dewan Bahasa 5/9,50998,USJ 89q,Kuala Lumpur,3.117134,101.615027\n2,G Coffee @ Kondominium Putra,Jln Yew 6X,63826,Kondominium Putra,Selangor Darul Ehsan,2.959571,101.51772")
+	fmt.Println("Data to be processed: \n", string(data))
+	// Create a Packet instance
+	pkt := packet.Packet{
+		Payload: data,
+	}
+
+	// Create a new worker using the filter mapper options
+	worker := FilterMapper{
+		Function: filterFunction3Store,
+	}
+
+	// Process the packet using the worker
+	result := string(worker.Process(pkt).Payload)
+	fmt.Println("Processed result: \n", result)
+
+	// Validate the result
+	expected := packet.Packet{
+		Payload: []byte("1,G Coffee @ USJ 89q\n2,G Coffee @ Kondominium Putra\n"),
 	}
 	if result != string(expected.Payload) {
 		t.Fatalf("unexpected result: got %+v", result)
