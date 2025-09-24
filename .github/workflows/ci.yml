@@ -11,6 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install rabbitmq-server -y --fix-missing
+          sudo systemctl start rabbitmq-server
+
       - name: general sanity checks
         run: |
           make lint
@@ -20,6 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install rabbitmq-server -y --fix-missing
+          sudo systemctl start rabbitmq-server
+
       - name: build the server
         run: |
           make build-server
@@ -29,6 +41,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install rabbitmq-server -y --fix-missing
+          sudo systemctl start rabbitmq-server
+
       - name: build the client
         run: |
           make build-client
@@ -41,6 +59,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get install rabbitmq-server -y --fix-missing
+          sudo systemctl start rabbitmq-server
+
       - name: build
         run: |
           make build
@@ -50,6 +73,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install rabbitmq-server -y --fix-missing
+          sudo systemctl start rabbitmq-server
 
       - name: Check tests
         run: |
