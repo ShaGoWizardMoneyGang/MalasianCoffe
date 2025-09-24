@@ -29,9 +29,24 @@ var (
 		}
 		return final
 	}
-	filterFunction2 = "Option2"
-	Option3         = "Option3"
-	Option4         = "Option4"
+	filterFunction2a = func(input string) string {
+		lines := strings.Split(input, "\n")
+		final := ""
+		for _, line := range lines {
+			data := strings.Split(line, ",")
+			if len(data) < 6 {
+				panic("Invalid data format")
+			}
+			layout := "2006-01-02 15:04:05" // Go's reference layout
+			t, _ := time.Parse(layout, data[5])
+			if t.Year() >= 2024 && t.Year() <= 2025 {
+				final += data[1] + "," + data[2] + "," + data[5] + "\n"
+			}
+		}
+		return final
+	}
+	Option3 = "Option3"
+	Option4 = "Option4"
 )
 
 type FilterMapper struct {
