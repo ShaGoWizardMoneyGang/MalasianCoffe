@@ -40,12 +40,39 @@ var (
 			layout := "2006-01-02 15:04:05" // Go's reference layout
 			t, _ := time.Parse(layout, data[5])
 			if t.Year() >= 2024 && t.Year() <= 2025 {
+				final += data[1] + "," + data[2] + "," + data[5] + "\n"
+			}
+		}
+		return final
+	}
+	filterFunction2b = func(input string) string {
+		lines := strings.Split(input, "\n")
+		final := ""
+		for _, line := range lines {
+			data := strings.Split(line, ",")
+			if len(data) < 6 {
+				panic("Invalid data format")
+			}
+			layout := "2006-01-02 15:04:05" // Go's reference layout
+			t, _ := time.Parse(layout, data[5])
+			if t.Year() >= 2024 && t.Year() <= 2025 {
 				final += data[1] + "," + data[4] + "," + data[5] + "\n"
 			}
 		}
 		return final
 	}
-	Option3 = "Option3"
+	filterFunction3Store = func(input string) string {
+		lines := strings.Split(input, "\n")
+		final := ""
+		for _, line := range lines {
+			data := strings.Split(line, ",")
+			if len(data) < 8 {
+				panic("Invalid data format")
+			}
+			final += data[0] + "," + data[1] + "\n"
+		}
+		return final
+	}
 	Option4 = "Option4"
 )
 
