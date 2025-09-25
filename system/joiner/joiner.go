@@ -12,7 +12,7 @@ var (
 	// Recibe year_half_created_at, store_id, tpv
 	// joinea con stores.csv cargado en memoria con store_id, store_name
 	// y me devuelve year_half_created_at, store_name, tpv
-	joinerFunctionQuery2 joinerOptions = func(j *Joiner, input string) string {
+	joinerFunctionQuery3 joinerOptions = func(j *Joiner, input string) string {
 		lines := strings.Split(input, "\n")
 		lines = lines[:len(lines)-1]
 		var b strings.Builder

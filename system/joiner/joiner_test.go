@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-func TestJoinByStoreNameQuery2(t *testing.T) {
+func TestJoinByStoreNameQuery3(t *testing.T) {
 	j := &Joiner{
-		Function: joinerFunctionQuery2,
+		Function: joinerFunctionQuery3,
 		Stores: map[string]string{
 			"1":  "G Coffee @ USJ 89q",
 			"2":  "G Coffee @ Kondominium Putra",
