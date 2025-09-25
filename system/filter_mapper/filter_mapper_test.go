@@ -211,6 +211,41 @@ func TestFilterMapperQuery3Transactions(t *testing.T) {
 	}
 }
 
-func TestFilterMapperQuery4(t *testing.T) {
+func TestFilterMapperQuery4Transactions(t *testing.T) {
+	// Mock data for testing
+	transactionsRaw := []byte(
+		"2e0b6369-f809-4de3-a2b5-eb932efe2f7a,1,5,,94144.0,40.0,0.0,40.0,2025-03-01 07:00:04\n" +
+			"7d0a474d-62f4-442a-96b6-a5df2bda8832,7,1,,331213.0,33.0,0.0,33.0,2025-07-01 07:00:02\n" +
+			"48968d91-dd5a-47f2-8646-42f8b587932f,3,1,,,30.0,0.0,30.0,2023-07-01 07:01:54",
+	)
+	fmt.Println("Data to be processed: \n", string(transactionsRaw))
+	// Create a Packet instance
+	transactionsRawPkt := packet.Packet{
+		Payload: transactionsRaw,
+	}
+	worker1 := FilterMapper{
+		Function: filterByYearCommon,
+	}
 
+	pkt := worker1.Process(transactionsRawPkt)
+
+	// Create a new worker using the filter mapper options
+	worker := FilterMapper{
+		Function: filterFunction4Transactions,
+	}
+
+	// Process the packet using the worker
+	result := string(worker.Process(pkt).Payload)
+	fmt.Println("Processed result: \n", result)
+
+	// Validate the result
+	expected := packet.Packet{
+		Payload: []byte(
+			"2e0b6369-f809-4de3-a2b5-eb932efe2f7a,1,94144.0\n" +
+				"7d0a474d-62f4-442a-96b6-a5df2bda8832,7,331213.0\n",
+		),
+	}
+	if result != string(expected.Payload) {
+		t.Fatalf("unexpected result: got %+v, expected %+v", result, string(expected.Payload))
+	}
 }

@@ -106,13 +106,27 @@ var (
 			t, _ := time.Parse(layout, data[8])
 			amount, _ := strconv.ParseFloat(data[7], 64)
 			amount = math.Round(amount*10) / 10
-			if t.Year() >= 2024 && t.Year() <= 2025 && t.Hour() >= 6 && t.Hour() <= 23 {
+			if t.Hour() >= 6 && t.Hour() <= 23 {
 				final += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n"
 			}
 		}
 		return final
 	}
-	Option4 = "Option4"
+	filterFunction4Transactions = func(input string) string {
+		lines := strings.Split(input, "\n")
+		final := ""
+		for _, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			data := strings.Split(line, ",")
+			if len(data) < 9 {
+				panic("Invalid data format")
+			}
+			final += data[0] + "," + data[1] + "," + data[4] + "\n"
+		}
+		return final
+	}
 )
 
 type FilterMapper struct {
