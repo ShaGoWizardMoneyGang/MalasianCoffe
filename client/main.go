@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
+
 	// "io"
 	"os"
 
@@ -17,9 +19,25 @@ const (
 	MAX_BATCH_SIZE int  = 8000
 )
 
-func createPackagesFrom(dir string, dirID uint, session_ID uint32, listen_addr string) {
+func sendToSocket(conn *net.Conn, data []byte) error {
+	length := len(data)
+
+	var sent = 0
+	var err error
+	for offset := 0 ; offset < length ; offset += sent {
+		sent, err = (*conn).Write(data[offset:])
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func createPackagesFrom(dir string, dirID uint, session_ID uint32, listen_addr string, send_addr *net.Conn) (error) {
 	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr)
 	payloadBuffer := make([]byte, MAX_BATCH_SIZE)
+	used_size := 0
 
 	entries, err := os.ReadDir(dir)
 
@@ -35,7 +53,7 @@ func createPackagesFrom(dir string, dirID uint, session_ID uint32, listen_addr s
 		}
 		csv_file, err := os.Open(dir + "/" + file.Name())
 		if err != nil {
-			return packet.Packet{}, errors.New(fmt.Sprintf("Couldn't open csv file in dir {}, because of {}", dir, err))
+			return errors.New(fmt.Sprintf("Couldn't open csv file in dir {}, because of {}", dir, err))
 		}
 		csv_reader := bufio.NewScanner(csv_file);
 		{
@@ -46,15 +64,26 @@ func createPackagesFrom(dir string, dirID uint, session_ID uint32, listen_addr s
 		for csv_reader.Scan() {
 			register := csv_reader.Text()
 			register_b := []byte(register)
-			if len(payloadBuffer) + len(register_b) > MAX_BATCH_SIZE {
+			if used_size + len(register_b) > MAX_BATCH_SIZE {
 				// Batch full, send it and clear the buffer
-				packetBuilder.CreatePacket(payloadBuffer, false)
+				packet, err := packetBuilder.CreatePacket(payloadBuffer, false)
+				if err != nil {
+					return err
+				}
+				sendToSocket(send_addr, packet.Serialize())
 				payloadBuffer = []byte{0}
+				used_size = 0
 			}
 			payloadBuffer = append(payloadBuffer, register_b...)
+			used_size += len(register_b)
 		}
 	}
-     packetBuilder.CreatePacket(payloadBuffer, true)
+     packet, err := packetBuilder.CreatePacket(payloadBuffer, true)
+	if err != nil {
+		return err
+	}
+	sendToSocket(send_addr, packet.Serialize())
+	return nil
 }
 
 func sendPacket(packet packet.Packet, addr string) {
@@ -64,7 +93,10 @@ func sendPacket(packet packet.Packet, addr string) {
 func main() {
 	// Directory with all dataset subdirectories
 	dataset_directory := os.Args[1]
+
 	addr := os.Args[2]
+	conn, err := net.Dial("tcp", addr)
+
 	listen_addr := os.Args[3]
 
 	// TODO: Obtener del gateway
@@ -83,12 +115,11 @@ func main() {
 			continue
 		}
 		subDirPath := dataset_directory + entry.Name()
-		packet, err := createPackagesFrom(subDirPath, dirID, session_id, listen_addr)
+		err := createPackagesFrom(subDirPath, dirID, session_id, listen_addr, &conn)
 		if err != nil {
 			 panic(err)
 		}
 
-		sendPacket(packet, addr)
 		dirID += 1
 	}
 	fmt.Println("hello world")

@@ -45,6 +45,10 @@ type Packet struct {
 	payload []byte
 }
 
+func (p *Packet) Serialize() ([]byte) {
+	panic("NOT YET IMPLEMENTED")
+}
+
 
 // Struct usado para crear varios packets de un mismo directorio
 type PacketBuilder struct {
