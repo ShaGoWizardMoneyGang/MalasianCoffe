@@ -38,3 +38,67 @@ func TestJoinByStoreNameQuery3(t *testing.T) {
 		panic("LO que salio no coincide con lo esperado")
 	}
 }
+
+func TestJoinByItemNameQuery2Quantity(t *testing.T) {
+	j := &Joiner{
+		Function: joinerFunctionQuery2Quantity,
+		MenuItems: map[string]string{
+			"1": "Espresso",
+			"2": "Americano",
+			"3": "Latte",
+			"4": "Cappuccino",
+			"5": "Flat White",
+			"6": "Mocha",
+			"7": "Hot Chocolate",
+			"8": "Matcha Latte",
+		},
+	}
+
+	transaction_items := "2024-12,2,150439\n" +
+		"2025-01,3,150392\n" +
+		"2025-03,6,155677\n"
+
+	paqueteSalida := j.Process(packet.Packet{Payload: []byte(transaction_items)})
+	salida := string(paqueteSalida.Payload)
+
+	esperado := "" +
+		"2024-12,Americano,150439\n" +
+		"2025-01,Latte,150392\n" +
+		"2025-03,Mocha,155677\n"
+
+	if esperado != salida {
+		panic("LO que salio no coincide con lo esperado")
+	}
+}
+
+func TestJoinByItemNameQuery2Subtotal(t *testing.T) {
+	j := &Joiner{
+		Function: joinerFunctionQuery2Subtotal,
+		MenuItems: map[string]string{
+			"1": "Espresso",
+			"2": "Americano",
+			"3": "Latte",
+			"4": "Cappuccino",
+			"5": "Flat White",
+			"6": "Mocha",
+			"7": "Hot Chocolate",
+			"8": "Matcha Latte",
+		},
+	}
+
+	transaction_items := "2024-12,2,2990050.0\n" +
+		"2025-01,3,3104830\n" +
+		"2025-03,6,3002390.0\n"
+
+	paqueteSalida := j.Process(packet.Packet{Payload: []byte(transaction_items)})
+	salida := string(paqueteSalida.Payload)
+
+	esperado := "" +
+		"2024-12,Americano,2990050.0\n" +
+		"2025-01,Latte,3104830\n" +
+		"2025-03,Mocha,3002390.0\n"
+
+	if esperado != salida {
+		panic("LO que salio no coincide con lo esperado")
+	}
+}

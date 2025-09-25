@@ -9,6 +9,9 @@ import (
 type joinerOptions func(*Joiner, string) string
 
 var (
+
+	// estas 3 funciones se pueden modularizar, las dejo asi para diferenciar proceso de cada query
+
 	// Recibe year_half_created_at, store_id, tpv
 	// joinea con stores.csv cargado en memoria con store_id, store_name
 	// y me devuelve year_half_created_at, store_name, tpv
@@ -27,12 +30,50 @@ var (
 		}
 		return b.String()
 	}
+
+	// Recibe year_month_created_at, item_id, quantity
+	// joinea con stores.csv cargado en memoria con item_id, item_name
+	// y me devuelve year_month_created_at, item_name, quantity
+	joinerFunctionQuery2Quantity joinerOptions = func(j *Joiner, input string) string {
+		lines := strings.Split(input, "\n")
+		lines = lines[:len(lines)-1]
+		var b strings.Builder
+		for _, r := range lines {
+			cols := strings.Split(r, ",")
+			if len(cols) < 3 {
+				panic("No hay 3 columnas como se esperaba")
+			}
+			month, itemID, quantity := cols[0], cols[1], cols[2]
+			itemName := j.MenuItems[itemID]
+			fmt.Fprintf(&b, "%s,%s,%s\n", month, itemName, quantity)
+		}
+		return b.String()
+	}
+
+	// Recibe year_month_created_at, item_id, subtotal
+	// joinea con menu_items.csv cargado en memoria con item_id, item_name
+	// y me devuelve year_month_created_at, item_name, subtotal
+	joinerFunctionQuery2Subtotal joinerOptions = func(j *Joiner, input string) string {
+		lines := strings.Split(input, "\n")
+		lines = lines[:len(lines)-1]
+		var b strings.Builder
+		for _, r := range lines {
+			cols := strings.Split(r, ",")
+			if len(cols) < 3 {
+				panic("No hay 3 columnas como se esperaba")
+			}
+			month, itemID, quantity := cols[0], cols[1], cols[2]
+			storeName := j.MenuItems[itemID]
+			fmt.Fprintf(&b, "%s,%s,%s\n", month, storeName, quantity)
+		}
+		return b.String()
+	}
 )
 
 type Joiner struct {
-	Function joinerOptions
-	Stores   map[string]string // aca me voy a guardar en memoria las tablas chicas, por
-	// ahora se llama stores
+	Function  joinerOptions
+	Stores    map[string]string // aca me voy a guardar en memoria las tablas chica
+	MenuItems map[string]string
 }
 
 func (c *Joiner) Process(pkt packet.Packet) packet.Packet {
