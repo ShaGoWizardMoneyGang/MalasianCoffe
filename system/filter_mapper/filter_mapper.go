@@ -73,6 +73,24 @@ var (
 		}
 		return final
 	}
+	filterFunction3Transactions = func(input string) string {
+		lines := strings.Split(input, "\n")
+		final := ""
+		for _, line := range lines {
+			data := strings.Split(line, ",")
+			if len(data) < 9 {
+				panic("Invalid data format")
+			}
+			layout := "2006-01-02 15:04:05" // Go's reference layout
+			t, _ := time.Parse(layout, data[8])
+			amount, _ := strconv.ParseFloat(data[7], 64)
+			amount = math.Round(amount*10) / 10
+			if t.Year() >= 2024 && t.Year() <= 2025 && t.Hour() >= 6 && t.Hour() <= 23 {
+				final += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n"
+			}
+		}
+		return final
+	}
 	Option4 = "Option4"
 )
 
