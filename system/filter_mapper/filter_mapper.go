@@ -11,7 +11,7 @@ import (
 type filterMapperOptions func(string) string
 
 var (
-	filterFunction1 filterMapperOptions = func(input string) string {
+	filterByYearCommon filterMapperOptions = func(input string) string {
 		lines := strings.Split(input, "\n")
 		final := ""
 		for _, line := range lines {
@@ -21,9 +21,27 @@ var (
 			}
 			layout := "2006-01-02 15:04:05" // Go's reference layout
 			t, _ := time.Parse(layout, data[8])
+			if t.Year() >= 2024 && t.Year() <= 2025 {
+				final += line + "\n"
+			}
+		}
+		return final
+	}
+	filterFunction1 filterMapperOptions = func(input string) string {
+		lines := strings.Split(input, "\n")
+
+		final := ""
+		for _, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			data := strings.Split(line, ",")
+			if len(data) < 9 {
+				panic("Invalid data format")
+			}
 			amount, _ := strconv.ParseFloat(data[7], 64)
 			amount = math.Round(amount*10) / 10
-			if t.Year() >= 2024 && t.Year() <= 2025 && amount >= 15.0 {
+			if amount >= 15.0 {
 				final += data[0] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "\n"
 			}
 		}
@@ -77,6 +95,9 @@ var (
 		lines := strings.Split(input, "\n")
 		final := ""
 		for _, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
 			data := strings.Split(line, ",")
 			if len(data) < 9 {
 				panic("Invalid data format")
