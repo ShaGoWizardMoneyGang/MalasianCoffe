@@ -2,6 +2,7 @@ package packet
 
 import (
 	"errors"
+	"fmt"
 
 	"strconv"
 )
@@ -46,7 +47,8 @@ type Packet struct {
 }
 
 func (p *Packet) Serialize() ([]byte) {
-	panic("NOT YET IMPLEMENTED")
+	fmt.Println("NOT YET IMPLEMENTED")
+	return p.payload
 }
 
 

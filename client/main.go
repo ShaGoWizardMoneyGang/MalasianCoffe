@@ -86,10 +86,6 @@ func createPackagesFrom(dir string, dirID uint, session_ID uint32, listen_addr s
 	return nil
 }
 
-func sendPacket(packet packet.Packet, addr string) {
-	
-}
-
 func main() {
 	// Directory with all dataset subdirectories
 	dataset_directory := os.Args[1]
