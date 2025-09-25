@@ -155,7 +155,7 @@ func TestFilterMapperQuery3Store(t *testing.T) {
 
 	// Create a new worker using the filter mapper options
 	mapperStoreIdName := FilterMapper{
-		Function: filterFunction3Store,
+		Function: mapStoreIdAndName,
 	}
 
 	// Process the packet using the worker
@@ -243,6 +243,40 @@ func TestFilterMapperQuery4Transactions(t *testing.T) {
 		Payload: []byte(
 			"2e0b6369-f809-4de3-a2b5-eb932efe2f7a,1,94144.0\n" +
 				"7d0a474d-62f4-442a-96b6-a5df2bda8832,7,331213.0\n",
+		),
+	}
+	if result != string(expected.Payload) {
+		t.Fatalf("unexpected result: got %+v, expected %+v", result, string(expected.Payload))
+	}
+}
+
+func TestFilterMapperQuery4Store(t *testing.T) {
+	//es trivial porque hace lo mismo que el de query 3, hay que reutilizar la función y/o los resultados. Ojo.
+}
+
+func TestFilterMapperQuery4UsersBirthdates(t *testing.T) {
+	usersRaw := []byte(
+		"9,female,1984-08-15,2023-07-01 12:33:40\n" +
+			"8,female,2006-06-16,2023-07-01 12:32:21\n",
+	)
+	fmt.Println("Data to be processed: \n", string(usersRaw))
+	// Create a Packet instance
+	usersRawPkt := packet.Packet{
+		Payload: usersRaw,
+	}
+	// Create a new worker using the filter mapper options
+	worker := FilterMapper{
+		Function: filterFunction4UsersBirthdates,
+	}
+	// Process the packet using the worker
+	result := string(worker.Process(usersRawPkt).Payload)
+	fmt.Println("Processed result: \n", result)
+
+	// Validate the result
+	expected := packet.Packet{
+		Payload: []byte(
+			"9,1984-08-15\n" +
+				"8,2006-06-16\n",
 		),
 	}
 	if result != string(expected.Payload) {

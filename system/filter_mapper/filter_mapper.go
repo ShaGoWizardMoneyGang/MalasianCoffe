@@ -79,7 +79,7 @@ var (
 		}
 		return final
 	}
-	filterFunction3Store = func(input string) string {
+	mapStoreIdAndName = func(input string) string {
 		lines := strings.Split(input, "\n")
 		final := ""
 		for _, line := range lines {
@@ -124,6 +124,21 @@ var (
 				panic("Invalid data format")
 			}
 			final += data[0] + "," + data[1] + "," + data[4] + "\n"
+		}
+		return final
+	}
+	filterFunction4UsersBirthdates = func(input string) string {
+		lines := strings.Split(input, "\n")
+		final := ""
+		for _, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			data := strings.Split(line, ",")
+			if len(data) < 4 {
+				panic("Invalid data format")
+			}
+			final += data[0] + "," + data[2] + "\n"
 		}
 		return final
 	}
