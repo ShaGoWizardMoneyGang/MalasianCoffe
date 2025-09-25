@@ -1,8 +1,5 @@
 package packet
 
-import (
-)
-
 // Formato:
 // String del estilo A.B.C.D...
 // Donde:
@@ -28,5 +25,5 @@ type Header struct {
 type Packet struct {
 	header Header
 
-	payload []byte
+	Payload []byte
 }
