@@ -1,9 +1,11 @@
 # TODO(fabri): emprolijar
 build: build-server build-client
 
-DATADIR=../dataset/
+DATADIR               ?=    ../dataset/
+GATEWAY_DIR           ?=    "localhost:9090"
+LISTEN_DIR            ?=    "localhost:9091"
 build-client:
-	cd client; go run main.go ${DATADIR}
+	cd client; go run main.go ${DATADIR} ${GATEWAY_DIR} ${LISTEN_DIR}
 
 build-server:
 	cd system; go run main.go

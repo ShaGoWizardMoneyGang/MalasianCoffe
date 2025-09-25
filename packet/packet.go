@@ -24,7 +24,8 @@ type Header struct {
 
 	packet_uuid PacketUuid
 
-	// TODO: esto potencialmente se puede guardar aparte en un nodo que guarde las IPS. No me gusta esa decision porque introducis comunicacion extra.
+	// TODO: esto potencialmente se puede guardar aparte en un nodo que guarde
+	// las IPS. No me gusta esa decision porque introducis comunicacion extra.
 	// La IP + puerto del cliente de la session
 	client_ip_port string
 }
