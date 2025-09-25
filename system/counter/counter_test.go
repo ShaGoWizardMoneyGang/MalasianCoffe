@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestCountByUserAndStore_Basic(t *testing.T) {
+func TestCountByUserAndStore(t *testing.T) {
 	// transaction_id,store_id,user_id
 	input := "2ae6d188-76c2-4095-b861-ab97d3cd9312,4,1038745.0\n" +
 		"7d0a474d-62f4-442a-96b6-a5df2bda8832,7,3296.0\n" +
