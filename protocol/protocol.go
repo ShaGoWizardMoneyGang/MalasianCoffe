@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
 type Values uint
@@ -14,6 +15,19 @@ const (
 	ValueUInteger64 Values = 1
 	ValueBool Values = 2
 )
+
+func typeName(indicator Values) string {
+	var type_of string
+	switch indicator {
+	case ValueString:
+		type_of = "string"
+	case ValueUInteger64:
+		type_of = "uint64"
+	case ValueBool:
+		type_of = "bool"
+	}
+	return type_of
+}
 
 // ================================= String ====================================
 func SerializeString(str string) ([]byte) {
@@ -27,20 +41,18 @@ func SerializeString(str string) ([]byte) {
 	buffer[0] = byte(ValueString)
 	binary.BigEndian.PutUint64(buffer[1:9], uint64(length))
 
-	for i := 0; i < length; i++ {
+	for i := range length {
 		current_byte := bytes[i]
 		buffer[i + 9] = current_byte
 	}
 
-	return bytes
+	return buffer
 }
-func DeserializeString(data *[]byte) (string, error) {
-	reader := bytes.NewReader((*data))
-
+func DeserializeString(reader *bytes.Reader) (string, error) {
 	var string_indicator [1]byte;
 	reader.Read(string_indicator[:])
 	if string_indicator[0] != byte(ValueString) {
-		return "", errors.New("Tried to deserialize uint64 when not uint64")
+		return "", fmt.Errorf("Tried to deserialize string it is %s", typeName(Values(string_indicator[0])))
 	}
 
 	var string_length [8]byte;
@@ -72,13 +84,11 @@ func SerializeUInteger64(i uint64) ([]byte) {
 	return buffer
 }
 
-func DeserializeUInteger64(data *[]byte) (uint64, error) {
-	reader := bytes.NewReader((*data))
-
+func DeserializeUInteger64(reader *bytes.Reader) (uint64, error) {
 	var integer_indicator [1]byte;
 	reader.Read(integer_indicator[:])
 	if integer_indicator[0] != byte(ValueUInteger64) {
-		return 0, errors.New("Tried to deserialize uint64 when not uint64")
+		return 0, errors.New("Tried to deserialize uint64 when not uint64. It is a {}")
 	}
 
 	var integer_length [1]byte;
@@ -119,9 +129,7 @@ func SerializeBool(b bool) ([]byte) {
 	return buffer
 }
 
-func DeserializeBool(data *[]byte) (bool, error) {
-	reader := bytes.NewReader((*data))
-
+func DeserializeBool(reader *bytes.Reader) (bool, error) {
 	var boolean_indicator [1]byte;
 	reader.Read(boolean_indicator[:])
 	if boolean_indicator[0] != byte(ValueBool) {

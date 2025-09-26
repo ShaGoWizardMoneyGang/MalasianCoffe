@@ -1,6 +1,7 @@
 package packet
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 )
@@ -13,20 +14,23 @@ func TestPacketSerialization(t *testing.T) {
 	};
 
 	header      := newHeader(23, packet_uuid, "localhost:9091")
-	payload     := []byte("extra territorium jus dicenti impune non paretur")
+	payload     := "extra territorium jus dicenti impune non paretur"
 
 	packet      := Packet {
 		header: header,
 		payload: payload,
 	}
-	fmt.Printf("{%v}\n", packet)
 
 	packet_serialized := packet.Serialize()
-	packet_deserialized, err := DeserializePackage(&packet_serialized)
+	reader := bytes.NewReader(packet_serialized)
+	packet_deserialized, err := DeserializePackage(reader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fmt.Printf("{%v}\n", packet)
-	fmt.Printf("{%v}\n", packet_deserialized)
+	if packet != packet_deserialized {
+		fmt.Printf("Before serialization: %v\n", packet)
+		fmt.Printf("After serialization: %v\n", packet_deserialized)
+		t.Fatal("ERROR: Packets differ")
+	}
 }

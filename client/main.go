@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	// "io"
 	"os"
@@ -36,8 +37,9 @@ func sendToSocket(conn *net.Conn, data []byte) error {
 
 func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr string, send_addr *net.Conn) (error) {
 	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr)
-	payloadBuffer := make([]byte, MAX_BATCH_SIZE)
-	used_size := 0
+	// payloadBuffer := make([]byte, MAX_BATCH_SIZE)
+	var payloadBuffer strings.Builder
+	payloadBuffer.Grow(MAX_BATCH_SIZE)
 
 	entries, err := os.ReadDir(dir)
 
@@ -62,23 +64,21 @@ func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr s
 		}
 
 		for csv_reader.Scan() {
-			register := csv_reader.Text()
-			register_b := []byte(register)
-			if used_size + len(register_b) > MAX_BATCH_SIZE {
+			register := csv_reader.Text() + "\n"
+			fmt.Print(register)
+			if payloadBuffer.Len() + len(register) > MAX_BATCH_SIZE {
 				// Batch full, send it and clear the buffer
-				packet, err := packetBuilder.CreatePacket(payloadBuffer, false)
+				packet, err := packetBuilder.CreatePacket(payloadBuffer.String(), false)
 				if err != nil {
 					return err
 				}
 				sendToSocket(send_addr, packet.Serialize())
-				payloadBuffer = []byte{0}
-				used_size = 0
+				payloadBuffer.Reset()
 			}
-			payloadBuffer = append(payloadBuffer, register_b...)
-			used_size += len(register_b)
+			payloadBuffer.WriteString(register)
 		}
 	}
-     packet, err := packetBuilder.CreatePacket(payloadBuffer, true)
+     packet, err := packetBuilder.CreatePacket(payloadBuffer.String(), true)
 	if err != nil {
 		return err
 	}

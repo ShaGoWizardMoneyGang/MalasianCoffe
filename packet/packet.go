@@ -1,6 +1,7 @@
 package packet
 
 import (
+	"bytes"
 	"errors"
 
 	"strconv"
@@ -28,12 +29,12 @@ func (pu *PacketUuid) serialize() ([]byte) {
 	return packet_b
 }
 
-func deserializePacketUuid(data *[]byte) (PacketUuid, error) {
-	uuid, error := protocol.DeserializeString(data)
+func deserializePacketUuid(reader *bytes.Reader) (PacketUuid, error) {
+	uuid, error := protocol.DeserializeString(reader)
 	if error != nil {
 		return PacketUuid{}, error
 	}
-	eof, error := protocol.DeserializeBool(data)
+	eof, error := protocol.DeserializeBool(reader)
 	if error != nil {
 		return PacketUuid{}, error
 	}
@@ -67,17 +68,17 @@ func (h *Header) serialize() ([]byte) {
 	return header_b
 }
 
-func deserializeHeader(data *[]byte) (Header, error){
-	session_id, error  := protocol.DeserializeUInteger64(data)
+func deserializeHeader(reader *bytes.Reader) (Header, error){
+	session_id, error  := protocol.DeserializeUInteger64(reader)
 	if error != nil {
 		return Header{}, error
      }
-	packet_uuid, error := deserializePacketUuid(data)
+	packet_uuid, error := deserializePacketUuid(reader)
 	if error != nil {
 		return Header{}, error
      }
 
-	client_ip_port, error := protocol.DeserializeString(data)
+	client_ip_port, error := protocol.DeserializeString(reader)
 	if error != nil {
 		return Header{}, error
      }
@@ -105,27 +106,31 @@ func newHeader(session_id uint64, packet_uuid PacketUuid, client_ip_port string)
 type Packet struct {
 	header Header
 
-	payload []byte
+	payload string
 }
 
 func (p *Packet) Serialize() ([]byte) {
 	header_b := p.header.serialize()
-	packet_b := append(header_b, p.payload...)
+	payload  := protocol.SerializeString(p.payload)
+	packet_b := append(header_b, payload...)
 
 	return packet_b
 }
 
-func DeserializePackage(data *[]byte) (Packet, error) {
-	header, error := deserializeHeader(data)
+func DeserializePackage(reader *bytes.Reader) (Packet, error) {
+	header, error := deserializeHeader(reader)
 	if error != nil {
 		return Packet{}, error
      }
 	// NOTE: En teoria, la data deberia estar consumida a este punto
-	payload := data
+	payload, error := protocol.DeserializeString(reader)
+	if error != nil {
+		return Packet{}, error
+     }
 
 	packet := Packet {
 		header: header,
-		payload: *payload,
+		payload: payload,
 	}
 
 	return packet, nil
@@ -163,7 +168,7 @@ func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string) (Pack
 	}
 }
 
-func (pb *PacketBuilder) CreatePacket(payload []byte, is_eof bool) (Packet, error){
+func (pb *PacketBuilder) CreatePacket(payload string, is_eof bool) (Packet, error){
 	// Sanity checks
 
 	if pb.already_sent_eof && is_eof {
