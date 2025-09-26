@@ -34,7 +34,7 @@ func sendToSocket(conn *net.Conn, data []byte) error {
 	return nil
 }
 
-func createPackagesFrom(dir string, dirID uint, session_ID uint32, listen_addr string, send_addr *net.Conn) (error) {
+func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr string, send_addr *net.Conn) (error) {
 	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr)
 	payloadBuffer := make([]byte, MAX_BATCH_SIZE)
 	used_size := 0
@@ -96,7 +96,7 @@ func main() {
 	listen_addr := os.Args[3]
 
 	// TODO: Obtener del gateway
-	session_id := uint32(0)
+	session_id := uint64(0)
 
 
 	entries, err := os.ReadDir(dataset_directory)

@@ -2,9 +2,11 @@ package packet
 
 import (
 	"errors"
-	"fmt"
+	// "fmt"
 
 	"strconv"
+
+	"malasian_coffe/protocol"
 )
 
 // Formato:
@@ -19,9 +21,17 @@ type PacketUuid struct {
 	eof bool
 }
 
+func (pu *PacketUuid) serialize() ([]byte) {
+	uuid_b := protocol.SerializeString(pu.uuid)
+	eof_b := protocol.SerializeBool(pu.eof)
+
+	packet_b := append(uuid_b, eof_b...)
+	return packet_b
+}
+
 type Header struct {
 	// ID de la session a la que este paquete corresponde
-	session_id uint32
+	session_id uint64
 
 	packet_uuid PacketUuid
 
@@ -31,7 +41,20 @@ type Header struct {
 	client_ip_port string
 }
 
-func newHeader(session_id uint32, packet_uuid PacketUuid, client_ip_port string) (Header){
+func (h *Header) serialize() ([]byte) {
+	session_id_b := protocol.SerializeUInteger64(h.session_id)
+	packet_b := h.packet_uuid.serialize()
+	client_ip_port_b := protocol.SerializeString(h.client_ip_port)
+
+	header_b := append(session_id_b, packet_b...)
+	header_b = append(header_b, client_ip_port_b...)
+
+	return header_b
+}
+
+
+
+func newHeader(session_id uint64, packet_uuid PacketUuid, client_ip_port string) (Header){
 	return Header{
 		session_id: session_id,
 		packet_uuid: packet_uuid,
@@ -47,8 +70,10 @@ type Packet struct {
 }
 
 func (p *Packet) Serialize() ([]byte) {
-	fmt.Println("NOT YET IMPLEMENTED")
-	return p.payload
+	header_b := p.header.serialize()
+	packet_b := append(header_b, p.payload...)
+
+	return packet_b
 }
 
 
@@ -58,7 +83,7 @@ type PacketBuilder struct {
 	// ID del directorio del cual van a ser todos los packets
 	dirID uint
 
-	session_id uint32
+	session_id uint64
 
 	currentSequenceNumber uint
 
@@ -70,7 +95,7 @@ type PacketBuilder struct {
 	already_sent_eof bool
 }
 
-func NewPacketBuilder(dirID uint, sessionID uint32, client_ip_port string) (PacketBuilder) {
+func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string) (PacketBuilder) {
 	return PacketBuilder {
 		dirID: dirID,
 		currentSequenceNumber: 0,
