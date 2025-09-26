@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	// Max batch size is 8 KILO bytes aka 8 thousand bytes
-	MAX_BATCH_SIZE int  = 8000
+	// Max batch size es 8192 simplemente porque es el valor default de BUFSIZ en glibc:
+	// https://sourceware.org/git/?p=glibc.git;a=blob;f=libio/stdio.h;h=e0e70945fab175fafcb0c8bbae96ad7eebe3df5a;hb=HEAD#l100
+	// Ademas, en el tp0 el maximo era 8000, el cual es parecido en tamano
+	MAX_BATCH_SIZE int  = 8192
 )
 
 func sendToSocket(conn *net.Conn, data []byte) error {
@@ -65,7 +67,6 @@ func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr s
 
 		for csv_reader.Scan() {
 			register := csv_reader.Text() + "\n"
-			fmt.Print(register)
 			if payloadBuffer.Len() + len(register) > MAX_BATCH_SIZE {
 				// Batch full, send it and clear the buffer
 				packet, err := packetBuilder.CreatePacket(payloadBuffer.String(), false)
