@@ -39,7 +39,7 @@ func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr s
 		}
 		csv_file, err := os.Open(dir + "/" + file.Name())
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("Couldn't open csv file in dir {%s}, because of {%s}", dir, err))
+			return fmt.Errorf("Couldn't open csv file in dir {%s}, because of {%s}", dir, err)
 		}
 		csv_reader := bufio.NewScanner(csv_file);
 		{

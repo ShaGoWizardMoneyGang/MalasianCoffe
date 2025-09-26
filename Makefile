@@ -1,3 +1,5 @@
+#============================== Build directive ===============================
+
 # TODO(fabri): emprolijar
 build: build-server build-client
 
@@ -10,13 +12,15 @@ build-client:
 build-server:
 	cd system; go run main.go
 
+#=============================== Test directive ================================
+
 test-server:
 	GOCACHE=off cd system/ ; go test -v ./...
 
-test-protocol:
-	GOCACHE=off cd protocol/ ; go test -v ./...
+test-packet:
+	GOCACHE=off cd packet/ ; go test -v ./...
 
-test: test-server test-protocol
+test: test-server test-packet
 
 lint:
 	./.github/scripts/check_go_version.sh
