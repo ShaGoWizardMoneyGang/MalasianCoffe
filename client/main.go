@@ -42,18 +42,18 @@ func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr s
 	entries, err := os.ReadDir(dir)
 
 	if err != nil {
-		fmt.Printf("Failed to read directory: {}\n", err)
+		fmt.Printf("Failed to read directory: {%s}\n", err)
 		panic("")
 	}
 
 	for _, file := range entries {
 		if file.IsDir() {
-			fmt.Printf("WARNING: Found subdirectory {} in directory {}", file, dir)
+			fmt.Printf("WARNING: Found subdirectory {%s} in directory {%s}", file, dir)
 			continue
 		}
 		csv_file, err := os.Open(dir + "/" + file.Name())
 		if err != nil {
-			return errors.New(fmt.Sprintf("Couldn't open csv file in dir {}, because of {}", dir, err))
+			return errors.New(fmt.Sprintf("Couldn't open csv file in dir {%s}, because of {%s}", dir, err))
 		}
 		csv_reader := bufio.NewScanner(csv_file);
 		{
@@ -101,7 +101,7 @@ func main() {
 
 	entries, err := os.ReadDir(dataset_directory)
 	if err != nil {
-		fmt.Printf("Failed to read directory: {}\n", err)
+		fmt.Printf("Failed to read directory: {%s}\n", err)
 		panic("")
 	}
 

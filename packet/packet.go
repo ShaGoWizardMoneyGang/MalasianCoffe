@@ -2,7 +2,6 @@ package packet
 
 import (
 	"errors"
-	// "fmt"
 
 	"strconv"
 
@@ -29,6 +28,22 @@ func (pu *PacketUuid) serialize() ([]byte) {
 	return packet_b
 }
 
+func deserializePacketUuid(data *[]byte) (PacketUuid, error) {
+	uuid, error := protocol.DeserializeString(data)
+	if error != nil {
+		return PacketUuid{}, error
+	}
+	eof, error := protocol.DeserializeBool(data)
+	if error != nil {
+		return PacketUuid{}, error
+	}
+
+	return PacketUuid{
+		uuid: uuid,
+		eof: eof,
+	}, nil
+}
+
 type Header struct {
 	// ID de la session a la que este paquete corresponde
 	session_id uint64
@@ -50,6 +65,30 @@ func (h *Header) serialize() ([]byte) {
 	header_b = append(header_b, client_ip_port_b...)
 
 	return header_b
+}
+
+func deserializeHeader(data *[]byte) (Header, error){
+	session_id, error  := protocol.DeserializeUInteger64(data)
+	if error != nil {
+		return Header{}, error
+     }
+	packet_uuid, error := deserializePacketUuid(data)
+	if error != nil {
+		return Header{}, error
+     }
+
+	client_ip_port, error := protocol.DeserializeString(data)
+	if error != nil {
+		return Header{}, error
+     }
+
+	header := Header {
+		session_id: session_id,
+		packet_uuid: packet_uuid,
+		client_ip_port: client_ip_port,
+	}
+
+	return header, nil
 }
 
 
@@ -74,6 +113,22 @@ func (p *Packet) Serialize() ([]byte) {
 	packet_b := append(header_b, p.payload...)
 
 	return packet_b
+}
+
+func DeserializePackage(data *[]byte) (Packet, error) {
+	header, error := deserializeHeader(data)
+	if error != nil {
+		return Packet{}, error
+     }
+	// NOTE: En teoria, la data deberia estar consumida a este punto
+	payload := data
+
+	packet := Packet {
+		header: header,
+		payload: *payload,
+	}
+
+	return packet, nil
 }
 
 
@@ -132,3 +187,4 @@ func (pb *PacketBuilder) CreatePacket(payload []byte, is_eof bool) (Packet, erro
 	}, nil
 
 }
+

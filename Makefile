@@ -13,7 +13,10 @@ build-server:
 test-server:
 	GOCACHE=off cd system/ ; go test -v ./...
 
-test: test-server
+test-protocol:
+	GOCACHE=off cd protocol/ ; go test -v ./...
+
+test: test-server test-protocol
 
 lint:
 	./.github/scripts/check_go_version.sh
