@@ -1,12 +1,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net"
-	"strings"
 
-	// "io"
 	"os"
 
 	"bufio"
@@ -22,26 +19,11 @@ const (
 	MAX_BATCH_SIZE int  = 8192
 )
 
-func sendToSocket(conn *net.Conn, data []byte) error {
-	length := len(data)
-
-	var sent = 0
-	var err error
-	for offset := 0 ; offset < length ; offset += sent {
-		sent, err = (*conn).Write(data[offset:])
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
 
 func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr string, send_addr *net.Conn) (error) {
-	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr)
-	// payloadBuffer := make([]byte, MAX_BATCH_SIZE)
-	var payloadBuffer strings.Builder
-	payloadBuffer.Grow(MAX_BATCH_SIZE)
+	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr, send_addr)
+	// var payloadBuffer strings.Builder
+	// payloadBuffer.Grow(MAX_BATCH_SIZE)
 
 	entries, err := os.ReadDir(dir)
 
@@ -57,7 +39,7 @@ func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr s
 		}
 		csv_file, err := os.Open(dir + "/" + file.Name())
 		if err != nil {
-			return errors.New(fmt.Sprintf("Couldn't open csv file in dir {%s}, because of {%s}", dir, err))
+			return fmt.Errorf(fmt.Sprintf("Couldn't open csv file in dir {%s}, because of {%s}", dir, err))
 		}
 		csv_reader := bufio.NewScanner(csv_file);
 		{
@@ -67,23 +49,19 @@ func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr s
 
 		for csv_reader.Scan() {
 			register := csv_reader.Text() + "\n"
-			if payloadBuffer.Len() + len(register) > MAX_BATCH_SIZE {
-				// Batch full, send it and clear the buffer
-				packet, err := packetBuilder.CreatePacket(payloadBuffer.String(), false)
-				if err != nil {
-					return err
-				}
-				sendToSocket(send_addr, packet.Serialize())
-				payloadBuffer.Reset()
+
+			err = packetBuilder.Send(register)
+			if err != nil {
+				return err
 			}
-			payloadBuffer.WriteString(register)
 		}
 	}
-     packet, err := packetBuilder.CreatePacket(payloadBuffer.String(), true)
+
+	err = packetBuilder.End()
 	if err != nil {
 		return err
 	}
-	sendToSocket(send_addr, packet.Serialize())
+
 	return nil
 }
 

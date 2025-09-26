@@ -4,9 +4,21 @@ import (
 	"bytes"
 	"errors"
 
+	"net"
+	"strings"
+
 	"strconv"
 
 	"malasian_coffe/protocol"
+
+	"log/slog"
+)
+
+const (
+	// Max batch size es 8192 simplemente porque es el valor default de BUFSIZ en glibc:
+	// https://sourceware.org/git/?p=glibc.git;a=blob;f=libio/stdio.h;h=e0e70945fab175fafcb0c8bbae96ad7eebe3df5a;hb=HEAD#l100
+	// Ademas, en el tp0 el maximo era 8000, el cual es parecido en tamano
+	MAX_BATCH_SIZE int  = 8192
 )
 
 // Formato:
@@ -149,13 +161,22 @@ type PacketBuilder struct {
 
 	client_ip_port string
 
+// =========================== Campos de payload ==============================
+
+	payload_buffer *strings.Builder
+
+	gatewayIP *net.Conn
+
 // ======================== Campos de sanity checks ===========================
 
 	// Sanity check para corroborar que no envio dos archivos con el indicador de EOF
 	already_sent_eof bool
 }
 
-func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string) (PacketBuilder) {
+func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string, gatewayIP *net.Conn) (PacketBuilder) {
+	var payload_buffer strings.Builder
+	payload_buffer.Grow(MAX_BATCH_SIZE)
+
 	return PacketBuilder {
 		dirID: dirID,
 		currentSequenceNumber: 0,
@@ -164,11 +185,70 @@ func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string) (Pack
 
 		client_ip_port: client_ip_port,
 
+		gatewayIP: gatewayIP,
+
+		// Payload
+		payload_buffer: &payload_buffer,
+
+		// Sanity
 		already_sent_eof: false,
 	}
 }
 
-func (pb *PacketBuilder) CreatePacket(payload string, is_eof bool) (Packet, error){
+func sendToSocket(conn *net.Conn, data []byte) error {
+	length := len(data)
+
+	var sent = 0
+	var err error
+	for offset := 0 ; offset < length ; offset += sent {
+		sent, err = (*conn).Write(data[offset:])
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (pb *PacketBuilder) Send(register string) (error) {
+	if pb.payload_buffer.Len() + len(register) > MAX_BATCH_SIZE {
+		packet, err := pb.createPacket(pb.payload_buffer.String(), false)
+		if err != nil {
+			return err
+		}
+
+		err = sendToSocket(pb.gatewayIP, packet.Serialize())
+		if err != nil {
+			return err
+		}
+
+		pb.payload_buffer.Reset()
+	}
+
+	pb.payload_buffer.WriteString(register)
+
+	return nil
+}
+
+func (pb *PacketBuilder) End() (error) {
+	packet, err := pb.createPacket(pb.payload_buffer.String(), true)
+
+	if err != nil {
+		return err
+	}
+
+	err = sendToSocket(pb.gatewayIP, packet.Serialize())
+	if err != nil {
+		return err
+	}
+
+	pb.payload_buffer.Reset()
+
+	return nil
+}
+
+func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, error){
+	slog.Info("New packet")
 	// Sanity checks
 
 	if pb.already_sent_eof && is_eof {
