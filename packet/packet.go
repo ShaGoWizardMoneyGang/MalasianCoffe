@@ -69,6 +69,21 @@ type Header struct {
 	client_ip_port string
 }
 
+func (h *Header) split(id int) (Header) {
+	new_uuid := h.packet_uuid.uuid + strconv.Itoa(id)
+
+	new_header := Header {
+		session_id: h.session_id,
+		  packet_uuid: PacketUuid{
+			  uuid: new_uuid,
+			  eof: h.packet_uuid.eof,
+			},
+		client_ip_port: h.client_ip_port,
+	}
+
+	return new_header
+}
+
 func (h *Header) serialize() ([]byte) {
 	session_id_b := protocol.SerializeUInteger64(h.session_id)
 	packet_b := h.packet_uuid.serialize()
@@ -119,6 +134,28 @@ type Packet struct {
 	header Header
 
 	payload string
+}
+
+// Mismo header, distinto payload
+func ChangePayload(packet Packet, newpayload []string) ([]Packet) {
+	packets := make([]Packet, len(newpayload))
+
+	for i, payload := range newpayload {
+		newheader := packet.header
+		if len(packets) > 1 {
+			newheader = packet.header.split(i)
+		}
+		packets[i] = Packet{
+			header: newheader,
+			payload: payload,
+		}
+	}
+
+	return packets
+}
+
+func (p *Packet) GetPayload() (string) {
+	return p.GetPayload()
 }
 
 func (p *Packet) Serialize() ([]byte) {
