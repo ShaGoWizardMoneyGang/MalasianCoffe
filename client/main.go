@@ -20,7 +20,7 @@ const (
 )
 
 
-func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr string, send_addr *net.Conn) (error) {
+func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr string, send_addr net.Conn) (error) {
 	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr, send_addr)
 	// var payloadBuffer strings.Builder
 	// payloadBuffer.Grow(MAX_BATCH_SIZE)
@@ -90,13 +90,13 @@ func main() {
 			continue
 		}
 		subDirPath := dataset_directory + entry.Name()
-		err := createPackagesFrom(subDirPath, dirID, session_id, listen_addr, &conn)
+		err := createPackagesFrom(subDirPath, dirID, session_id, listen_addr, conn)
 		if err != nil {
 			 panic(err)
 		}
 
 		dirID += 1
 	}
-	fmt.Println("hello world")
+	fmt.Println("I am the client")
 }
 

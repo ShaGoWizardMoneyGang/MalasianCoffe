@@ -8,10 +8,11 @@ import (
 	"strings"
 
 	"strconv"
+	"log/slog"
 
 	"malasian_coffe/protocol"
+	"malasian_coffe/utils/network"
 
-	"log/slog"
 )
 
 const (
@@ -165,7 +166,7 @@ type PacketBuilder struct {
 
 	payload_buffer *strings.Builder
 
-	gatewayIP *net.Conn
+	gatewayIP net.Conn
 
 // ======================== Campos de sanity checks ===========================
 
@@ -173,7 +174,7 @@ type PacketBuilder struct {
 	already_sent_eof bool
 }
 
-func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string, gatewayIP *net.Conn) (PacketBuilder) {
+func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string, gatewayIP net.Conn) (PacketBuilder) {
 	var payload_buffer strings.Builder
 	payload_buffer.Grow(MAX_BATCH_SIZE)
 
@@ -195,20 +196,6 @@ func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string, gatew
 	}
 }
 
-func sendToSocket(conn *net.Conn, data []byte) error {
-	length := len(data)
-
-	var sent = 0
-	var err error
-	for offset := 0 ; offset < length ; offset += sent {
-		sent, err = (*conn).Write(data[offset:])
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
 
 func (pb *PacketBuilder) Send(register string) (error) {
 	if pb.payload_buffer.Len() + len(register) > MAX_BATCH_SIZE {
@@ -217,7 +204,7 @@ func (pb *PacketBuilder) Send(register string) (error) {
 			return err
 		}
 
-		err = sendToSocket(pb.gatewayIP, packet.Serialize())
+		err = network.Send(pb.gatewayIP, packet.Serialize())
 		if err != nil {
 			return err
 		}
@@ -237,7 +224,7 @@ func (pb *PacketBuilder) End() (error) {
 		return err
 	}
 
-	err = sendToSocket(pb.gatewayIP, packet.Serialize())
+	err = network.Send(pb.gatewayIP, packet.Serialize())
 	if err != nil {
 		return err
 	}

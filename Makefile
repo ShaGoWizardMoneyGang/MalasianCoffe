@@ -4,10 +4,14 @@
 build: build-server build-client
 
 DATADIR               ?=    ../dataset/
-GATEWAY_DIR           ?=    "localhost:9090"
-LISTEN_DIR            ?=    "localhost:9091"
+GATEWAY_ADDR           ?=    "localhost:9090"
+LISTEN_ADDR            ?=    "localhost:9091"
 build-client:
-	cd client; go run main.go ${DATADIR} ${GATEWAY_DIR} ${LISTEN_DIR}
+	cd client; go run main.go ${DATADIR} ${GATEWAY_ADDR} ${LISTEN_ADDR}
+
+RABBIT_ADDR           ?=    "localhost:9092"
+build-gateway:
+	cd client; go run main.go ${DATADIR} ${RABBIT_ADDR} ${LISTEN_ADDR}
 
 build-server:
 	cd system; go run main.go
