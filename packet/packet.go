@@ -165,7 +165,7 @@ type PacketBuilder struct {
 
 	payload_buffer *strings.Builder
 
-	gatewayIP *net.Conn
+	gatewayIP net.Conn
 
 // ======================== Campos de sanity checks ===========================
 
@@ -173,7 +173,7 @@ type PacketBuilder struct {
 	already_sent_eof bool
 }
 
-func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string, gatewayIP *net.Conn) (PacketBuilder) {
+func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string, gatewayIP net.Conn) (PacketBuilder) {
 	var payload_buffer strings.Builder
 	payload_buffer.Grow(MAX_BATCH_SIZE)
 
