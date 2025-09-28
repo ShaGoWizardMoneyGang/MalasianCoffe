@@ -12,7 +12,7 @@ import (
 
 	"malasian_coffe/packet"
 	"malasian_coffe/protocol"
-	// "malasian_coffe/utils/network"
+	"malasian_coffe/utils/network"
 )
 
 const (
@@ -91,7 +91,7 @@ func main() {
 	// }
 	// session_id := string(session_id_b)
 // ============================ TODO: Encapsular ===============================
-	string_b, err := protocol.ReceiveFromNetwork(conn)
+	string_b, err := network.ReceiveFromNetwork(conn)
 	if err != nil {
 		panic(err)
 	}
