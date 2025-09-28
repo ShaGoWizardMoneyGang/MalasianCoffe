@@ -4,14 +4,14 @@ DATADIR                ?=    ../dataset/
 GATEWAY_ADDR           ?=    "localhost:9090"
 LISTEN_ADDR            ?=    "localhost:9091"
 run-client:
-	cd client; go run main.go ${DATADIR} ${GATEWAY_ADDR} ${LISTEN_ADDR}
+	cd client; go run client.go ${DATADIR} ${GATEWAY_ADDR} ${LISTEN_ADDR}
 
 RABBIT_ADDR           ?=    "localhost:9092"
 run-gateway:
 	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${RABBIT_ADDR}
 
 run-server:
-	cd system; go run main.go ${RABBIT_ADDR}
+	cd system; go run system.go ${RABBIT_ADDR}
 
 #============================== Build directives ===============================
 
