@@ -35,7 +35,10 @@ test-server:
 test-packet:
 	GOCACHE=off cd packet/ ; go test -v ./...
 
-test: test-server test-packet
+test-all:
+	go test -v ./...
+
+test: test-server test-packet test-all
 
 lint:
 	./.github/scripts/check_go_version.sh
