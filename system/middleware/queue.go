@@ -93,8 +93,8 @@ cada mensaje de datos o de control.
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 */
-func (q *MessageMiddlewareQueue) StartConsuming() (messageQueue MessageQueue, error *MessageMiddlewareError) {
-	return &q.consumeChannel, nil
+func (q *MessageMiddlewareQueue) StartConsuming() (messageQueue MessageQueue, error MessageMiddlewareError) {
+	return &q.consumeChannel, 0
 }
 
 /*

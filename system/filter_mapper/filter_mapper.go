@@ -5,83 +5,49 @@ import (
 	"fmt"
 	"malasian_coffe/packet"
 	filter_mapper "malasian_coffe/system/filter_mapper/src"
-	"os"
-
-	amqp "github.com/rabbitmq/amqp091-go"
+	"malasian_coffe/system/middleware"
 )
 
-// Argumentos que recibe:
-// 1. Address de rabbit
-// 2. Nombre de la funcion que tiene que ejecutar
 func main() {
-	type Colas struct {
-		colaInput  []string
-		colaOutput []string
-	}
-	funcionesYColas := make(map[string]Colas)
-	funcionesYColas["query1YearAndAmount"] = Colas{colaInput: []string{"DataQuery1"}, colaOutput: []string{"FilterMapper1YearAndAmount"}}
-	// funcionesYColas["query2"] = Colas{colaInput: []string{"entrada-2"}, colaOutput: []string{"salida-2"}}
-
-	// nombre_funcion := "query1YearAndAmount"
-	//map con key de nombre de la funcion y clave tupla de cola input y cola output
-
-	rabbit_addr := os.Args[1]
-	rconn, err := amqp.Dial("amqp://guest:guest@" + rabbit_addr + "/")
+	// Hay que ponerle el arg del rabbit
+	colaEntrada, err := middleware.CreateQueue("DataQuery1", middleware.ChannelOptionsDefault())
 	if err != nil {
-		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %w. Is the daemon active?
-		Try running:
-
-		sudo systemctl start rabbitmq
-		or
-		sudo rc-service rabbitmq start`))
+		panic(fmt.Errorf("CreateQueue(DataQuery1): %w", err))
 	}
-	ch, _ := rconn.Channel()
-	ch.QueueDeclare(
-		"DataQuery1", // name
-		false,        // durable
-		false,        // delete when unused
-		false,        // exclusive
-		false,        // no-wait
-		nil,          // arguments
-	)
-	msgs, _ := ch.Consume(
-		"DataQuery1", // queue
-		"",           // consumer
-		false,        // auto-ack
-		false,        // exclusive
-		false,        // no-local
-		false,        // no-wait
-		nil,          // args
-	)
+	defer colaEntrada.Close()
+
+	// arranca a consumir
+	msgQueue, consumeError := colaEntrada.StartConsuming()
+	if consumeError != 0 {
+		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
+	}
+	defer colaEntrada.StopConsuming()
+
 	worker := filter_mapper.FilterMapper{}
 	var result []packet.Packet
-	for message := range msgs {
-		packet_reader := bytes.NewReader(message.Body)
-		packet, _ := packet.DeserializePackage(packet_reader)
-		fmt.Printf("HOLA ESTAS EN EL FILTER MAPPER %v\n", packet)
-		result = append(result, worker.Process(packet, "query1YearAndAmount"))
-		fmt.Printf("HOLA YA PROCESASTE EL PAQUETE %v\n", result)
-		if packet.IsEOF() {
+
+	// msgQueue es **<-chan amqp.Delivery HORRIBLE
+	for message := range **msgQueue {
+		packetReader := bytes.NewReader(message.Body)
+		pkt, _ := packet.DeserializePackage(packetReader)
+
+		fmt.Printf("paquete recibido: %+v\n", pkt)
+		paqueteSalida := worker.Process(pkt, "query1YearAndAmount")
+		result = append(result, paqueteSalida)
+		fmt.Printf("paquete procesado: %+v\n", paqueteSalida)
+		if pkt.IsEOF() {
 			break
 		}
-		//break
-
 	}
-	ch.QueueDeclare(
-		"FilterMapper1YearAndAmount", // name
-		false,                        // durable
-		false,                        // delete when unused
-		false,                        // exclusive
-		false,                        // no-wait
-		nil,                          // arguments
-	)
-	fmt.Printf("%v\n", result)
-	for _, packet := range result {
-		ch.Publish("", "FilterMapper1YearAndAmount", false, false,
-			amqp.Publishing{
-				// DeliveryMode: amqp.Persistent,
-				ContentType: "text/plain",
-				Body:        packet.Serialize(),
-			})
+
+	// cola de salida, envio
+	colaSalida, err := middleware.CreateQueue("FilterMapper1YearAndAmount", middleware.ChannelOptionsDefault())
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
+	}
+	defer colaSalida.Close()
+
+	for _, pkt := range result {
+		_ = colaSalida.Send(pkt.Serialize())
 	}
 }
