@@ -76,7 +76,7 @@ func (pb *PacketBuilder) Send(register string) (error) {
 			return err
 		}
 
-		err = network.Send(pb.gatewayIP, packet.Serialize())
+		err = network.SendToNetwork(pb.gatewayIP, packet.Serialize())
 		if err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ func (pb *PacketBuilder) End() (error) {
 		return err
 	}
 
-	err = network.Send(pb.gatewayIP, packet.Serialize())
+	err = network.SendToNetwork(pb.gatewayIP, packet.Serialize())
 	if err != nil {
 		return err
 	}

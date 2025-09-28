@@ -8,15 +8,16 @@ import (
 // ========================== Important functions =============================
 
 // Send some data to the network
-func SendToNetwork(conn net.Conn, data []byte) {
+func SendToNetwork(conn net.Conn, data []byte) error {
 	networkPacket := newNetworkPacket(data)
 	networkPacket_b := networkPacket.serialize()
-	Send(conn, networkPacket_b)
+	error := send(conn, networkPacket_b)
+	return error
 }
 
 // Receive from the network
 func ReceiveFromNetwork(conn net.Conn) ([]byte, error) {
-	indicator, err := Read(conn, 1);
+	indicator, err := read(conn, 1);
 	if err != nil {
 		return nil, fmt.Errorf("Failed to receive NetworkPacketIndicator")
 
@@ -25,13 +26,13 @@ func ReceiveFromNetwork(conn net.Conn) ([]byte, error) {
 		return nil, fmt.Errorf("NetworkPacket does not match expected NetworkPacket indicator. Expected %d, found %d", networkpacketindicator, int(indicator[0]))
 	}
 
-	size_b, err := Read(conn, 8);
+	size_b, err := read(conn, 8);
 	if err != nil {
 		return nil, fmt.Errorf("Failed to receive NetworkPacketIndicator size")
 	}
 	size := binary.BigEndian.Uint64(size_b)
 
-	data, err := Read(conn, int(size))
+	data, err := read(conn, int(size))
 
 	return data, nil
 }
@@ -72,7 +73,7 @@ func (np *networkPacket) serialize() []byte {
 // ============================ Socket wrappers ===============================
 
 // Wrapper function around net.Conn.Write that handles short writes
-func Send(conn net.Conn, data []byte) error {
+func send(conn net.Conn, data []byte) error {
 	length := len(data)
 
 	var sent = 0
@@ -87,7 +88,7 @@ func Send(conn net.Conn, data []byte) error {
 	return nil
 }
 
-func Read(conn net.Conn, size int) ([]byte, error) {
+func read(conn net.Conn, size int) ([]byte, error) {
 	buffer := make([]byte, size)
 
 	var received = 0
