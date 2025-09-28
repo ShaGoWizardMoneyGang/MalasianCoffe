@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"malasian_coffe/packet"
 	filter_mapper "malasian_coffe/system/filter_mapper/src"
+	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -24,7 +25,16 @@ func main() {
 	// nombre_funcion := "query1YearAndAmount"
 	//map con key de nombre de la funcion y clave tupla de cola input y cola output
 
-	rconn, _ := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	rabbit_addr := os.Args[1]
+	rconn, err := amqp.Dial("amqp://guest:guest@" + rabbit_addr + "/")
+	if err != nil {
+		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %w. Is the daemon active?
+		Try running:
+
+		sudo systemctl start rabbitmq
+		or
+		sudo rc-service rabbitmq start`))
+	}
 	ch, _ := rconn.Channel()
 	ch.QueueDeclare(
 		"DataQuery1", // name

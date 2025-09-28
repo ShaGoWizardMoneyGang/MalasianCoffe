@@ -11,7 +11,7 @@ run-gateway:
 	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${LISTEN_ADDR}
 
 run-server:
-	cd system; go run system.go ${LISTEN_ADDR}
+	cd system; go run system.go ${LISTEN_ADDR} ${RABBIT_ADDR}
 
 run-filter:
 	cd system/filter_mapper; go run filter_mapper.go ${RABBIT_ADDR}
@@ -22,7 +22,7 @@ run-concat:
 
 current_dir = $(shell pwd)
 
-build: build-server build-client build-gateway
+build: build-server build-client build-gateway build-filter build-concat
 build-client:
 	cd client; go build -o ${current_dir}/bin/client
 
@@ -31,6 +31,12 @@ build-gateway:
 
 build-server:
 	cd system; go build -o ${current_dir}/bin/server
+
+build-filter:
+	cd system/filter_mapper; go build -o ${current_dir}/bin/filter_mapper
+
+build-concat:
+	cd system/concat; go build -o ${current_dir}/bin/concat
 
 #=============================== Test directives ===============================
 

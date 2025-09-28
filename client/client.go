@@ -13,6 +13,7 @@ import (
 	"malasian_coffe/packet"
 	"malasian_coffe/protocol"
 	"malasian_coffe/utils/network"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -20,11 +21,10 @@ const (
 	// Max batch size es 8192 simplemente porque es el valor default de BUFSIZ en glibc:
 	// https://sourceware.org/git/?p=glibc.git;a=blob;f=libio/stdio.h;h=e0e70945fab175fafcb0c8bbae96ad7eebe3df5a;hb=HEAD#l100
 	// Ademas, en el tp0 el maximo era 8000, el cual es parecido en tamano
-	MAX_BATCH_SIZE int  = 8192
+	MAX_BATCH_SIZE int = 8192 //OJO DEPRECADO NO USARRRR USAR EL OTROOOO
 )
 
-
-func createPackagesFrom(dir string, dirID uint, session_ID string, listen_addr string, send_addr net.Conn) (error) {
+func createPackagesFrom(dir string, dirID uint, session_ID string, listen_addr string, send_addr net.Conn) error {
 	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr, send_addr)
 	// var payloadBuffer strings.Builder
 	// payloadBuffer.Grow(MAX_BATCH_SIZE)
@@ -45,7 +45,7 @@ func createPackagesFrom(dir string, dirID uint, session_ID string, listen_addr s
 		if err != nil {
 			return fmt.Errorf("Couldn't open csv file in dir {%s}, because of {%s}", dir, err)
 		}
-		csv_reader := bufio.NewScanner(csv_file);
+		csv_reader := bufio.NewScanner(csv_file)
 		{
 			// Skip first line which holds column names
 			csv_reader.Scan()
@@ -103,7 +103,7 @@ func main() {
 		subDirPath := dataset_directory + entry.Name()
 		err := createPackagesFrom(subDirPath, dirID, session_id, listen_addr, conn)
 		if err != nil {
-			 panic(err)
+			panic(err)
 		}
 
 		dirID += 1
@@ -113,21 +113,21 @@ func main() {
 	rconn, _ := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	ch, _ := rconn.Channel()
 	ch.QueueDeclare(
-		"prueba",  // name
-		false, // durable
-		false, // delete when unused
-		false, // exclusive
-		false, // no-wait
-		nil,   // arguments
+		"prueba", // name
+		false,    // durable
+		false,    // delete when unused
+		false,    // exclusive
+		false,    // no-wait
+		nil,      // arguments
 	)
 	msgs, err := ch.Consume(
 		"prueba", // queue
-		"",     // consumer
-		false,  // auto-ack
-		false,  // exclusive
-		false,  // no-local
-		false,  // no-wait
-		nil,    // args
+		"",       // consumer
+		false,    // auto-ack
+		false,    // exclusive
+		false,    // no-local
+		false,    // no-wait
+		nil,      // args
 	)
 
 	for message := range msgs {
@@ -136,4 +136,3 @@ func main() {
 		fmt.Printf("%v\n", packet)
 	}
 }
-
