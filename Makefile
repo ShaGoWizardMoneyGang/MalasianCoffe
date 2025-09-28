@@ -22,7 +22,7 @@ run-concat:
 
 current_dir = $(shell pwd)
 
-build: build-server build-client build-gateway build-filter build-concat
+build: build-server build-client build-gateway build-filter build-concat build-sender
 build-client:
 	cd client; go build -o ${current_dir}/bin/client
 
@@ -37,6 +37,9 @@ build-filter:
 
 build-concat:
 	cd system/concat; go build -o ${current_dir}/bin/concat
+
+build-sender:
+	cd system/sender; go build -o ${current_dir}/bin/sender
 
 #=============================== Test directives ===============================
 
