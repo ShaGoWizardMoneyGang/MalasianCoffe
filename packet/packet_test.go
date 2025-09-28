@@ -13,7 +13,7 @@ func TestPacketSerialization(t *testing.T) {
 		false,
 	};
 
-	header      := newHeader(23, packet_uuid, "localhost:9091")
+	header      := newHeader("session-id", packet_uuid, "localhost:9091")
 	payload     := "extra territorium jus dicenti impune non paretur"
 
 	packet      := Packet {

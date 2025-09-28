@@ -1,6 +1,8 @@
 package main
 
 import (
+	// "encoding/binary"
+	"bytes"
 	"fmt"
 	"net"
 
@@ -9,7 +11,8 @@ import (
 	"bufio"
 
 	"malasian_coffe/packet"
-	// "malasian_coffe/protocol"
+	"malasian_coffe/protocol"
+	"malasian_coffe/utils/network"
 )
 
 const (
@@ -20,7 +23,7 @@ const (
 )
 
 
-func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr string, send_addr *net.Conn) (error) {
+func createPackagesFrom(dir string, dirID uint, session_ID string, listen_addr string, send_addr net.Conn) (error) {
 	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr, send_addr)
 	// var payloadBuffer strings.Builder
 	// payloadBuffer.Grow(MAX_BATCH_SIZE)
@@ -74,9 +77,16 @@ func main() {
 
 	listen_addr := os.Args[3]
 
-	// TODO: Obtener del gateway
-	session_id := uint64(0)
-
+	string_b, err := network.ReceiveFromNetwork(conn)
+	if err != nil {
+		panic(err)
+	}
+	string_reader := bytes.NewReader(string_b)
+	session_id, err := protocol.DeserializeString(string_reader)
+	if err != nil {
+		panic(err)
+	}
+	println(session_id)
 
 	entries, err := os.ReadDir(dataset_directory)
 	if err != nil {
@@ -90,13 +100,13 @@ func main() {
 			continue
 		}
 		subDirPath := dataset_directory + entry.Name()
-		err := createPackagesFrom(subDirPath, dirID, session_id, listen_addr, &conn)
+		err := createPackagesFrom(subDirPath, dirID, session_id, listen_addr, conn)
 		if err != nil {
 			 panic(err)
 		}
 
 		dirID += 1
 	}
-	fmt.Println("hello world")
+	fmt.Println("I am the client")
 }
 
