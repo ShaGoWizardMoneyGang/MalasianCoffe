@@ -114,7 +114,7 @@ func filterFunctionQuery3Transactions(input string) string {
 		t, _ := time.Parse(layout, data[8])
 		amount, _ := strconv.ParseFloat(data[7], 64)
 		amount = math.Round(amount*10) / 10
-		if t.Hour() >= 6 && t.Hour() <= 23 {
+		if yearCondition(data) && t.Hour() >= 6 && t.Hour() <= 23 {
 			final += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n"
 		}
 	}
@@ -132,7 +132,9 @@ func filterFunctionQuery4Transactions(input string) string {
 		if len(data) < 9 {
 			panic("Invalid data format")
 		}
-		final += data[0] + "," + data[1] + "," + data[4] + "\n"
+		if yearCondition(data) {
+			final += data[0] + "," + data[1] + "," + data[4] + "\n"
+		}
 	}
 	return final
 }
@@ -172,6 +174,14 @@ func (c *FilterMapper) Process(pkt packet.Packet, function string) []packet.Pack
 		output = filterFunctionQuery2a(input)
 	case "query2byearandsubtotal":
 		output = filterFunctionQuery2b(input)
+	case "query3mapstoreidandname":
+		output = mapStoreIdAndName(input)
+	case "query3transactions":
+		output = filterFunctionQuery3Transactions(input)
+	case "query4transactions":
+		output = filterFunctionQuery4Transactions(input)
+	case "query4usersbirthdates":
+		output = filterFunctionQuery4UsersBirthdates(input)
 	default:
 		panic(fmt.Sprintf("Unknown function %s", function))
 	}
