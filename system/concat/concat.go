@@ -48,11 +48,11 @@ func main() {
 	for message := range msgs {
 		packet_reader := bytes.NewReader(message.Body)
 		packet, _ := packet.DeserializePackage(packet_reader)
-		if packet.IsEOF() {
-			break
-		}
 		fmt.Printf("HOLA ESTAS EN EL CONCAT %v\n", packet)
 		result = append(result, worker.Process(packet)[0])
 		fmt.Printf("HOLA YA PROCESASTE EL PAQUETE DEL CONCAT %v\n", result)
+		if packet.IsEOF() {
+			break
+		}
 	}
 }

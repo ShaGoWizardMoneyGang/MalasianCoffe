@@ -48,12 +48,13 @@ func main() {
 	for message := range msgs {
 		packet_reader := bytes.NewReader(message.Body)
 		packet, _ := packet.DeserializePackage(packet_reader)
-		if packet.IsEOF() {
-			break
-		}
 		fmt.Printf("HOLA ESTAS EN EL FILTER MAPPER %v\n", packet)
 		result = append(result, worker.Process(packet, "query1YearAndAmount"))
 		fmt.Printf("HOLA YA PROCESASTE EL PAQUETE %v\n", result)
+		if packet.IsEOF() {
+			break
+		}
+		//break
 
 	}
 	ch.QueueDeclare(
