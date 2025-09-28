@@ -6,13 +6,18 @@ LISTEN_ADDR            ?=    "localhost:9091"
 run-client:
 	cd client; go run client.go ${DATADIR} ${GATEWAY_ADDR} ${LISTEN_ADDR}
 
-RABBIT_ADDR           ?=    "localhost:9092"
+RABBIT_ADDR           ?=    "localhost:5672"
 run-gateway:
 	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${RABBIT_ADDR}
 
 run-server:
 	cd system; go run system.go ${RABBIT_ADDR}
 
+run-filter:
+	cd system/filter_mapper; go run filter_mapper.go 
+
+run-concat: 
+	cd system/concat; go run concat.go 
 #============================== Build directives ===============================
 
 current_dir = $(shell pwd)

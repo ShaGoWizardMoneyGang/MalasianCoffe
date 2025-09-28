@@ -159,7 +159,7 @@ func filterFunctionQuery4UsersBirthdates(input string) string {
 type FilterMapper struct {
 }
 
-func (c *FilterMapper) Process(pkt packet.Packet, function string) []packet.Packet {
+func (c *FilterMapper) Process(pkt packet.Packet, function string) packet.Packet {
 	input := pkt.GetPayload()
 	function_name := strings.ToLower(function)
 
@@ -186,7 +186,7 @@ func (c *FilterMapper) Process(pkt packet.Packet, function string) []packet.Pack
 	}
 
 	outputs := []string{output}
-	new_packets := packet.ChangePayload(pkt, outputs)
+	new_packets := packet.ChangePayload(pkt, outputs)[0]
 
 	return new_packets
 }

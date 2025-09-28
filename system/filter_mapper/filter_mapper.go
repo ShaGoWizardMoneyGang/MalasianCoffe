@@ -44,12 +44,30 @@ func main() {
 		nil,         // args
 	)
 	worker := filter_mapper.FilterMapper{}
+	var result []packet.Packet
 	for message := range msgs {
 		packet_reader := bytes.NewReader(message.Body)
 		packet, _ := packet.DeserializePackage(packet_reader)
 		fmt.Printf("HOLA ESTAS EN EL FILTER MAPPER %v\n", packet)
-		result := worker.Process(packet, "query1YearAndAmount")
+		result = append(result, worker.Process(packet, "query1YearAndAmount"))
 		fmt.Printf("HOLA YA PROCESASTE EL PAQUETE %v\n", result)
+		break
 	}
-
+	ch.QueueDeclare(
+		"salida-1", // name
+		false,      // durable
+		false,      // delete when unused
+		false,      // exclusive
+		false,      // no-wait
+		nil,        // arguments
+	)
+	fmt.Printf("%v\n", result)
+	for _, packet := range result {
+		ch.Publish("", "salida-1", false, false,
+			amqp.Publishing{
+				// DeliveryMode: amqp.Persistent,
+				ContentType: "text/plain",
+				Body:        packet.Serialize(),
+			})
+	}
 }

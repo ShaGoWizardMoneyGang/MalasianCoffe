@@ -1,28 +1,56 @@
-package concat
+package main
 
 import (
+	"bytes"
+	"fmt"
 	"malasian_coffe/packet"
+	concat "malasian_coffe/system/concat/src"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type Concat struct {
-	// Guardo el resultado, recuerdo que voy a tener un nodo concat por query!!!
-	// el unico caso especial es la de la consulta 4 que devuelve 2 tablas
-	result string
-}
-
-func (c *Concat) concatFunctionQuery(input string) string {
-	if len(input) > 0 && input[len(input)-1] != '\n' { //puedo tener un input vacio por si creo un packet nuevo
-		input += "\n"
+// Argumentos que recibe:
+// 1. Address de rabbit
+// 2. Nombre de la funcion que tiene que ejecutar
+func main() {
+	type Colas struct {
+		colaInput  []string
+		colaOutput []string
 	}
-	c.result += input
-	return c.result
-}
+	funcionesYColas := make(map[string]Colas)
+	funcionesYColas["query1234"] = Colas{colaInput: []string{"salida-1"}, colaOutput: []string{"salida-2"}}
+	// funcionesYColas["query2"] = Colas{colaInput: []string{"entrada-2"}, colaOutput: []string{"salida-2"}}
 
-func (c *Concat) Process(pkt packet.Packet) []packet.Packet {
-	input := pkt.GetPayload()
-	output := c.concatFunctionQuery(input)
-	outputs := []string{output}
-	newPacket := packet.ChangePayload(pkt, outputs)
+	// nombre_funcion := "query1YearAndAmount"
+	//map con key de nombre de la funcion y clave tupla de cola input y cola output
 
-	return newPacket
+	rconn, _ := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	ch, _ := rconn.Channel()
+	ch.QueueDeclare(
+		"salida-1", // name
+		false,      // durable
+		false,      // delete when unused
+		false,      // exclusive
+		false,      // no-wait
+		nil,        // arguments
+	)
+	msgs, _ := ch.Consume(
+		"salida-1", // queue
+		"",         // consumer
+		false,      // auto-ack
+		false,      // exclusive
+		false,      // no-local
+		false,      // no-wait
+		nil,        // args
+	)
+	worker := concat.Concat{}
+	var result []packet.Packet
+	for message := range msgs {
+		packet_reader := bytes.NewReader(message.Body)
+		packet, _ := packet.DeserializePackage(packet_reader)
+		fmt.Printf("HOLA ESTAS EN EL CONCAT %v\n", packet)
+		result = append(result, worker.Process(packet)[0])
+		fmt.Printf("HOLA YA PROCESASTE EL PAQUETE DEL CONCAT %v\n", result)
+		break
+	}
 }
