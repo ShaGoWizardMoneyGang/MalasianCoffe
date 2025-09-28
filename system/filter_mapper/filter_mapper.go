@@ -168,6 +168,10 @@ func (c *FilterMapper) Process(pkt packet.Packet, function string) []packet.Pack
 		output = filterByYearCommon(input_lines)
 	case "query1yearandamount":
 		output = filterFunctionQuery1(input)
+	case "query2ayearandquantity":
+		output = filterFunctionQuery2a(input)
+	case "query2byearandsubtotal":
+		output = filterFunctionQuery2b(input)
 	default:
 		panic(fmt.Sprintf("Unknown function %s", function))
 	}

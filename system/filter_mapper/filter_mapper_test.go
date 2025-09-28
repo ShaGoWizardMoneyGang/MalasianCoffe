@@ -48,75 +48,39 @@ func TestFilterMapperQuery1(t *testing.T) {
 	}
 }
 
-// func TestFilterMapperQuery2a(t *testing.T) {
-// 	// Mock data for testing
-// 	transactionItemsRaw := []byte(
-// 		"b8a05324-c892-4e1f-a4b8-c78ec3884847,8,1,10.0,10.0,2025-05-01 10:51:41\n" +
-// 			"eab08b4e-fee8-4bf9-9a98-ce1c1d704111,3,3,8.0,24.0,2024-07-01 10:53:42\n" +
-// 			"c672d808-733a-4562-835c-b278eda590d7,8,1,10.0,10.0,2023-12-01 11:42:24",
-// 	)
-// 	fmt.Println("Data to be processed: \n", string(transactionItemsRaw))
+func TestFilterMapperQuery2a(t *testing.T) {
+	transactionItemsRaw := []string{
+		"b8a05324-c892-4e1f-a4b8-c78ec3884847,8,1,10.0,10.0,2025-05-01 10:51:41\n" +
+			"eab08b4e-fee8-4bf9-9a98-ce1c1d704111,3,3,8.0,24.0,2024-07-01 10:53:42\n" +
+			"c672d808-733a-4562-835c-b278eda590d7,8,1,10.0,10.0,2023-12-01 11:42:24",
+	}
+	pkt_empty := packet.Packet{}
+	pkt := packet.ChangePayload(pkt_empty, transactionItemsRaw)
+	worker := FilterMapper{}
 
-// 	// Create a Packet instance
-// 	pkt := packet.Packet{
-// 		Payload: transactionItemsRaw,
-// 	}
+	result := worker.Process(pkt[0], "query2aYearAndQuantity")
+	expected := "8,1,2025-05-01 10:51:41\n3,3,2024-07-01 10:53:42\n"
+	if result[0].GetPayload() != expected {
+		t.Fatalf("unexpected result: got %+v", result[0].GetPayload())
+	}
+}
 
-// 	// Create a new worker using the filter mapper options
-// 	filterByYear := FilterMapper{
-// 		Function: filterFunction2a,
-// 	}
+func TestFilterMapperQuery2b(t *testing.T) {
+	transactionItemsRaw := []string{
+		"b8a05324-c892-4e1f-a4b8-c78ec3884847,8,1,10.0,10.0,2025-05-01 10:51:41\n" +
+			"eab08b4e-fee8-4bf9-9a98-ce1c1d704111,3,3,8.0,24.0,2024-07-01 10:53:42\n" +
+			"c672d808-733a-4562-835c-b278eda590d7,8,1,10.0,10.0,2023-12-01 11:42:24",
+	}
+	pkt_empty := packet.Packet{}
+	pkt := packet.ChangePayload(pkt_empty, transactionItemsRaw)
+	worker := FilterMapper{}
 
-// 	// Process the packet using the worker
-// 	transactionItemsByYear := string(filterByYear.Process(pkt).Payload)
-// 	fmt.Println("Processed result: \n", transactionItemsByYear)
-
-// 	// Validate the result
-// 	expected := packet.Packet{
-// 		Payload: []byte(
-// 			"8,1,2025-05-01 10:51:41\n" +
-// 				"3,3,2024-07-01 10:53:42\n",
-// 		),
-// 	}
-// 	if transactionItemsByYear != string(expected.Payload) {
-// 		t.Fatalf("unexpected result: got %+v", transactionItemsByYear)
-// 	}
-// }
-
-// func TestFilterMapperQuery2b(t *testing.T) {
-// 	// Mock data for testing
-// 	transactionItemsRaw := []byte(
-// 		"b8a05324-c892-4e1f-a4b8-c78ec3884847,8,1,10.0,10.0,2025-05-01 10:51:41\n" +
-// 			"eab08b4e-fee8-4bf9-9a98-ce1c1d704111,3,3,8.0,24.0,2024-07-01 10:53:42\n" +
-// 			"c672d808-733a-4562-835c-b278eda590d7,8,1,10.0,10.0,2023-12-01 11:42:24",
-// 	)
-// 	fmt.Println("Data to be processed: \n", string(transactionItemsRaw))
-
-// 	// Create a Packet instance
-// 	pkt := packet.Packet{
-// 		Payload: transactionItemsRaw,
-// 	}
-
-// 	// Create a new worker using the filter mapper options
-// 	filterByYear := FilterMapper{
-// 		Function: filterFunction2b,
-// 	}
-
-// 	// Process the packet using the worker
-// 	transactionItemsByYear := string(filterByYear.Process(pkt).Payload)
-// 	fmt.Println("Processed result: \n", transactionItemsByYear)
-
-// 	// Validate the result
-// 	expected := packet.Packet{
-// 		Payload: []byte(
-// 			"8,10.0,2025-05-01 10:51:41\n" +
-// 				"3,24.0,2024-07-01 10:53:42\n",
-// 		),
-// 	}
-// 	if transactionItemsByYear != string(expected.Payload) {
-// 		t.Fatalf("unexpected result: got %+v", transactionItemsByYear)
-// 	}
-// }
+	result := worker.Process(pkt[0], "query2bYearAndSubtotal")
+	expected := "8,10.0,2025-05-01 10:51:41\n3,24.0,2024-07-01 10:53:42\n"
+	if result[0].GetPayload() != expected {
+		t.Fatalf("unexpected result: got %+v", result)
+	}
+}
 
 // func TestFilterMapperQuery3Store(t *testing.T) {
 // 	// Mock data for testing
