@@ -7,7 +7,6 @@ import (
 
 func TestJoinByStoreNameQuery3(t *testing.T) {
 	j := &Joiner{
-		Function: joinerFunctionQuery3,
 		Stores: map[string]string{
 			"1":  "G Coffee @ USJ 89q",
 			"2":  "G Coffee @ Kondominium Putra",
@@ -26,9 +25,10 @@ func TestJoinByStoreNameQuery3(t *testing.T) {
 		"2025-H2,2,99\n" +
 		"2025-H1,6,10\n"
 
-	paqueteSalida := j.Process(packet.Packet{Payload: []byte(transactions)})
-	salida := string(paqueteSalida.Payload)
+	pqtEntrada := packet.ChangePayload(packet.Packet{}, []string{transactions})[0]
 
+	paqueteSalida := (j.Process(pqtEntrada, "query3"))[0]
+	salida := paqueteSalida.GetPayload()
 	esperado := "" +
 		"2025-H1,G Coffee @ USJ 89q,123\n" +
 		"2025-H2,G Coffee @ Kondominium Putra,99\n" +
@@ -41,7 +41,6 @@ func TestJoinByStoreNameQuery3(t *testing.T) {
 
 func TestJoinByItemNameQuery2Quantity(t *testing.T) {
 	j := &Joiner{
-		Function: joinerFunctionQuery2Quantity,
 		MenuItems: map[string]string{
 			"1": "Espresso",
 			"2": "Americano",
@@ -58,8 +57,10 @@ func TestJoinByItemNameQuery2Quantity(t *testing.T) {
 		"2025-01,3,150392\n" +
 		"2025-03,6,155677\n"
 
-	paqueteSalida := j.Process(packet.Packet{Payload: []byte(transaction_items)})
-	salida := string(paqueteSalida.Payload)
+	pqtEntrada := packet.ChangePayload(packet.Packet{}, []string{transaction_items})[0]
+
+	paqueteSalida := (j.Process(pqtEntrada, "query2quantity"))[0]
+	salida := paqueteSalida.GetPayload()
 
 	esperado := "" +
 		"2024-12,Americano,150439\n" +
@@ -73,7 +74,6 @@ func TestJoinByItemNameQuery2Quantity(t *testing.T) {
 
 func TestJoinByItemNameQuery2Subtotal(t *testing.T) {
 	j := &Joiner{
-		Function: joinerFunctionQuery2Subtotal,
 		MenuItems: map[string]string{
 			"1": "Espresso",
 			"2": "Americano",
@@ -90,8 +90,10 @@ func TestJoinByItemNameQuery2Subtotal(t *testing.T) {
 		"2025-01,3,3104830\n" +
 		"2025-03,6,3002390.0\n"
 
-	paqueteSalida := j.Process(packet.Packet{Payload: []byte(transaction_items)})
-	salida := string(paqueteSalida.Payload)
+	pqtEntrada := packet.ChangePayload(packet.Packet{}, []string{transaction_items})[0]
+
+	paqueteSalida := (j.Process(pqtEntrada, "query2subtotal"))[0]
+	salida := paqueteSalida.GetPayload()
 
 	esperado := "" +
 		"2024-12,Americano,2990050.0\n" +
