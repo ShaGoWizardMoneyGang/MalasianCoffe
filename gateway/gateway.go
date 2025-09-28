@@ -16,7 +16,6 @@ import (
 
 
 	"malasian_coffe/utils/uuid"
-	"malasian_coffe/utils/network"
 	"malasian_coffe/protocol"
 )
 
@@ -55,8 +54,7 @@ func main() {
 
 func handle_connection(conn net.Conn) {
 	session_id   := uuid.GenerateUUID()
-	println(session_id)
 	session_id_b := protocol.SerializeString(session_id)
 
-	network.Send(conn, session_id_b)
+	protocol.SendToNetwork(conn, session_id_b)
 }

@@ -1,7 +1,8 @@
 package main
 
 import (
-	"encoding/binary"
+	// "encoding/binary"
+	"bytes"
 	"fmt"
 	"net"
 
@@ -10,7 +11,8 @@ import (
 	"bufio"
 
 	"malasian_coffe/packet"
-	"malasian_coffe/utils/network"
+	"malasian_coffe/protocol"
+	// "malasian_coffe/utils/network"
 )
 
 const (
@@ -76,19 +78,29 @@ func main() {
 	listen_addr := os.Args[3]
 
 // ============================ TODO: Encapsular ===============================
-	network.Read(conn, 1)
-	session_id_size_b, err := network.Read(conn, 8)
-	if err != nil {
-		panic(err)
-	}
-	session_id_size := binary.BigEndian.Uint64(session_id_size_b)
+	// network.Read(conn, 1)
+	// session_id_size_b, err := network.Read(conn, 8)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// session_id_size := binary.BigEndian.Uint64(session_id_size_b)
 
-	session_id_b, err := network.Read(conn, int(session_id_size))
+	// session_id_b, err := network.Read(conn, int(session_id_size))
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// session_id := string(session_id_b)
+// ============================ TODO: Encapsular ===============================
+	string_b, err := protocol.ReceiveFromNetwork(conn)
 	if err != nil {
 		panic(err)
 	}
-	session_id := string(session_id_b)
-// ============================ TODO: Encapsular ===============================
+	string_reader := bytes.NewReader(string_b)
+	session_id, err := protocol.DeserializeString(string_reader)
+	if err != nil {
+		panic(err)
+	}
+	println(session_id)
 
 	entries, err := os.ReadDir(dataset_directory)
 	if err != nil {
