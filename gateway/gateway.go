@@ -16,8 +16,13 @@ import (
 )
 
 func main() {
-	// Directory with all dataset subdirectories
+	// Own gateways addr
 	gateway_addr := os.Args[1]
+
+	// Rabbit server addr
+	rabbit_addr := os.Args[2]
+	rabbit_conn, err := net.Dial("tcp", rabbit_addr)
+
 
 	list, err := net.Listen("tcp", gateway_addr)
 	if err != nil {
@@ -43,14 +48,22 @@ func main() {
 
 		// multiple connections may be served concurrently.
 
-		go handle_connection(conn)
+		go handle_connection(conn, rabbit_conn)
 	}
 
 }
 
-func handle_connection(conn net.Conn) {
+func handle_connection(conn net.Conn, system net.Conn) {
 	session_id   := uuid.GenerateUUID()
 	session_id_b := protocol.SerializeString(session_id)
 
 	network.SendToNetwork(conn, session_id_b)
+
+	for {
+		packet, err := network.ReceiveFromNetwork(conn)
+		if err != nil {
+			panic(err)
+		}
+		network.SendToNetwork(system, packet)
+	}
 }

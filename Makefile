@@ -11,7 +11,7 @@ run-gateway:
 	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${RABBIT_ADDR}
 
 run-server:
-	cd system; go run main.go
+	cd system; go run main.go ${RABBIT_ADDR}
 
 #============================== Build directives ===============================
 
