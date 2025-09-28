@@ -14,7 +14,7 @@ type PacketUuid struct {
 
 type Header struct {
 	// ID de la session a la que este paquete corresponde
-	session_id uint64
+	session_id string
 
 	packet_uuid PacketUuid
 
@@ -25,7 +25,7 @@ type Header struct {
 }
 
 
-func newHeader(session_id uint64, packet_uuid PacketUuid, client_ip_port string) (Header){
+func newHeader(session_id string, packet_uuid PacketUuid, client_ip_port string) (Header){
 	return Header{
 		session_id: session_id,
 		packet_uuid: packet_uuid,

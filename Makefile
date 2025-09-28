@@ -11,7 +11,7 @@ build-client:
 
 RABBIT_ADDR           ?=    "localhost:9092"
 build-gateway:
-	cd client; go run main.go ${DATADIR} ${RABBIT_ADDR} ${LISTEN_ADDR}
+	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${RABBIT_ADDR}
 
 build-server:
 	cd system; go run main.go

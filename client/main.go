@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
 
@@ -9,7 +10,7 @@ import (
 	"bufio"
 
 	"malasian_coffe/packet"
-	// "malasian_coffe/protocol"
+	"malasian_coffe/utils/network"
 )
 
 const (
@@ -20,7 +21,7 @@ const (
 )
 
 
-func createPackagesFrom(dir string, dirID uint, session_ID uint64, listen_addr string, send_addr net.Conn) (error) {
+func createPackagesFrom(dir string, dirID uint, session_ID string, listen_addr string, send_addr net.Conn) (error) {
 	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr, send_addr)
 	// var payloadBuffer strings.Builder
 	// payloadBuffer.Grow(MAX_BATCH_SIZE)
@@ -74,9 +75,20 @@ func main() {
 
 	listen_addr := os.Args[3]
 
-	// TODO: Obtener del gateway
-	session_id := uint64(0)
+// ============================ TODO: Encapsular ===============================
+	network.Read(conn, 1)
+	session_id_size_b, err := network.Read(conn, 8)
+	if err != nil {
+		panic(err)
+	}
+	session_id_size := binary.BigEndian.Uint64(session_id_size_b)
 
+	session_id_b, err := network.Read(conn, int(session_id_size))
+	if err != nil {
+		panic(err)
+	}
+	session_id := string(session_id_b)
+// ============================ TODO: Encapsular ===============================
 
 	entries, err := os.ReadDir(dataset_directory)
 	if err != nil {

@@ -35,7 +35,7 @@ func deserializePacketUuid(reader *bytes.Reader) (PacketUuid, error) {
 // ================================= Header ====================================
 
 func (h *Header) serialize() ([]byte) {
-	session_id_b := protocol.SerializeUInteger64(h.session_id)
+	session_id_b := protocol.SerializeString(h.session_id)
 	packet_b := h.packet_uuid.serialize()
 	client_ip_port_b := protocol.SerializeString(h.client_ip_port)
 
@@ -46,7 +46,7 @@ func (h *Header) serialize() ([]byte) {
 }
 
 func deserializeHeader(reader *bytes.Reader) (Header, error){
-	session_id, error  := protocol.DeserializeUInteger64(reader)
+	session_id, error  := protocol.DeserializeString(reader)
 	if error != nil {
 		return Header{}, error
      }
