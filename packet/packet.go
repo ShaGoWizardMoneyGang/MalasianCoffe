@@ -18,7 +18,7 @@ const (
 	// Max batch size es 8192 simplemente porque es el valor default de BUFSIZ en glibc:
 	// https://sourceware.org/git/?p=glibc.git;a=blob;f=libio/stdio.h;h=e0e70945fab175fafcb0c8bbae96ad7eebe3df5a;hb=HEAD#l100
 	// Ademas, en el tp0 el maximo era 8000, el cual es parecido en tamano
-	MAX_BATCH_SIZE int  = 8192
+	MAX_BATCH_SIZE int = 8192
 )
 
 // Formato:
@@ -33,7 +33,7 @@ type PacketUuid struct {
 	eof bool
 }
 
-func (pu *PacketUuid) serialize() ([]byte) {
+func (pu *PacketUuid) serialize() []byte {
 	uuid_b := protocol.SerializeString(pu.uuid)
 	eof_b := protocol.SerializeBool(pu.eof)
 
@@ -53,7 +53,7 @@ func deserializePacketUuid(reader *bytes.Reader) (PacketUuid, error) {
 
 	return PacketUuid{
 		uuid: uuid,
-		eof: eof,
+		eof:  eof,
 	}, nil
 }
 
@@ -69,7 +69,22 @@ type Header struct {
 	client_ip_port string
 }
 
-func (h *Header) serialize() ([]byte) {
+func (h *Header) split(id int) Header {
+	new_uuid := h.packet_uuid.uuid + strconv.Itoa(id)
+
+	new_header := Header{
+		session_id: h.session_id,
+		packet_uuid: PacketUuid{
+			uuid: new_uuid,
+			eof:  h.packet_uuid.eof,
+		},
+		client_ip_port: h.client_ip_port,
+	}
+
+	return new_header
+}
+
+func (h *Header) serialize() []byte {
 	session_id_b := protocol.SerializeUInteger64(h.session_id)
 	packet_b := h.packet_uuid.serialize()
 	client_ip_port_b := protocol.SerializeString(h.client_ip_port)
@@ -80,36 +95,34 @@ func (h *Header) serialize() ([]byte) {
 	return header_b
 }
 
-func deserializeHeader(reader *bytes.Reader) (Header, error){
-	session_id, error  := protocol.DeserializeUInteger64(reader)
+func deserializeHeader(reader *bytes.Reader) (Header, error) {
+	session_id, error := protocol.DeserializeUInteger64(reader)
 	if error != nil {
 		return Header{}, error
-     }
+	}
 	packet_uuid, error := deserializePacketUuid(reader)
 	if error != nil {
 		return Header{}, error
-     }
+	}
 
 	client_ip_port, error := protocol.DeserializeString(reader)
 	if error != nil {
 		return Header{}, error
-     }
+	}
 
-	header := Header {
-		session_id: session_id,
-		packet_uuid: packet_uuid,
+	header := Header{
+		session_id:     session_id,
+		packet_uuid:    packet_uuid,
 		client_ip_port: client_ip_port,
 	}
 
 	return header, nil
 }
 
-
-
-func newHeader(session_id uint64, packet_uuid PacketUuid, client_ip_port string) (Header){
+func newHeader(session_id uint64, packet_uuid PacketUuid, client_ip_port string) Header {
 	return Header{
-		session_id: session_id,
-		packet_uuid: packet_uuid,
+		session_id:     session_id,
+		packet_uuid:    packet_uuid,
 		client_ip_port: client_ip_port,
 	}
 
@@ -121,9 +134,31 @@ type Packet struct {
 	payload string
 }
 
-func (p *Packet) Serialize() ([]byte) {
+// Mismo header, distinto payload
+func ChangePayload(packet Packet, newpayload []string) []Packet {
+	packets := make([]Packet, len(newpayload))
+
+	for i, payload := range newpayload {
+		newheader := packet.header
+		if len(packets) > 1 {
+			newheader = packet.header.split(i)
+		}
+		packets[i] = Packet{
+			header:  newheader,
+			payload: payload,
+		}
+	}
+
+	return packets
+}
+
+func (p *Packet) GetPayload() string {
+	return p.payload
+}
+
+func (p *Packet) Serialize() []byte {
 	header_b := p.header.serialize()
-	payload  := protocol.SerializeString(p.payload)
+	payload := protocol.SerializeString(p.payload)
 	packet_b := append(header_b, payload...)
 
 	return packet_b
@@ -133,25 +168,24 @@ func DeserializePackage(reader *bytes.Reader) (Packet, error) {
 	header, error := deserializeHeader(reader)
 	if error != nil {
 		return Packet{}, error
-     }
+	}
 	// NOTE: En teoria, la data deberia estar consumida a este punto
 	payload, error := protocol.DeserializeString(reader)
 	if error != nil {
 		return Packet{}, error
-     }
+	}
 
-	packet := Packet {
-		header: header,
+	packet := Packet{
+		header:  header,
 		payload: payload,
 	}
 
 	return packet, nil
 }
 
-
 // Struct usado para crear varios packets de un mismo directorio
 type PacketBuilder struct {
-// ============================ Campos de logica ===============================
+	// ============================ Campos de logica ===============================
 	// ID del directorio del cual van a ser todos los packets
 	dirID uint
 
@@ -161,24 +195,24 @@ type PacketBuilder struct {
 
 	client_ip_port string
 
-// =========================== Campos de payload ==============================
+	// =========================== Campos de payload ==============================
 
 	payload_buffer *strings.Builder
 
 	gatewayIP *net.Conn
 
-// ======================== Campos de sanity checks ===========================
+	// ======================== Campos de sanity checks ===========================
 
 	// Sanity check para corroborar que no envio dos archivos con el indicador de EOF
 	already_sent_eof bool
 }
 
-func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string, gatewayIP *net.Conn) (PacketBuilder) {
+func NewPacketBuilder(dirID uint, sessionID uint64, client_ip_port string, gatewayIP *net.Conn) PacketBuilder {
 	var payload_buffer strings.Builder
 	payload_buffer.Grow(MAX_BATCH_SIZE)
 
-	return PacketBuilder {
-		dirID: dirID,
+	return PacketBuilder{
+		dirID:                 dirID,
 		currentSequenceNumber: 0,
 
 		session_id: sessionID,
@@ -200,7 +234,7 @@ func sendToSocket(conn *net.Conn, data []byte) error {
 
 	var sent = 0
 	var err error
-	for offset := 0 ; offset < length ; offset += sent {
+	for offset := 0; offset < length; offset += sent {
 		sent, err = (*conn).Write(data[offset:])
 		if err != nil {
 			return err
@@ -210,8 +244,8 @@ func sendToSocket(conn *net.Conn, data []byte) error {
 	return nil
 }
 
-func (pb *PacketBuilder) Send(register string) (error) {
-	if pb.payload_buffer.Len() + len(register) > MAX_BATCH_SIZE {
+func (pb *PacketBuilder) Send(register string) error {
+	if pb.payload_buffer.Len()+len(register) > MAX_BATCH_SIZE {
 		packet, err := pb.createPacket(pb.payload_buffer.String(), false)
 		if err != nil {
 			return err
@@ -230,7 +264,7 @@ func (pb *PacketBuilder) Send(register string) (error) {
 	return nil
 }
 
-func (pb *PacketBuilder) End() (error) {
+func (pb *PacketBuilder) End() error {
 	packet, err := pb.createPacket(pb.payload_buffer.String(), true)
 
 	if err != nil {
@@ -247,7 +281,7 @@ func (pb *PacketBuilder) End() (error) {
 	return nil
 }
 
-func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, error){
+func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, error) {
 	slog.Info("New packet")
 	// Sanity checks
 
@@ -259,17 +293,16 @@ func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, erro
 	packet_id := strconv.FormatUint(uint64(pb.dirID), 10) + "." + strconv.FormatUint(uint64(pb.currentSequenceNumber), 10)
 	pb.currentSequenceNumber += 1
 
-	packet_uuid := PacketUuid {
+	packet_uuid := PacketUuid{
 		uuid: packet_id,
-		eof: is_eof,
-	};
+		eof:  is_eof,
+	}
 
-	header := newHeader(pb.session_id, packet_uuid, pb.client_ip_port);
+	header := newHeader(pb.session_id, packet_uuid, pb.client_ip_port)
 
-	return Packet {
-		header: header,
+	return Packet{
+		header:  header,
 		payload: payload,
 	}, nil
 
 }
-
