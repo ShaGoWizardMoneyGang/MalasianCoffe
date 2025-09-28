@@ -8,8 +8,6 @@ import (
 
 	"net"
 
-	"log/slog"
-
 	"malasian_coffe/protocol"
 	"malasian_coffe/utils/uuid"
 	"malasian_coffe/utils/network"
@@ -38,7 +36,7 @@ func main() {
 
 		if err != nil {
 
-			slog.Error("%s", err)
+			panic(err)
 
 		}
 
