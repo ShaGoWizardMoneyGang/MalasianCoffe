@@ -26,8 +26,7 @@ type Header struct {
 	client_ip_port string
 }
 
-
-func newHeader(session_id string, packet_uuid PacketUuid, client_ip_port string) (Header){
+func newHeader(session_id string, packet_uuid PacketUuid, client_ip_port string) Header {
 	return Header{
 		session_id:     session_id,
 		packet_uuid:    packet_uuid,
@@ -75,4 +74,8 @@ func ChangePayload(packet Packet, newpayload []string) []Packet {
 
 func (p *Packet) GetPayload() string {
 	return p.payload
+}
+
+func (p *Packet) IsEOF() bool {
+	return p.header.packet_uuid.eof
 }

@@ -18,8 +18,8 @@ func main() {
 		colaOutput []string
 	}
 	funcionesYColas := make(map[string]Colas)
-	funcionesYColas["query1234"] = Colas{colaInput: []string{"salida-1"}, colaOutput: []string{"salida-2"}}
-	// funcionesYColas["query2"] = Colas{colaInput: []string{"entrada-2"}, colaOutput: []string{"salida-2"}}
+	funcionesYColas["query1234"] = Colas{colaInput: []string{"FilterMapper1YearAndAmount"}, colaOutput: []string{"Concat1"}}
+	// funcionesYColas["query2"] = Colas{colaInput: []string{"entrada-2"}, colaOutput: []string{"ConcatQuery1"}}
 
 	// nombre_funcion := "query1YearAndAmount"
 	//map con key de nombre de la funcion y clave tupla de cola input y cola output
@@ -27,30 +27,32 @@ func main() {
 	rconn, _ := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	ch, _ := rconn.Channel()
 	ch.QueueDeclare(
-		"salida-1", // name
-		false,      // durable
-		false,      // delete when unused
-		false,      // exclusive
-		false,      // no-wait
-		nil,        // arguments
+		"FilterMapper1YearAndAmount", // name
+		false,                        // durable
+		false,                        // delete when unused
+		false,                        // exclusive
+		false,                        // no-wait
+		nil,                          // arguments
 	)
 	msgs, _ := ch.Consume(
-		"salida-1", // queue
-		"",         // consumer
-		false,      // auto-ack
-		false,      // exclusive
-		false,      // no-local
-		false,      // no-wait
-		nil,        // args
+		"FilterMapper1YearAndAmount", // queue
+		"",                           // consumer
+		false,                        // auto-ack
+		false,                        // exclusive
+		false,                        // no-local
+		false,                        // no-wait
+		nil,                          // args
 	)
 	worker := concat.Concat{}
 	var result []packet.Packet
 	for message := range msgs {
 		packet_reader := bytes.NewReader(message.Body)
 		packet, _ := packet.DeserializePackage(packet_reader)
+		if packet.IsEOF() {
+			break
+		}
 		fmt.Printf("HOLA ESTAS EN EL CONCAT %v\n", packet)
 		result = append(result, worker.Process(packet)[0])
 		fmt.Printf("HOLA YA PROCESASTE EL PAQUETE DEL CONCAT %v\n", result)
-		break
 	}
 }

@@ -8,16 +8,16 @@ run-client:
 
 RABBIT_ADDR           ?=    "localhost:5672"
 run-gateway:
-	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${RABBIT_ADDR}
+	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${LISTEN_ADDR}
 
 run-server:
-	cd system; go run system.go ${RABBIT_ADDR}
+	cd system; go run system.go ${LISTEN_ADDR}
 
 run-filter:
-	cd system/filter_mapper; go run filter_mapper.go 
+	cd system/filter_mapper; go run filter_mapper.go ${RABBIT_ADDR}
 
 run-concat: 
-	cd system/concat; go run concat.go 
+	cd system/concat; go run concat.go ${RABBIT_ADDR}
 #============================== Build directives ===============================
 
 current_dir = $(shell pwd)

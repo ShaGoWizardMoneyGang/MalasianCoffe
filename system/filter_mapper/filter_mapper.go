@@ -18,7 +18,7 @@ func main() {
 		colaOutput []string
 	}
 	funcionesYColas := make(map[string]Colas)
-	funcionesYColas["query1YearAndAmount"] = Colas{colaInput: []string{"entrada-1"}, colaOutput: []string{"salida-1"}}
+	funcionesYColas["query1YearAndAmount"] = Colas{colaInput: []string{"DataQuery1"}, colaOutput: []string{"FilterMapper1YearAndAmount"}}
 	// funcionesYColas["query2"] = Colas{colaInput: []string{"entrada-2"}, colaOutput: []string{"salida-2"}}
 
 	// nombre_funcion := "query1YearAndAmount"
@@ -27,43 +27,46 @@ func main() {
 	rconn, _ := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	ch, _ := rconn.Channel()
 	ch.QueueDeclare(
-		"entrada-1", // name
-		false,       // durable
-		false,       // delete when unused
-		false,       // exclusive
-		false,       // no-wait
-		nil,         // arguments
+		"DataQuery1", // name
+		false,        // durable
+		false,        // delete when unused
+		false,        // exclusive
+		false,        // no-wait
+		nil,          // arguments
 	)
 	msgs, _ := ch.Consume(
-		"entrada-1", // queue
-		"",          // consumer
-		false,       // auto-ack
-		false,       // exclusive
-		false,       // no-local
-		false,       // no-wait
-		nil,         // args
+		"DataQuery1", // queue
+		"",           // consumer
+		false,        // auto-ack
+		false,        // exclusive
+		false,        // no-local
+		false,        // no-wait
+		nil,          // args
 	)
 	worker := filter_mapper.FilterMapper{}
 	var result []packet.Packet
 	for message := range msgs {
 		packet_reader := bytes.NewReader(message.Body)
 		packet, _ := packet.DeserializePackage(packet_reader)
+		if packet.IsEOF() {
+			break
+		}
 		fmt.Printf("HOLA ESTAS EN EL FILTER MAPPER %v\n", packet)
 		result = append(result, worker.Process(packet, "query1YearAndAmount"))
 		fmt.Printf("HOLA YA PROCESASTE EL PAQUETE %v\n", result)
-		break
+
 	}
 	ch.QueueDeclare(
-		"salida-1", // name
-		false,      // durable
-		false,      // delete when unused
-		false,      // exclusive
-		false,      // no-wait
-		nil,        // arguments
+		"FilterMapper1YearAndAmount", // name
+		false,                        // durable
+		false,                        // delete when unused
+		false,                        // exclusive
+		false,                        // no-wait
+		nil,                          // arguments
 	)
 	fmt.Printf("%v\n", result)
 	for _, packet := range result {
-		ch.Publish("", "salida-1", false, false,
+		ch.Publish("", "FilterMapper1YearAndAmount", false, false,
 			amqp.Publishing{
 				// DeliveryMode: amqp.Persistent,
 				ContentType: "text/plain",
