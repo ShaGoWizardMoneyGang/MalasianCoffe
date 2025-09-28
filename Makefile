@@ -15,15 +15,17 @@ run-server:
 
 #============================== Build directives ===============================
 
+current_dir = $(shell pwd)
+
 build: build-server build-client build-gateway
 build-client:
-	cd client; go build main.go
+	cd client; go build -o ${current_dir}/bin/client
 
 build-gateway:
-	cd gateway; go build gateway.go
+	cd gateway; go build -o ${current_dir}/bin/gateway
 
 build-server:
-	cd system; go build main.go
+	cd system; go build -o ${current_dir}/bin/server
 
 #=============================== Test directives ===============================
 
