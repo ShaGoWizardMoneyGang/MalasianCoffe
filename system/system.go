@@ -22,7 +22,7 @@ func main() {
 
 		sudo systemctl start rabbitmq
 		or
-		sudo rc-service rabbitmq start`))
+		sudo rc-service rabbitmq start`, rabbit_addr))
 	}
 	ch, err := rconn.Channel()
 	if err != nil {
@@ -53,7 +53,7 @@ func main() {
 		}
 		packet, err := packet.DeserializePackage(packet_reader)
 		if err != nil {
-			panic(err)
+			fmt.Errorf("Error deserializing package: %s", err)
 		}
 		fmt.Printf("%v\n", packet)
 		ch.Publish("", "DataQuery1", false, false,

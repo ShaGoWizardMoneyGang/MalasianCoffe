@@ -13,8 +13,6 @@ import (
 	"malasian_coffe/packet"
 	"malasian_coffe/protocol"
 	"malasian_coffe/utils/network"
-
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const (
@@ -110,29 +108,29 @@ func main() {
 	}
 	fmt.Println("I am the client")
 
-	rconn, _ := amqp.Dial("amqp://guest:guest@localhost:5672/")
-	ch, _ := rconn.Channel()
-	ch.QueueDeclare(
-		"prueba", // name
-		false,    // durable
-		false,    // delete when unused
-		false,    // exclusive
-		false,    // no-wait
-		nil,      // arguments
-	)
-	msgs, err := ch.Consume(
-		"prueba", // queue
-		"",       // consumer
-		false,    // auto-ack
-		false,    // exclusive
-		false,    // no-local
-		false,    // no-wait
-		nil,      // args
-	)
+	// rconn, _ := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	// ch, _ := rconn.Channel()
+	// ch.QueueDeclare(
+	// 	"prueba", // name
+	// 	false,    // durable
+	// 	false,    // delete when unused
+	// 	false,    // exclusive
+	// 	false,    // no-wait
+	// 	nil,      // arguments
+	// )
+	// msgs, err := ch.Consume(
+	// 	"prueba", // queue
+	// 	"",       // consumer
+	// 	false,    // auto-ack
+	// 	false,    // exclusive
+	// 	false,    // no-local
+	// 	false,    // no-wait
+	// 	nil,      // args
+	// )
 
-	for message := range msgs {
-		packet_reader := bytes.NewReader(message.Body)
-		packet, _ := packet.DeserializePackage(packet_reader)
-		fmt.Printf("%v\n", packet)
-	}
+	// for message := range msgs {
+	// 	packet_reader := bytes.NewReader(message.Body)
+	// 	packet, _ := packet.DeserializePackage(packet_reader)
+	// 	fmt.Printf("%v\n", packet)
+	// }
 }

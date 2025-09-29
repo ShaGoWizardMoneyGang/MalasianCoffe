@@ -1,0 +1,56 @@
+name: tp1
+services:
+  server:
+    container_name: server
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./server_bin 0.0.0.0:9091 rabbitmq:5672
+    volumes:
+      - ./bin/server:/app/server_bin
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  gateway:
+    container_name: gateway
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./gateway_bin 0.0.0.0:9090 server:9091
+    volumes:
+      - ./bin/gateway:/app/gateway_bin
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  client1:
+    container_name: client1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./client_bin ../dataset/ gateway:9090 gateway:9091
+    volumes:
+      - ./bin/client:/app/client_bin
+      - ./dataset:/dataset
+    depends_on:
+      - gateway
+    networks:
+      - testing_net
+
+  rabbitmq:
+    container_name: rabbitmq_test
+    image: rabbitmq:4.1.4-management
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    networks:
+      - testing_net
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 5s
+      retries: 5
+
+networks:
+  testing_net:
+    driver: bridge
