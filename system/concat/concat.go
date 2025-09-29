@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"malasian_coffe/packet"
+	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
 	"malasian_coffe/system/middleware"
 )
@@ -73,5 +73,15 @@ func main() {
 			// send
 			break
 		}
+	}
+
+	colaSalida, err := middleware.CreateQueue("salida-query-1", middleware.ChannelOptionsDefault())
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
+	}
+	defer colaSalida.Close()
+
+	for _, pkt := range result {
+		_ = colaSalida.Send(pkt.Serialize())
 	}
 }

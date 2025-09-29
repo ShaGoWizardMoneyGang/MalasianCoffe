@@ -10,7 +10,7 @@ import (
 
 type ChannelOptions struct {
 	// Donde hablo con rabbit
-	daemonAddress string
+	DaemonAddress string
 	/*	q, err := ch.QueueDeclare(
 		"",    // name
 		false, // durable
@@ -23,13 +23,13 @@ type ChannelOptions struct {
 
 func ChannelOptionsDefault() ChannelOptions {
 	return ChannelOptions{
-		daemonAddress: "amqp://guest:guest@localhost:5672/",
+		DaemonAddress: "amqp://guest:guest@localhost:5672/",
 	}
 }
 
 func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, error) {
 
-	conn, err := amqp.Dial(options.daemonAddress)
+	conn, err := amqp.Dial(options.DaemonAddress)
 	if err != nil {
 		return nil, fmt.Errorf(`failed to connect to RabbitMQ: %w. Is the daemon active?
 		Try running:

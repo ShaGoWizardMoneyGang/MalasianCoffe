@@ -6,10 +6,11 @@ import (
 	"net"
 	"os"
 
-	"malasian_coffe/packet"
+	amqp "github.com/rabbitmq/amqp091-go"
+
+	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/network"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
@@ -56,6 +57,12 @@ func main() {
 			fmt.Errorf("Error deserializing package: %s", err)
 		}
 		fmt.Printf("%v\n", packet)
+
+		// TODO: esto esta hardcodeado asi porque es para la query 1.
+		// Aca deberia haber un switch que lo envie a la queue correspondiente
+		if packet.GetDirID() != "3"{
+			continue
+		}
 		ch.Publish("", "DataQuery1", false, false,
 			amqp.Publishing{
 				// DeliveryMode: amqp.Persistent,

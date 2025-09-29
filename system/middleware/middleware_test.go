@@ -18,7 +18,6 @@ func TestWorkingQueue1To1(t *testing.T) {
 	started := make(chan bool)
 	go func() {
 		msgs, _ := queue.StartConsuming()
-
 		hasStarted := false
 		for message := range *(*(msgs)) {
 			// Starts reading messages

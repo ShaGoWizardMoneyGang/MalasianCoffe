@@ -18,11 +18,15 @@ run-filter:
 
 run-concat: 
 	cd system/concat; go run concat.go ${RABBIT_ADDR}
+
+# RABBIT_ADDR           ?=    "amqp://guest:guest@localhost:5672/"
+run-sender:
+	cd system/sender; go run sender.go ${RABBIT_ADDR}
 #============================== Build directives ===============================
 
 current_dir = $(shell pwd)
 
-build: build-server build-client build-gateway build-filter build-concat
+build: build-server build-client build-gateway build-filter build-concat build-sender
 build-client:
 	cd client; go build -o ${current_dir}/bin/client
 
@@ -37,6 +41,9 @@ build-filter:
 
 build-concat:
 	cd system/concat; go build -o ${current_dir}/bin/concat
+
+build-sender:
+	cd system/sender; go build -o ${current_dir}/bin/sender
 
 #=============================== Test directives ===============================
 
@@ -61,3 +68,6 @@ download-dataset:
 # Delete unused dataset files
 	rm -rf dataset/vouchers
 	rm -rf dataset/payment_methods
+
+rabbit-gui:
+	xdg-open http://localhost:15672
