@@ -26,28 +26,23 @@ func main() {
 	worker := filter_mapper.FilterMapper{}
 	var result []packet.Packet
 
-	// msgQueue es **<-chan amqp.Delivery HORRIBLE
-	for message := range **msgQueue {
-		packetReader := bytes.NewReader(message.Body)
-		pkt, _ := packet.DeserializePackage(packetReader)
-
-		fmt.Printf("paquete recibido: %+v\n", pkt)
-		paqueteSalida := worker.Process(pkt, "query1YearAndAmount")
-		result = append(result, paqueteSalida)
-		fmt.Printf("paquete procesado: %+v\n", paqueteSalida)
-		if pkt.IsEOF() {
-			break
-		}
-	}
-
 	// cola de salida, envio
 	colaSalida, err := middleware.CreateQueue("FilterMapper1YearAndAmount", middleware.ChannelOptionsDefault())
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
 	}
-	// defer colaSalida.Close()
 
-	for _, pkt := range result {
-		_ = colaSalida.Send(pkt.Serialize())
+	// msgQueue es **<-chan amqp.Delivery HORRIBLE
+	for message := range **msgQueue {
+		packetReader := bytes.NewReader(message.Body)
+		pkt, _ := packet.DeserializePackage(packetReader)
+
+		paqueteSalida := worker.Process(pkt, "query1YearAndAmount")
+		result = append(result, paqueteSalida)
+		// fmt.Printf("paquete recibido:")
+
+		for _, pkt := range result {
+			_ = colaSalida.Send(pkt.Serialize())
+		}
 	}
 }

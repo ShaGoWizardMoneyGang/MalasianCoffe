@@ -60,6 +60,12 @@ func main() {
 	// 	false,                        // no-wait
 	// 	nil,                          // args
 	// )
+	colaSalida, err := middleware.CreateQueue("salida-query-1", middleware.ChannelOptionsDefault())
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
+	}
+	// defer colaSalida.Close()
+
 	worker := concat.Concat{}
 	var result []packet.Packet
 	for message := range **msgQueue {
@@ -67,21 +73,15 @@ func main() {
 		packet, _ := packet.DeserializePackage(packet_reader)
 		result = worker.Process(packet)
 		//fmt.Printf("HOLA ESTAS EN EL CONCAT %v\n", packet)
+		// fmt.Println("Me llego un paquete")
 		//result = append(result, worker.Process(packet)[0])
 		//fmt.Printf("HOLA YA PROCESASTE EL PAQUETE DEL CONCAT %v\n", result)
 		if len(result) != 0 {
-			// send
-			break
+			for _, pkt := range result {
+				_ = colaSalida.Send(pkt.Serialize())
+			}
 		}
 	}
 
-	colaSalida, err := middleware.CreateQueue("salida-query-1", middleware.ChannelOptionsDefault())
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
-	}
-	defer colaSalida.Close()
 
-	for _, pkt := range result {
-		_ = colaSalida.Send(pkt.Serialize())
-	}
 }
