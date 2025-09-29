@@ -17,12 +17,12 @@ func main() {
 	rconn, err := amqp.Dial("amqp://guest:guest@" + rabbit_addr + "/")
 
 	if err != nil {
-		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %w. Is the daemon active?
+		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %s. Is the daemon active?
 		Try running:
 
 		sudo systemctl start rabbitmq
 		or
-		sudo rc-service rabbitmq start`))
+		sudo rc-service rabbitmq start`, rabbit_addr))
 	}
 	ch, err := rconn.Channel()
 	if err != nil {
@@ -53,7 +53,7 @@ func main() {
 		}
 		packet, err := packet.DeserializePackage(packet_reader)
 		if err != nil {
-			panic(err)
+			fmt.Errorf("Error deserializing package: %s", err)
 		}
 		fmt.Printf("%v\n", packet)
 		ch.Publish("", "DataQuery1", false, false,

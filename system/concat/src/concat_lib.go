@@ -10,19 +10,29 @@ type Concat struct {
 	result string
 }
 
-func (c *Concat) concatFunctionQuery(input string) string {
+func (c *Concat) concatFunctionQuery(input string) {
 	if len(input) > 0 && input[len(input)-1] != '\n' { //puedo tener un input vacio por si creo un packet nuevo
 		input += "\n"
 	}
 	c.result += input
-	return c.result
+}
+
+func (c *Concat) end() {
+	c.result = ""
 }
 
 func (c *Concat) Process(pkt packet.Packet) []packet.Packet {
 	input := pkt.GetPayload()
-	output := c.concatFunctionQuery(input)
-	outputs := []string{output}
+	c.concatFunctionQuery(input)
+	if !pkt.IsEOF() {
+		return []packet.Packet{}
+	}
+
+	// Cuando llegamos aca, ya tenemos todo concatenado.
+	outputs := []string{c.result}
 	newPacket := packet.ChangePayload(pkt, outputs)
+
+	c.end()
 
 	return newPacket
 }
