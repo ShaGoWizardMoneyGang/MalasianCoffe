@@ -83,3 +83,7 @@ func (p *Packet) IsEOF() bool {
 func (p *Packet) GetSessionID() string {
 	return p.header.session_id
 }
+
+func (p *Packet) GetClientAddr() string {
+	return p.header.client_ip_port
+}
