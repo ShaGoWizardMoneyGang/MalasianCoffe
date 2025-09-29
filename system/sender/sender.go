@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"net"
-	"os"
+	// "os"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/packets/packet_answer"
@@ -15,7 +15,7 @@ import (
 // 1: Direccion de rabbit
 func main() {
 	// TODO: Hacer que escuche de todas las colas de salida
-	rabbit_addr := os.Args[1]
+	// rabbit_addr := os.Args[1]
 	// rconn, _ := amqp.Dial(rabbit_addr)
 
 	// ch, _ := rconn.Channel()
@@ -29,9 +29,7 @@ func main() {
 	// 	false, // no-wait
 	// 	nil,   // arguments
 	// )
-	queue, err := middleware.CreateQueue("salida-query-1", middleware.ChannelOptions {
-		DaemonAddress: rabbit_addr,
-	})
+	queue, err := middleware.CreateQueue("salida-query-1", middleware.ChannelOptionsDefault())
 	if err != nil {
 		panic("Couldn't create query 1 queu")
 	}

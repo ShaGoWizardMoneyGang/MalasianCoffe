@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
+	"malasian_coffe/system/middleware"
 	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -64,5 +65,15 @@ func main() {
 		if packet.IsEOF() {
 			break
 		}
+	}
+
+	colaSalida, err := middleware.CreateQueue("salida-query-1", middleware.ChannelOptionsDefault())
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
+	}
+	defer colaSalida.Close()
+
+	for _, pkt := range result {
+		_ = colaSalida.Send(pkt.Serialize())
 	}
 }
