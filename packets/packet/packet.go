@@ -79,3 +79,7 @@ func (p *Packet) GetPayload() string {
 func (p *Packet) IsEOF() bool {
 	return p.header.packet_uuid.eof
 }
+
+func (p *Packet) GetSessionID() string {
+	return p.header.session_id
+}

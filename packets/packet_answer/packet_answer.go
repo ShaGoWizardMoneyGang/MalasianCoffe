@@ -1,7 +1,10 @@
 package packetanswer
 
-// Este es el packet que se envia como respuesta a la query. Difiere del input.
+import (
+	"malasian_coffe/packets/packet"
+)
 
+// Este es el packet que se envia como respuesta a la query. Difiere del input.
 type AnswerHeader struct {
 	// ID de la session a la que este paquete corresponde
 	// Usado como sanity check
@@ -17,9 +20,9 @@ type PacketAnswer struct {
 }
 
 // Crea un PacketAnswer de un Packet
-func From (packet Packet, query string) PacketAnswer {
+func From (packet packet.Packet, query string) PacketAnswer {
 	payload      := packet.GetPayload()
-	session_id   := packet.header.session_id
+	session_id   := packet.GetSessionID()
 	packetanswer := PacketAnswer {
 		header: AnswerHeader {
 			session_id: session_id,
