@@ -5,8 +5,10 @@ import (
 	"net"
 	"os"
 
+	amqp "github.com/rabbitmq/amqp091-go"
+
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_answer"
+	packetanswer "malasian_coffe/packets/packet_answer"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
 )
