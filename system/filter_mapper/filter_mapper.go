@@ -14,14 +14,14 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(DataQuery1): %w", err))
 	}
-	defer colaEntrada.Close()
+	// defer colaEntrada.Close()
 
 	// arranca a consumir
 	msgQueue, consumeError := colaEntrada.StartConsuming()
 	if consumeError != 0 {
 		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
 	}
-	defer colaEntrada.StopConsuming()
+	// defer colaEntrada.StopConsuming()
 
 	worker := filter_mapper.FilterMapper{}
 	var result []packet.Packet
@@ -45,7 +45,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
 	}
-	defer colaSalida.Close()
+	// defer colaSalida.Close()
 
 	for _, pkt := range result {
 		_ = colaSalida.Send(pkt.Serialize())

@@ -16,6 +16,7 @@ import (
 	"github.com/fatih/color"
 )
 
+
 func createPackagesFrom(dir string, dirID uint, session_ID string, listen_addr string, send_addr net.Conn) error {
 	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr, send_addr)
 	// var payloadBuffer strings.Builder

@@ -65,7 +65,7 @@ func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, 
 	consumeChannel, err := ch.Consume(
 		q.Name,      // queue
 		consumerTag, // consumer
-		true,        // auto-ack
+		false,       // auto-ack
 		false,       // exclusive
 		false,       // no-local/fix fmt.Errorf call has arguments but no formatting directives
 		false,       // no-wait
