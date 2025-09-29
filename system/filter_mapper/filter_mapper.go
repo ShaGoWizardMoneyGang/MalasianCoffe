@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"malasian_coffe/packet"
+	"malasian_coffe/packets/packet"
 	filter_mapper "malasian_coffe/system/filter_mapper/src"
 	"malasian_coffe/system/middleware"
 )

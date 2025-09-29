@@ -10,7 +10,7 @@ import (
 
 	"bufio"
 
-	"malasian_coffe/packet"
+	"malasian_coffe/packets/packet"
 	"malasian_coffe/protocol"
 	"malasian_coffe/utils/network"
 

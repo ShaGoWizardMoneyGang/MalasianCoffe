@@ -2,7 +2,7 @@ package filter_mapper
 
 import (
 	"fmt"
-	"malasian_coffe/packet"
+	"malasian_coffe/packets/packet"
 	"math"
 	"strconv"
 	"strings"

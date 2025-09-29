@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"malasian_coffe/packet"
+	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
 	"os"
 

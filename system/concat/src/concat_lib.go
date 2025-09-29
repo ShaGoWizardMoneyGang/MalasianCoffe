@@ -1,7 +1,7 @@
 package concat
 
 import (
-	"malasian_coffe/packet"
+	"malasian_coffe/packets/packet"
 )
 
 type Concat struct {

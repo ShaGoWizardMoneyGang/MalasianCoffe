@@ -6,10 +6,11 @@ import (
 	"net"
 	"os"
 
-	"malasian_coffe/packet"
+	amqp "github.com/rabbitmq/amqp091-go"
+
+	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/network"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
