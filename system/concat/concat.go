@@ -65,10 +65,12 @@ func main() {
 	for message := range **msgQueue {
 		packet_reader := bytes.NewReader(message.Body)
 		packet, _ := packet.DeserializePackage(packet_reader)
-		fmt.Printf("HOLA ESTAS EN EL CONCAT %v\n", packet)
-		result = append(result, worker.Process(packet)[0])
-		fmt.Printf("HOLA YA PROCESASTE EL PAQUETE DEL CONCAT %v\n", result)
-		if packet.IsEOF() {
+		result = worker.Process(packet)
+		//fmt.Printf("HOLA ESTAS EN EL CONCAT %v\n", packet)
+		//result = append(result, worker.Process(packet)[0])
+		//fmt.Printf("HOLA YA PROCESASTE EL PAQUETE DEL CONCAT %v\n", result)
+		if len(result) != 0 {
+			// send
 			break
 		}
 	}
