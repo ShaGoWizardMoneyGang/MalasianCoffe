@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	// "net"
 
 	"os"
@@ -51,6 +52,7 @@ func main() {
 }
 
 func handle_connection(conn net.Conn, system net.Conn) {
+	defer conn.Close()
 	session_id := uuid.GenerateUUID()
 	session_id_b := protocol.SerializeString(session_id)
 
@@ -59,7 +61,10 @@ func handle_connection(conn net.Conn, system net.Conn) {
 	for {
 		packet, err := network.ReceiveFromNetwork(conn)
 		if err != nil {
-			fmt.Errorf("Error receiving from network: %s", err)
+			if err != io.EOF {
+				fmt.Printf("Unkown error : %s\n", err)
+			}
+			break
 		}
 		network.SendToNetwork(system, packet)
 	}
