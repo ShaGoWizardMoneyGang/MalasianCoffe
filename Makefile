@@ -68,3 +68,6 @@ download-dataset:
 # Delete unused dataset files
 	rm -rf dataset/vouchers
 	rm -rf dataset/payment_methods
+
+rabbit-gui:
+	xdg-open http://localhost:15672
