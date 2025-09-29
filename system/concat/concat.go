@@ -29,7 +29,7 @@ func main() {
 	rabbit_addr := os.Args[1]
 	rconn, err := amqp.Dial("amqp://guest:guest@" + rabbit_addr + "/")
 	if err != nil {
-		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %w. Is the daemon active?
+		panic(fmt.Errorf(`failed to rconnect to RabbitMQ. Is the daemon active?
 		Try running:
 
 		sudo systemctl start rabbitmq
