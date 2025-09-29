@@ -20,8 +20,8 @@ func main() {
 	gateway_addr := os.Args[1]
 
 	// Rabbit server addr
-	rabbit_addr := os.Args[2]
-	rabbit_conn, err := net.Dial("tcp", rabbit_addr)
+	system_addr := os.Args[2]
+	system_conn, err := net.Dial("tcp", system_addr)
 
 	list, err := net.Listen("tcp", gateway_addr)
 	if err != nil {
@@ -47,7 +47,7 @@ func main() {
 
 		// multiple connections may be served concurrently.
 
-		go handle_connection(conn, rabbit_conn)
+		go handle_connection(conn, system_conn)
 	}
 
 }

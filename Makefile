@@ -2,11 +2,12 @@
 
 DATADIR                ?=    ../dataset/
 GATEWAY_ADDR           ?=    "localhost:9090"
-LISTEN_ADDR            ?=    "localhost:9091"
+CLIENT_LISTEN_ADDR     ?=    "localhost:9093"
 run-client:
-	cd client; go run client.go ${DATADIR} ${GATEWAY_ADDR} ${LISTEN_ADDR}
+	cd client; go run client.go ${DATADIR} ${GATEWAY_ADDR} ${CLIENT_LISTEN_ADDR}
 
 RABBIT_ADDR           ?=    "localhost:5672"
+LISTEN_ADDR            ?=    "localhost:9092"
 run-gateway:
 	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${LISTEN_ADDR}
 

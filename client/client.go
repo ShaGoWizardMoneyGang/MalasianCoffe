@@ -196,7 +196,7 @@ func waitForAnswers(listen_addr string) error {
 
 	list, err := net.Listen("tcp", listen_addr)
 	if err != nil {
-		panic("Failed to create listener")
+		panic(fmt.Errorf("Failed to create listener %w", err))
 	}
 	for {
 		received_answers.display()
