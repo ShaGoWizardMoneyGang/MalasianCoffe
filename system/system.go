@@ -57,6 +57,12 @@ func main() {
 			panic(err)
 		}
 		fmt.Printf("%v\n", packet)
+
+		// TODO: esto esta hardcodeado asi porque es para la query 1.
+		// Aca deberia haber un switch que lo envie a la queue correspondiente
+		if packet.GetDirID() != "3"{
+			continue
+		}
 		ch.Publish("", "DataQuery1", false, false,
 			amqp.Publishing{
 				// DeliveryMode: amqp.Persistent,
