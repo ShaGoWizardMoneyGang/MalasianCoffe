@@ -45,7 +45,7 @@ func (pa *PacketAnswer) Serialize() ([]byte) {
 	return packetanswer
 }
 
-func DeserializePackage(reader *bytes.Reader) (PacketAnswer, error) {
+func DeserializePackageAnswer(reader *bytes.Reader) (PacketAnswer, error) {
 	header, error := deserializeAnswerHeader(reader)
 	if error != nil {
 		return PacketAnswer{}, error

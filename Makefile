@@ -18,6 +18,10 @@ run-filter:
 
 run-concat: 
 	cd system/concat; go run concat.go ${RABBIT_ADDR}
+
+# RABBIT_ADDR           ?=    "amqp://guest:guest@localhost:5672/"
+run-sender:
+	cd system/sender; go run sender.go ${RABBIT_ADDR}
 #============================== Build directives ===============================
 
 current_dir = $(shell pwd)
