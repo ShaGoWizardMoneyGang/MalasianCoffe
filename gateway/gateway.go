@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+
 	// "net"
 
 	"os"
@@ -68,4 +69,5 @@ func handle_connection(conn net.Conn, system net.Conn) {
 		}
 		network.SendToNetwork(system, packet)
 	}
+	fmt.Printf("Session %s ended - Finished Handling\n", session_id)
 }
