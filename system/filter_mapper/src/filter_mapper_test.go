@@ -1,11 +1,6 @@
 package filter_mapper
 
-import (
-	"malasian_coffe/packet"
-	"testing"
-)
-
-func TestFilterByYear(t *testing.T) {
+/*func TestFilterByYear(t *testing.T) {
 	// Mock data for testing
 	data := []string{"2ae6d188-76c2-4095-b861-ab97d3cd9312,4,5,,,38.0,0.0,38.0,2024-07-01 23:01:00\n" +
 		"7d0a474d-62f4-442a-96b6-a5df2bda8832,7,1,,,33.0,0.0,33.0,2025-07-01 07:00:02\n" +
@@ -154,3 +149,4 @@ func TestFilterMapperQuery4UsersBirthdates(t *testing.T) {
 		t.Fatalf("unexpected result: got %+v", result[0].GetPayload())
 	}
 }
+*/

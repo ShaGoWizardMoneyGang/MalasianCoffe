@@ -1,7 +1,7 @@
 package counter
 
 import (
-	"malasian_coffe/packet"
+	"malasian_coffe/packets/packet"
 	"testing"
 )
 

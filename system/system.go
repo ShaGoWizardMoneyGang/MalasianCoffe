@@ -1,20 +1,34 @@
 package main
 
 import (
-	"fmt"
 	"bytes"
+	"fmt"
 	"net"
 	"os"
 
-	"malasian_coffe/packet"
-
+	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/network"
+	"malasian_coffe/system/middleware"
+
 )
 
 func main() {
-	rabbit_addr := os.Args[1]
+	rabbit_addr := os.Args[2]
 
-	list, err := net.Listen("tcp", rabbit_addr)
+	colaInicial, err := middleware.CreateQueue("DataQuery1", middleware.ChannelOptionsDefault())
+	if err != nil {
+		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %s. Is the daemon active?
+		Try running:
+
+		sudo systemctl start rabbitmq
+		or
+		sudo rc-service rabbitmq start`, rabbit_addr))
+	}
+
+	//listen_addr
+	listen_addr := os.Args[1]
+
+	list, err := net.Listen("tcp", listen_addr)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create listener. Error: %s", err))
 	}
@@ -28,8 +42,15 @@ func main() {
 		}
 		packet, err := packet.DeserializePackage(packet_reader)
 		if err != nil {
-			panic(err)
+			fmt.Errorf("Error deserializing package: %s", err)
 		}
 		fmt.Printf("%v\n", packet)
+
+		// TODO: esto esta hardcodeado asi porque es para la query 1.
+		// Aca deberia haber un switch que lo envie a la queue correspondiente
+		if packet.GetDirID() != "3"{
+			continue
+		}
+		colaInicial.Send(packet.Serialize())
 	}
 }

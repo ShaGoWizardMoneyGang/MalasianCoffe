@@ -14,6 +14,11 @@ type PacketUuid struct {
 	eof bool
 }
 
+func (pu *PacketUuid) getDirID() string {
+	dir_id := string(pu.uuid[0])
+	return dir_id
+}
+
 type Header struct {
 	// ID de la session a la que este paquete corresponde
 	session_id string
@@ -26,8 +31,7 @@ type Header struct {
 	client_ip_port string
 }
 
-
-func newHeader(session_id string, packet_uuid PacketUuid, client_ip_port string) (Header){
+func newHeader(session_id string, packet_uuid PacketUuid, client_ip_port string) Header {
 	return Header{
 		session_id:     session_id,
 		packet_uuid:    packet_uuid,
@@ -75,4 +79,20 @@ func ChangePayload(packet Packet, newpayload []string) []Packet {
 
 func (p *Packet) GetPayload() string {
 	return p.payload
+}
+
+func (p *Packet) IsEOF() bool {
+	return p.header.packet_uuid.eof
+}
+
+func (p *Packet) GetSessionID() string {
+	return p.header.session_id
+}
+
+func (p *Packet) GetClientAddr() string {
+	return p.header.client_ip_port
+}
+
+func (p *Packet) GetDirID() string {
+	return p.header.packet_uuid.getDirID()
 }

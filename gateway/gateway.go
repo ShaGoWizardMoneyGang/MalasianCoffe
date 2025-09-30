@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+
 	// "net"
 
 	"os"
@@ -9,8 +11,8 @@ import (
 	"net"
 
 	"malasian_coffe/protocol"
-	"malasian_coffe/utils/uuid"
 	"malasian_coffe/utils/network"
+	"malasian_coffe/utils/uuid"
 )
 
 func main() {
@@ -18,9 +20,8 @@ func main() {
 	gateway_addr := os.Args[1]
 
 	// Rabbit server addr
-	rabbit_addr := os.Args[2]
-	rabbit_conn, err := net.Dial("tcp", rabbit_addr)
-
+	system_addr := os.Args[2]
+	system_conn, err := net.Dial("tcp", system_addr)
 
 	list, err := net.Listen("tcp", gateway_addr)
 	if err != nil {
@@ -46,13 +47,14 @@ func main() {
 
 		// multiple connections may be served concurrently.
 
-		go handle_connection(conn, rabbit_conn)
+		go handle_connection(conn, system_conn)
 	}
 
 }
 
 func handle_connection(conn net.Conn, system net.Conn) {
-	session_id   := uuid.GenerateUUID()
+	defer conn.Close()
+	session_id := uuid.GenerateUUID()
 	session_id_b := protocol.SerializeString(session_id)
 
 	network.SendToNetwork(conn, session_id_b)
@@ -60,8 +62,12 @@ func handle_connection(conn net.Conn, system net.Conn) {
 	for {
 		packet, err := network.ReceiveFromNetwork(conn)
 		if err != nil {
-			panic(err)
+			if err != io.EOF {
+				fmt.Printf("Unkown error : %s\n", err)
+			}
+			break
 		}
 		network.SendToNetwork(system, packet)
 	}
+	fmt.Printf("Session %s ended - Finished Handling\n", session_id)
 }

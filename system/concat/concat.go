@@ -1,28 +1,51 @@
-package concat
+package main
 
 import (
-	"malasian_coffe/packet"
+	"bytes"
+	"fmt"
+	"log/slog"
+	"malasian_coffe/packets/packet"
+	concat "malasian_coffe/system/concat/src"
+	"malasian_coffe/system/middleware"
 )
 
-type Concat struct {
-	// Guardo el resultado, recuerdo que voy a tener un nodo concat por query!!!
-	// el unico caso especial es la de la consulta 4 que devuelve 2 tablas
-	result string
-}
-
-func (c *Concat) concatFunctionQuery(input string) string {
-	if len(input) > 0 && input[len(input)-1] != '\n' { //puedo tener un input vacio por si creo un packet nuevo
-		input += "\n"
+// Argumentos que recibe:
+// 1. Address de rabbit
+// 2. Nombre de la funcion que tiene que ejecutar
+func main() {
+	colaEntrada, err := middleware.CreateQueue("FilterMapper1YearAndAmount", middleware.ChannelOptionsDefault())
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
 	}
-	c.result += input
-	return c.result
-}
+	msgQueue, consumeError := colaEntrada.StartConsuming()
+	if consumeError != 0 {
+		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
+	}
 
-func (c *Concat) Process(pkt packet.Packet) []packet.Packet {
-	input := pkt.GetPayload()
-	output := c.concatFunctionQuery(input)
-	outputs := []string{output}
-	newPacket := packet.ChangePayload(pkt, outputs)
+	colaSalida, err := middleware.CreateQueue("SalidaQuery1", middleware.ChannelOptionsDefault())
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
+	}
 
-	return newPacket
+	worker := concat.Concat{}
+	var result []packet.Packet
+	for message := range *msgQueue {
+
+		slog.Debug("Recibi mensaje")
+		packet_reader := bytes.NewReader(message.Body)
+		packet, _ := packet.DeserializePackage(packet_reader)
+
+		result = worker.Process(packet)
+		err := message.Ack(false)
+		if err != nil {
+			panic(fmt.Errorf("Could not ack, %w", err))
+		}
+		if len(result) != 0 {
+			slog.Info("Obtuve EOF, mando todo empaquetado a la cola de sending")
+			for _, pkt := range result {
+				err := colaSalida.Send(pkt.Serialize())
+				println(err)
+			}
+		}
+	}
 }
