@@ -57,10 +57,11 @@ test-packet:
 test-all:
 	go test -v ./...
 
-test: test-server test-packet test-all
+test: test-server test-packet test-all lint
 
 lint:
 	./.github/scripts/check_go_version.sh
+	./.github/scripts/check_invariantes.sh
 
 #============================== Misc directives ===============================
 download-dataset:
