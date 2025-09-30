@@ -1,32 +1,43 @@
+# Calling convention, prioridades (si aplica)
+# 1. Address propia
+# 2. Input
+# 3. Output
+# 4. Address del servidor
+# 5. Address de rabbit
+# 6. Nombre de la funcion
+# Ejemplo:
+# make run-filter RUN_FUNCTION="query1YearAndAmount"
 #============================== Run directives =================================
-
-DATADIR                ?=    ../dataset/
-GATEWAY_ADDR           ?=    "localhost:9090"
-CLIENT_LISTEN_ADDR     ?=    "localhost:9093"
-run-client:
-	cd client; go run client.go ${DATADIR} ${GATEWAY_ADDR} ${CLIENT_LISTEN_ADDR}
-
-RABBIT_ADDR           ?=    "localhost:5672"
-LISTEN_ADDR            ?=    "localhost:9092"
-run-gateway:
-	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${LISTEN_ADDR}
-
-run-server:
-	cd system; go run system.go ${LISTEN_ADDR} ${RABBIT_ADDR}
-
-run-filter:
-	cd system/filter_mapper; go run filter_mapper.go ${RABBIT_ADDR}
-
-run-concat: 
-	cd system/concat; go run concat.go ${RABBIT_ADDR}
-
-# RABBIT_ADDR           ?=    "amqp://guest:guest@localhost:5672/"
-run-sender:
-	cd system/sender; go run sender.go ${RABBIT_ADDR}
-#============================== Build directives ===============================
 
 current_dir = $(shell pwd)
 
+DATADIR                ?=    ${current_dir}/dataset/
+OUTDIR                 ?=    ${current_dir}/out/
+GATEWAY_ADDR           ?=    "localhost:9090"
+CLIENT_LISTEN_ADDR     ?=    "localhost:9093"
+run-client:
+	cd client; go run client.go ${DATADIR} ${OUTDIR} ${GATEWAY_ADDR} ${CLIENT_LISTEN_ADDR}
+
+RABBIT_ADDR           ?=    "localhost:5672"
+SERVER_ADDR           ?=    "localhost:9092"
+
+# El nombre de la funcion a ejecutar
+RUN_FUNCTION          ?=    ""
+run-gateway:
+	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${SERVER_ADDR} ${RUN_FUNCTION}
+
+run-server:
+	cd system; go run system.go ${SERVER_ADDR} ${RABBIT_ADDR}
+
+run-filter:
+	cd system/filter_mapper; go run filter_mapper.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
+run-concat:
+	cd system/concat; go run concat.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
+run-sender:
+	cd system/sender; go run sender.go ${RABBIT_ADDR}
+#============================== Build directives ===============================
 build: build-server build-client build-gateway build-filter build-concat build-sender
 build-client:
 	cd client; go build -o ${current_dir}/bin/client

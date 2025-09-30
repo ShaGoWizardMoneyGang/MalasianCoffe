@@ -62,13 +62,13 @@ func createPackagesFrom(dir string, session_ID string, listen_addr string, send_
 }
 
 func main() {
-	// Directory with all dataset subdirectories
 	dataset_directory := os.Args[1]
+	// out_dir := os.Args[2]
+	gateway_addr := os.Args[3]
+	listen_addr := os.Args[4]
 
-	addr := os.Args[2]
-	conn, err := net.Dial("tcp", addr)
+	conn, err := net.Dial("tcp", gateway_addr)
 
-	listen_addr := os.Args[3]
 
 	string_b, err := network.ReceiveFromNetwork(conn)
 	if err != nil {
