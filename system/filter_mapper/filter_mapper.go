@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
 	filter_mapper "malasian_coffe/system/filter_mapper/src"
 	"malasian_coffe/system/middleware"
@@ -32,17 +33,20 @@ func main() {
 		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
 	}
 
-	// msgQueue es **<-chan amqp.Delivery HORRIBLE
-	for message := range **msgQueue {
+	for message := range *msgQueue {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
 		paqueteSalida := worker.Process(pkt, "query1YearAndAmount")
-		result = append(result, paqueteSalida)
-		// fmt.Printf("paquete recibido:")
+		result = []packet.Packet{paqueteSalida}
 
 		for _, pkt := range result {
+			slog.Info("Mando packet filtrado a siguiente cola")
 			_ = colaSalida.Send(pkt.Serialize())
+		}
+		err := message.Ack(false)
+		if err != nil {
+			panic(fmt.Errorf("Could not ack, %w", err))
 		}
 	}
 }

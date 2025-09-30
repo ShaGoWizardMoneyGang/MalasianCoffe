@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"malasian_coffe/utils/network"
+	"malasian_coffe/utils/dataset"
 )
 
 const (
@@ -23,7 +24,7 @@ const (
 type PacketBuilder struct {
 	// ============================ Campos de logica ===============================
 	// ID del directorio del cual van a ser todos los packets
-	dirID uint
+	directory_name string
 
 	session_id string
 
@@ -43,12 +44,12 @@ type PacketBuilder struct {
 	already_sent_eof bool
 }
 
-func NewPacketBuilder(dirID uint, sessionID string, client_ip_port string, gatewayIP net.Conn) PacketBuilder {
+func NewPacketBuilder(directory_name string, sessionID string, client_ip_port string, gatewayIP net.Conn) PacketBuilder {
 	var payload_buffer strings.Builder
 	payload_buffer.Grow(MAX_BATCH_SIZE)
 
 	return PacketBuilder{
-		dirID:                 dirID,
+		directory_name: directory_name,
 		currentSequenceNumber: 0,
 
 		session_id: sessionID,
@@ -102,6 +103,7 @@ func (pb *PacketBuilder) End() error {
 	return nil
 }
 
+
 func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, error) {
 	slog.Info("New packet")
 	// Sanity checks
@@ -110,8 +112,12 @@ func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, erro
 		return Packet{}, errors.New("Tried to send a packet with EOF = true, when a packet with that flag on was alreay sent")
 	}
 
+	dir_id, err := dataset.DatasetToID(pb.directory_name)
+	if err != nil {
+		return Packet{}, err
+	}
 	// Build packet
-	packet_id := strconv.FormatUint(uint64(pb.dirID), 10) + "." + strconv.FormatUint(uint64(pb.currentSequenceNumber), 10)
+	packet_id := strconv.FormatUint(dir_id, 10) + "." + strconv.FormatUint(uint64(pb.currentSequenceNumber), 10)
 	pb.currentSequenceNumber += 1
 
 	packet_uuid := PacketUuid{

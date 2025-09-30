@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"net"
 	"os"
-	"bufio"
-
+	"path/filepath"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/packets/packet_answer"
@@ -17,10 +17,9 @@ import (
 )
 
 
-func createPackagesFrom(dir string, dirID uint, session_ID string, listen_addr string, send_addr net.Conn) error {
-	packetBuilder := packet.NewPacketBuilder(dirID, session_ID, listen_addr, send_addr)
-	// var payloadBuffer strings.Builder
-	// payloadBuffer.Grow(MAX_BATCH_SIZE)
+func createPackagesFrom(dir string, session_ID string, listen_addr string, send_addr net.Conn) error {
+	directory_name := filepath.Base(dir)
+	packetBuilder := packet.NewPacketBuilder(directory_name, session_ID, listen_addr, send_addr)
 
 	entries, err := os.ReadDir(dir)
 
@@ -88,18 +87,16 @@ func main() {
 		panic("")
 	}
 
-	dirID := uint(0)
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		subDirPath := dataset_directory + entry.Name()
-		err := createPackagesFrom(subDirPath, dirID, session_id, listen_addr, conn)
+		err := createPackagesFrom(subDirPath, session_id, listen_addr, conn)
 		if err != nil {
 			panic(err)
 		}
 
-		dirID += 1
 	}
 
 	fmt.Println("All dataset sent, now waiting for replies")

@@ -4,8 +4,9 @@ package middleware
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"malasian_coffe/utils/uuid"
 )
 
 type ChannelOptions struct {
@@ -60,26 +61,13 @@ func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, 
 		fmt.Printf("Nombre de la cola: %s recibida por parametro y nombre de la cola creada: %s", name, q.Name)
 		panic("Queue name does not match received name")
 	}
-	consumerTag := "ctag-" + name + "-" + uuid.New().String()
+	consumerTag := "ctag-" + name + "-" + uuid.GenerateUUID()
 	// Channel es donde van a llegar los mensajes a la cola
-	consumeChannel, err := ch.Consume(
-		q.Name,      // queue
-		consumerTag, // consumer
-		false,       // auto-ack
-		false,       // exclusive
-		false,       // no-local/fix fmt.Errorf call has arguments but no formatting directives
-		false,       // no-wait
-		nil,         // args
-	)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to consume queue: %w", err)
-	}
 
 	// Aca obtenemos channel
 	return &MessageMiddlewareQueue{
 		queueName:      name,
 		channel:        ch,
-		consumeChannel: &consumeChannel,
 		consumerTag:    consumerTag,
 	}, nil
 
@@ -93,8 +81,54 @@ cada mensaje de datos o de control.
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 */
-func (q *MessageMiddlewareQueue) StartConsuming() (messageQueue MessageQueue, error MessageMiddlewareError) {
-	return &q.consumeChannel, 0
+func (q *MessageMiddlewareQueue) StartConsuming() (messageQueue ConsumeChannel, error MessageMiddlewareError) {
+	consumeChannel, err := (*q.channel).Consume(
+		q.queueName,      // queue
+		q.consumerTag,    // consumer
+
+
+
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⡴⠶⠾⠿⠛⠟⠻⠿⠿⠶⠶⣤⣤⣄⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣴⠶⠟⠋⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠙⠛⠷⢶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣴⠾⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠲⠶⢾⣿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣾⡏⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡄⠙⢻⣶⡄⠀⠀⠀⠀⠀⠀⠀⠀
+ // ================================ NO TOCAR ================================== // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣶⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠻⣦⣄⠀⠀⠀⠀⠀⠀
+ /* LOS ACKS SON FUNDAMENTALES en RABBIT */                                      // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠈⠛⣷⡄⠀⠀⠀⠀
+ /* SI NECESITAS SACARLO PARA DEBUGGEAR, DEBBUGEA DE OTRA FORMA */               // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⡿⠁⠀⠀⠀⣄⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠈⢿⣆⠀⠀⠀
+ false, // auto-ack ENSERIO NO TOCAR ESTE BOOLEANO                               // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⠏⠀⠀⠀⠀⠀⠈⠛⢷⣤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣴⡿⠛⠀⠀⠀⠀⠀⠀⠀⢿⡆⠀⠀
+ // NO LO MIRES DEMASIADO TAMPOCO                                                // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣾⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⠷⣦⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⠾⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⠀⠀
+ // ================================ NO TOCAR ================================== // ⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⣷⣿⣿⣾⢿⣇⠀⠀⠀⢀⣠⣤⣤⣤⣬⣙⣿⣦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⠟⣋⣁⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⡇⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠀⠀⣾⣟⣛⣉⣽⠉⢻⣆⣠⡶⠟⢛⣩⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣾⣿⣿⣿⣿⣿⣿⣿⣟⠻⠷⣦⣄⠀⠀⠀⠀⠀⠀⢸⣷⠀
+                                                                                 // ⠀⠀⠀⠀⠀⣠⣤⣶⣟⣋⡭⣿⠃⢠⡿⢙⠋⠀⣠⣿⣿⣿⣿⣿⣿⣿⣿⣿⠣⣿⣿⡄⠀⠀⠀⠀⠀⠀⠀⣿⡏⢻⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄⠀⠙⢷⡄⠀⠀⠀⠀⠀⣿⠀
+                                                                                 // ⠀⠀⠀⠀⢰⣿⣿⣧⣤⣻⡿⠁⣠⡿⠁⢸⣇⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⣿⣿⣿⡄⠀⠀⠀⠀⠀⣼⣿⠇⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⡀⠈⢿⡆⠀⠀⠀⠀⣿⡆
+                                                                                 // ⠀⠀⢀⣴⣿⣽⣯⣭⣍⠍⠀⣰⡿⠁⢠⡾⠿⣮⠝⠛⠻⣿⣿⣿⣿⣿⣯⠏⠀⠻⣿⣿⣿⣄⢠⣤⠤⣾⠿⠟⠀⠈⠳⠿⠿⣿⣿⣿⣿⣿⣿⣿⠿⠃⠀⠸⣷⠀⠀⠀⠀⢹⣇
+                                                                                 // ⠀⣴⣿⣿⣿⣶⣾⣿⣻⣿⣾⡿⠁⠀⢸⡿⣭⣿⣿⣶⣃⣀⣙⣻⣾⣂⣀⠀⠀⠀⣀⣀⣹⣿⠠⣤⢤⣦⣤⣀⠀⠀⢠⣤⣤⣶⣶⣿⣿⠋⠉⣀⣠⣤⡄⠀⣿⠃⠀⠀⠀⣸⣯
+                                                                                 // ⢸⣿⣿⣟⣿⣿⣿⣦⡹⣯⣿⡇⠀⣤⣼⢃⣿⣿⣿⣿⣟⣿⡙⠀⠉⠻⣿⣧⠀⣴⣿⣿⣿⡇⠀⠀⠐⣿⣿⣿⠆⢸⣿⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⢰⣿⠲⡾⣛⠻⢛⡷
+                                                                                 // ⢸⣿⡟⣾⣿⣿⣿⣿⣷⢹⣿⣷⠀⠘⣿⣿⣿⣿⣿⣿⡗⠀⠀⠀⠀⢀⣿⣿⠀⣿⣿⣿⣿⠁⠀⠀⠀⣿⣿⣿⡇⣸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣾⠃⢠⠕⢡⠣⠰⣟
+                                                                                 // ⠈⣿⣿⣝⣿⣿⣿⡿⢏⣿⢿⣿⠃⣸⠟⠿⠛⠿⣿⣿⡗⠀⣀⣀⣀⣼⣿⣿⣯⣿⣿⠟⠃⠀⠀⠀⠀⠘⠿⣿⣿⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠃⣰⢋⡜⢆⢣⢘⣯
+                                                                                 // ⠀⠈⠻⣿⣷⣶⣶⣷⠿⣿⣿⠃⢰⣏⠈⠉⠉⠙⠛⣿⣯⠐⠀⠀⢹⣿⣿⠿⠟⠉⠀⠀⠀⣀⣀⣀⡀⠀⠀⠈⠙⠻⢿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠟⠋⣠⢞⡓⢭⡘⡌⠆⣸⡧
+                                                                                 // ⠀⠀⠀⢹⣿⣫⣭⣭⡻⢿⣧⢠⣿⣯⡴⣾⣅⣀⣴⣟⠻⣬⣓⣤⣿⠉⠀⠀⠀⠀⣠⣾⠟⠛⠛⠛⢿⣶⡄⠀⠀⠀⠀⠈⠙⠛⠛⠛⠛⠉⣰⠶⡒⣍⠲⢬⡘⢆⡳⢈⠄⣿⠁
+                                                                                 // ⠀⠀⠀⠸⣿⣿⣿⣿⣿⣿⡿⣼⣿⡜⡟⠉⠉⠉⠱⠶⠥⣼⣟⠉⠀⠀⠀⠀⠀⠈⠋⠁⠀⠀⠀⠀⠀⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⢣⠱⣌⠚⡤⣙⢢⡱⠉⣼⡏⠀
+                                                                                 // ⠀⠀⠀⠀⣿⣧⣿⣿⣟⣼⡿⣿⢿⣿⠄⢀⣀⠀⠀⠀⠀⠸⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⡇⢧⠘⢧⢠⢃⠼⠃⣸⡿⠀⠀
+                                                                                 // ⠀⠀⠀⠀⢻⣯⣽⣿⣿⣭⣿⣿⡋⠉⡉⠬⣉⠏⡉⢀⣤⣾⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⣢⠙⡆⢣⠞⠐⣼⠏⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⢿⣿⣿⣿⣿⣿⣿⣷⣧⡽⠧⠷⠶⠚⠋⠁⠀⣽⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⣧⡜⢓⣨⠞⠁⠀⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠸⢿⣿⣿⣿⣿⣿⣶⣶⠂⠀⣀⢐⡲⠆⠀⣠⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⠿⠋⠁⠀⠀⠀⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠘⢿⣿⣿⣿⣿⣿⡾⣭⣳⣌⣣⣴⠶⠛⢷⡋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣴⠶⠟⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠀⠀⠉⢿⣯⣯⣙⡉⢉⣉⡉⠁⣀⣀⣴⠟⠛⠳⠶⣦⣤⣤⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣤⣤⣶⠶⠛⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠻⢿⣭⣥⣫⣟⣖⣰⠟⠁⠀⠀⠀⠀⠀⠀⠈⠉⠉⠙⠛⠛⠛⠛⠛⠛⠛⠛⠛⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+                                                                                 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+
+		false,       // exclusive
+		false,       // no-local/fix fmt.Errorf call has arguments but no formatting directives
+		false,       // no-wait
+		nil,         // args
+	)
+
+	if err != nil {
+		return nil, 1
+	}
+	return &consumeChannel, 0
 }
 
 /*

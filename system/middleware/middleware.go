@@ -19,7 +19,6 @@ const (
 type MessageMiddlewareQueue struct {
 	queueName      string
 	channel        MiddlewareChannel
-	consumeChannel ConsumeChannel
 	consumerTag    string
 }
 

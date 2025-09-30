@@ -6,17 +6,16 @@ import (
 	"net"
 	"os"
 
-	amqp "github.com/rabbitmq/amqp091-go"
-
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/network"
+	"malasian_coffe/system/middleware"
 
 )
 
 func main() {
 	rabbit_addr := os.Args[2]
-	rconn, err := amqp.Dial("amqp://guest:guest@" + rabbit_addr + "/")
 
+	colaInicial, err := middleware.CreateQueue("DataQuery1", middleware.ChannelOptionsDefault())
 	if err != nil {
 		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %s. Is the daemon active?
 		Try running:
@@ -25,18 +24,7 @@ func main() {
 		or
 		sudo rc-service rabbitmq start`, rabbit_addr))
 	}
-	ch, err := rconn.Channel()
-	if err != nil {
-		panic(fmt.Errorf("Failed to connect to the channel: %w", err))
-	}
-	ch.QueueDeclare(
-		"DataQuery1", // name
-		false,        // durable
-		false,        // delete when unused
-		false,        // exclusive
-		false,        // no-wait
-		nil,          // arguments
-	)
+
 	//listen_addr
 	listen_addr := os.Args[1]
 
@@ -63,11 +51,6 @@ func main() {
 		if packet.GetDirID() != "3"{
 			continue
 		}
-		ch.Publish("", "DataQuery1", false, false,
-			amqp.Publishing{
-				// DeliveryMode: amqp.Persistent,
-				ContentType: "text/plain",
-				Body:        packet.Serialize(),
-			})
+		colaInicial.Send(packet.Serialize())
 	}
 }
