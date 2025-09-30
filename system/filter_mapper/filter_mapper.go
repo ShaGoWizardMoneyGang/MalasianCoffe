@@ -32,16 +32,12 @@ func main() {
 		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
 	}
 
-	// msgQueue es **<-chan amqp.Delivery HORRIBLE
 	for message := range *msgQueue {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
 		paqueteSalida := worker.Process(pkt, "query1YearAndAmount")
-		// fmt.Printf("paquete recibido:")
-		// result = append(result, paqueteSalida)
 		result = []packet.Packet{paqueteSalida}
-		fmt.Printf("paquete recibido:")
 
 		for _, pkt := range result {
 			_ = colaSalida.Send(pkt.Serialize())

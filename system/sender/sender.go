@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"net"
-	// "os"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/packets/packet_answer"
@@ -14,28 +14,16 @@ import (
 // Argumentos que recibe
 // 1: Direccion de rabbit
 func main() {
-	// TODO: Hacer que escuche de todas las colas de salida
-	// rabbit_addr := os.Args[1]
-	// rconn, _ := amqp.Dial(rabbit_addr)
-
-	// ch, _ := rconn.Channel()
-
-	// // NOTE: Declare para asegurarme que existe
-	// ch.QueueDeclare(
-	// 	"salida-1",  // name
-	// 	false, // durable
-	// 	false, // delete when unused
-	// 	false, // exclusive
-	// 	false, // no-wait
-	// 	nil,   // arguments
-	// )
+	// TODO: Esto no esta bueno para el sender porque tiene que escuchar de mas
+	// de una cola a la vez, onda regex.
 	queue, err := middleware.CreateQueue("SalidaQuery1", middleware.ChannelOptionsDefault())
 	if err != nil {
 		panic("Couldn't create query 1 queu")
 	}
-	// TODO: Esto no esta bueno para el sender porque tiene que escuchar de mas
-	// de una cola a la vez, onda regex.
-	msgs, _ := queue.StartConsuming()
+	msgs, err_2 := queue.StartConsuming()
+	if err_2 != 0 {
+		panic("Couldn't start consuming queue 2")
+	}
 	for message := range *msgs {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
