@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
 	"malasian_coffe/system/middleware"
@@ -30,6 +31,7 @@ func main() {
 	var result []packet.Packet
 	for message := range *msgQueue {
 
+		slog.Debug("Recibi mensaje")
 		packet_reader := bytes.NewReader(message.Body)
 		packet, _ := packet.DeserializePackage(packet_reader)
 
@@ -39,6 +41,7 @@ func main() {
 			panic(fmt.Errorf("Could not ack, %w", err))
 		}
 		if len(result) != 0 {
+			slog.Info("Obtuve EOF, mando todo empaquetado a la cola de sending")
 			for _, pkt := range result {
 				err := colaSalida.Send(pkt.Serialize())
 				println(err)

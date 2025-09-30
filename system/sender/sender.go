@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"net"
 
 	"malasian_coffe/packets/packet"
@@ -38,6 +39,7 @@ func main() {
 		pkt_answer := packetanswer.From(pkt, "Query 1")
 		pkt_answer_b := pkt_answer.Serialize()
 
+		slog.Info("Sending answer packet back to client")
 		network.SendToNetwork(conn, pkt_answer_b)
 		err = message.Ack(false)
 		if err != nil {

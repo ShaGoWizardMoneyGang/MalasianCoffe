@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
 	filter_mapper "malasian_coffe/system/filter_mapper/src"
 	"malasian_coffe/system/middleware"
@@ -40,6 +41,7 @@ func main() {
 		result = []packet.Packet{paqueteSalida}
 
 		for _, pkt := range result {
+			slog.Info("Mando packet filtrado a siguiente cola")
 			_ = colaSalida.Send(pkt.Serialize())
 		}
 		err := message.Ack(false)
