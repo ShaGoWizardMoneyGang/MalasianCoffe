@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"time"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/packets/packet_answer"
@@ -25,6 +26,8 @@ func main() {
 	if err_2 != 0 {
 		panic("Couldn't start consuming queue 2")
 	}
+	// NOTE: Este sleep lo pongo porque si el dataset es corto, el cliente envia todo y no le da tiempo a crear un socket
+	time.Sleep(10 * time.Second)
 	for message := range *msgs {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
