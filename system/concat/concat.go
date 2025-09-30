@@ -68,7 +68,7 @@ func main() {
 
 	worker := concat.Concat{}
 	var result []packet.Packet
-	for message := range **msgQueue {
+	for message := range *msgQueue {
 		packet_reader := bytes.NewReader(message.Body)
 		packet, _ := packet.DeserializePackage(packet_reader)
 		result = worker.Process(packet)

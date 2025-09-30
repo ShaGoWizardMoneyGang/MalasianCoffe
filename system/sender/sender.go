@@ -36,7 +36,7 @@ func main() {
 	// TODO: Esto no esta bueno para el sender porque tiene que escuchar de mas
 	// de una cola a la vez, onda regex.
 	msgs, _ := queue.StartConsuming()
-	for message := range **msgs {
+	for message := range *msgs {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 

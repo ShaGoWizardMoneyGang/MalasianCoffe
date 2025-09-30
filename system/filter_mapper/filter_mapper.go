@@ -33,7 +33,7 @@ func main() {
 	}
 
 	// msgQueue es **<-chan amqp.Delivery HORRIBLE
-	for message := range **msgQueue {
+	for message := range *msgQueue {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
