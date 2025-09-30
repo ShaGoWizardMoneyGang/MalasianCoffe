@@ -29,7 +29,7 @@ func main() {
 	// 	false, // no-wait
 	// 	nil,   // arguments
 	// )
-	queue, err := middleware.CreateQueue("salida-query-1", middleware.ChannelOptionsDefault())
+	queue, err := middleware.CreateQueue("SalidaQuery1", middleware.ChannelOptionsDefault())
 	if err != nil {
 		panic("Couldn't create query 1 queu")
 	}
@@ -51,5 +51,9 @@ func main() {
 		pkt_answer_b := pkt_answer.Serialize()
 
 		network.SendToNetwork(conn, pkt_answer_b)
+		err = message.Ack(false)
+		if err != nil {
+			panic(fmt.Errorf("Could not ack, %w", err))
+		}
 	}
 }

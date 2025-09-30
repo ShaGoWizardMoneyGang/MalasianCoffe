@@ -6,6 +6,7 @@ import (
 	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
 	"malasian_coffe/system/middleware"
+	"time"
 )
 
 // Argumentos que recibe:
@@ -60,7 +61,7 @@ func main() {
 	// 	false,                        // no-wait
 	// 	nil,                          // args
 	// )
-	colaSalida, err := middleware.CreateQueue("salida-query-1", middleware.ChannelOptionsDefault())
+	colaSalida, err := middleware.CreateQueue("SalidaQuery1", middleware.ChannelOptionsDefault())
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
 	}
@@ -72,16 +73,21 @@ func main() {
 		packet_reader := bytes.NewReader(message.Body)
 		packet, _ := packet.DeserializePackage(packet_reader)
 		result = worker.Process(packet)
-		//fmt.Printf("HOLA ESTAS EN EL CONCAT %v\n", packet)
-		// fmt.Println("Me llego un paquete")
-		//result = append(result, worker.Process(packet)[0])
-		//fmt.Printf("HOLA YA PROCESASTE EL PAQUETE DEL CONCAT %v\n", result)
+
+
+		err := message.Ack(false)
+		if err != nil {
+			panic(fmt.Errorf("Could not ack, %w", err))
+		}
 		if len(result) != 0 {
+			// NOTE: Solo para debug
+			println("Envio al sender")
+			time.Sleep(10 * time.Second)
 			for _, pkt := range result {
-				_ = colaSalida.Send(pkt.Serialize())
+				fmt.Printf("%v \n", pkt)
+				err := colaSalida.Send(pkt.Serialize())
+				println(err)
 			}
 		}
 	}
-
-
 }

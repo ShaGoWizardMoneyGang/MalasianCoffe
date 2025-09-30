@@ -38,11 +38,17 @@ func main() {
 		pkt, _ := packet.DeserializePackage(packetReader)
 
 		paqueteSalida := worker.Process(pkt, "query1YearAndAmount")
-		result = append(result, paqueteSalida)
 		// fmt.Printf("paquete recibido:")
+		// result = append(result, paqueteSalida)
+		result = []packet.Packet{paqueteSalida}
+		fmt.Printf("paquete recibido:")
 
 		for _, pkt := range result {
 			_ = colaSalida.Send(pkt.Serialize())
+		}
+		err := message.Ack(false)
+		if err != nil {
+			panic(fmt.Errorf("Could not ack, %w", err))
 		}
 	}
 }

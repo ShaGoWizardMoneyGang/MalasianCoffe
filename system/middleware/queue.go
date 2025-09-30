@@ -84,7 +84,7 @@ Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessag
 func (q *MessageMiddlewareQueue) StartConsuming() (messageQueue ConsumeChannel, error MessageMiddlewareError) {
 	consumeChannel, err := (*q.channel).Consume(
 		q.queueName,      // queue
-		"",          // consumer
+		q.consumerTag,    // consumer
 		true,        // auto-ack
 		false,       // exclusive
 		false,       // no-local/fix fmt.Errorf call has arguments but no formatting directives
