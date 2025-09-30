@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"net"
 	"os"
-	"bufio"
-
+	"path/filepath"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/packets/packet_answer"
@@ -18,9 +18,8 @@ import (
 
 
 func createPackagesFrom(dir string, session_ID string, listen_addr string, send_addr net.Conn) error {
-	packetBuilder := packet.NewPacketBuilder(dir, session_ID, listen_addr, send_addr)
-	// var payloadBuffer strings.Builder
-	// payloadBuffer.Grow(MAX_BATCH_SIZE)
+	directory_name := filepath.Base(dir)
+	packetBuilder := packet.NewPacketBuilder(directory_name, session_ID, listen_addr, send_addr)
 
 	entries, err := os.ReadDir(dir)
 
