@@ -103,7 +103,7 @@ func mapStoreIdAndName(input string) []string {
 			panic("Invalid data format")
 		}
 
-		if   data[0] == "" ||
+		if data[0] == "" ||
 			data[1] == "" {
 			slog.Debug("Registro con campos de interes vacios, dropeado")
 			continue
@@ -164,7 +164,7 @@ func filterFunctionQuery4UsersBirthdates(input string) string {
 		if len(data) < 4 {
 			panic("Invalid data format")
 		}
-		if data[0]  == "" || data[2] == "" {
+		if data[0] == "" || data[2] == "" {
 			slog.Debug("Registro con menos de 9 columnas, dropeado")
 			continue
 		}
@@ -189,7 +189,7 @@ func filterTransactions(input string) []string {
 		}
 
 		// TODO(fabri): Revisar como handlear el dropeo, tal vez tiene que ser mas quirurquico.
-		if   data[0] == "" ||
+		if data[0] == "" ||
 			data[1] == "" ||
 			data[4] == "" ||
 			data[7] == "" ||
@@ -212,8 +212,6 @@ func filterTransactions(input string) []string {
 	}
 	return []string{final_query1, final_query3, final_query4}
 }
-
-
 
 // =========================== TransactionFilter ==============================
 
@@ -239,9 +237,9 @@ func (tfm *transactionFilterMapper) Build(rabbitAddr string) {
 
 	tfm.colaEntradaTransaction = colaEntradaTransaction
 
-	tfm.colaSalida1  = colaSalida1
-	tfm.colaSalida3  = colaSalida3
-	tfm.colaSalida4  = colaSalida4
+	tfm.colaSalida1 = colaSalida1
+	tfm.colaSalida3 = colaSalida3
+	tfm.colaSalida4 = colaSalida4
 }
 func (tfm *transactionFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
@@ -253,15 +251,15 @@ func (tfm *transactionFilterMapper) Process(pkt packet.Packet) []packet.OutBound
 
 	outBoundMessage := []packet.OutBoundMessage{
 		{
-			Packet: newPayload[0],
+			Packet:     newPayload[0],
 			ColaSalida: tfm.colaSalida1,
 		},
 		{
-			Packet: newPayload[1],
+			Packet:     newPayload[1],
 			ColaSalida: tfm.colaSalida3,
 		},
 		{
-			Packet: newPayload[2],
+			Packet:     newPayload[2],
 			ColaSalida: tfm.colaSalida4,
 		},
 	}
@@ -288,8 +286,8 @@ func (sfm *storeFilterMapper) Build(rabbitAddr string) {
 
 	sfm.colaEntradaStore = colaEntradaStore
 
-	sfm.colaSalida3  = colaSalida3
-	sfm.colaSalida4  = colaSalida4
+	sfm.colaSalida3 = colaSalida3
+	sfm.colaSalida4 = colaSalida4
 }
 
 func (sfm *storeFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
@@ -304,11 +302,11 @@ func (sfm *storeFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessag
 	newPayload := packet.ChangePayload(pkt, mapped_stores)
 	outBoundMessage := []packet.OutBoundMessage{
 		{
-			Packet: newPayload[0],
+			Packet:     newPayload[0],
 			ColaSalida: sfm.colaSalida3,
 		},
 		{
-			Packet: newPayload[1],
+			Packet:     newPayload[1],
 			ColaSalida: sfm.colaSalida4,
 		},
 	}
@@ -330,9 +328,9 @@ func (ufm *userFilterMapper) Build(rabbitAddr string) {
 
 	colaSalida4 := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
 
-	ufm.colaEntradaUsers  = colaEntradaUsers
+	ufm.colaEntradaUsers = colaEntradaUsers
 
-	ufm.colaSalida4  = colaSalida4
+	ufm.colaSalida4 = colaSalida4
 }
 
 func (ufm *userFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
@@ -348,7 +346,7 @@ func (ufm *userFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage
 	newPayload := packet.ChangePayload(pkt, filtered_users)
 	outBoundMessage := []packet.OutBoundMessage{
 		{
-			Packet: newPayload[0],
+			Packet:     newPayload[0],
 			ColaSalida: ufm.colaSalida4,
 		},
 	}
@@ -369,11 +367,11 @@ type FilterMapper interface {
 }
 
 func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {
-	var filterMapper FilterMapper;
+	var filterMapper FilterMapper
 	switch datasetName {
 	case "transactions":
 		filterMapper = &transactionFilterMapper{}
-	case "store":
+	case "stores":
 		filterMapper = &storeFilterMapper{}
 	case "users":
 		filterMapper = &userFilterMapper{}

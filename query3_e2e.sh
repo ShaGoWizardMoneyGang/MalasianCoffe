@@ -19,8 +19,8 @@ tmux send-keys -t 0 "make run-server &" C-m
 tmux send-keys -t 0 "make run-gateway &" C-m
 tmux send-keys -t 0 "make run-filter RUN_FUNCTION=transactions &" C-m
 tmux send-keys -t 0 "make run-concat &" C-m
-tmux send-keys -t 0 "make run-aggregator RUN_FUNCTION=query3 &" C-m
-tmux send-keys -t 0 "make run-aggregator RUN_FUNCTION=query3Global &" C-m
+tmux send-keys -t 0 "make run-partial-aggregator RUN_FUNCTION=query3 &" C-m
+tmux send-keys -t 0 "make run-global-aggregator RUN_FUNCTION=query3Global &" C-m
 tmux send-keys -t 0 "make run-sender RUN_FUNCTION=Query3 &" C-m
 tmux send-keys -t 0 "make run-joiner RUN_FUNCTION=Query3 &" C-m
 tmux send-keys -t 0 "wait" C-m
