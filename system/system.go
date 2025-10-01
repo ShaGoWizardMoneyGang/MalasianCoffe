@@ -5,21 +5,22 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/utils/network"
 	"malasian_coffe/system/middleware"
-
+	"malasian_coffe/utils/dataset"
+	"malasian_coffe/utils/network"
 )
 
 func main() {
 	rabbit_addr := os.Args[2]
 
-	colaTransactions, err := middleware.CreateQueue("DataTransactions", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
-	// colaUsers, err := middleware.CreateQueue("DataUsers", middleware.ChannelOptionsDefault())
-	// colaStore, err := middleware.CreateQueue("DataStore", middleware.ChannelOptionsDefault())
-	// colaTransactionItems, err := middleware.CreateQueue("DataTransactionItems", middleware.ChannelOptionsDefault())
-	// colaMenuItems, err := middleware.CreateQueue("DataMenuItems", middleware.ChannelOptionsDefault())
+	colaTransactions, err := middleware.CreateQueue("DataTransactions", middleware.ChannelOptions {DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	colaUsers, err := middleware.CreateQueue("DataUsers", middleware.ChannelOptions {DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	colaStore, err := middleware.CreateQueue("DataStore", middleware.ChannelOptions {DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	colaTransactionItems, err := middleware.CreateQueue("DataTransactionItems", middleware.ChannelOptions {DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	colaMenuItems, err := middleware.CreateQueue("DataMenuItems", middleware.ChannelOptions {DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
 	if err != nil {
 		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %s. Is the daemon active?
 		Try running:
@@ -52,9 +53,22 @@ func main() {
 
 		// TODO: esto esta hardcodeado asi porque es para la query 1.
 		// Aca deberia haber un switch que lo envie a la queue correspondiente
-		if packet.GetDirID() != "3"{
-			continue
+		packet_id, err := strconv.ParseUint(packet.GetDirID(), 10, 64)
+		dataset_name, err := dataset.IDtoDataset(packet_id)
+		if err != nil {
+			panic(err)
 		}
-		colaTransactions.Send(packet.Serialize())
+		switch dataset_name {
+		case "menu_items":
+			colaMenuItems.Send(packet.Serialize())
+		case "stores":
+			colaStore.Send(packet.Serialize())
+		case "transaction_items":
+			colaTransactionItems.Send(packet.Serialize())
+		case "transactions":
+			colaTransactions.Send(packet.Serialize())
+		case "users":
+			colaUsers.Send(packet.Serialize())
+		}
 	}
 }
