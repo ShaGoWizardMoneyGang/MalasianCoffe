@@ -3,6 +3,7 @@ package joiner
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -135,6 +136,7 @@ func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 }
 
 func (jq3 *joinerQuery3) Build(rabbitAddr string) {
+	slog.Info("Inicializo el Joiner 3")
 	// SessionID -> channel
 	sessionHandler           := make(map[string](chan packet.Packet))
 	// canalSalida              := make(chan packet.Packet)
@@ -159,6 +161,7 @@ func (jq3 *joinerQuery3) send(pkt packet.Packet) {
 }
 
 func (jq3 *joinerQuery3) Process() {
+	slog.Info("Arranca procesamiento del joiner 3")
 	storeListener            := make(chan packet.Packet)
 	aggregatorGlobalListener := make(chan packet.Packet)
 
@@ -169,6 +172,7 @@ func (jq3 *joinerQuery3) Process() {
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
+			slog.Info("Recibi mensaje de cola de stores")
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
@@ -189,6 +193,8 @@ func (jq3 *joinerQuery3) Process() {
 		messages := colas.ConsumeInput(colasEntrada)
 
 		for message := range *messages {
+			slog.Info("Recibi mensaje de cola de stores")
+
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
