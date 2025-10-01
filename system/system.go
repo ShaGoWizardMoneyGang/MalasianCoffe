@@ -19,7 +19,7 @@ func main() {
 	//QUERY 2 USA TRANSACTIONS Y STORES
 	colaTransactions, err := middleware.CreateQueue("DataTransactions", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
 	colaUsers, err := middleware.CreateQueue("DataUsers", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
-	colaStore, err := middleware.CreateQueue("DataStore", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	colaStores, err := middleware.CreateQueue("DataStores", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
 	colaTransactionItems, err := middleware.CreateQueue("DataTransactionItems", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
 	colaMenuItems, err := middleware.CreateQueue("DataMenuItems", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
 	if err != nil {
@@ -64,7 +64,7 @@ func main() {
 			colaMenuItems.Send(packet.Serialize())
 		case "stores":
 			slog.Debug("Envio a cola de stores")
-			colaStore.Send(packet.Serialize())
+			colaStores.Send(packet.Serialize())
 		case "transaction_items":
 			slog.Debug("Envio a cola de transaccions items")
 			colaTransactionItems.Send(packet.Serialize())

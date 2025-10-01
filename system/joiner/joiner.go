@@ -126,8 +126,10 @@ func main() {
 			packet, _ := packet.DeserializePackage(packet_reader)
 			lines := strings.Split(packet.GetPayload(), "\n") //leo el paquete
 			lines = lines[:len(lines)-1]
+
 			for _, r := range lines { //por cada linea del paquete
 				cols := strings.Split(r, ",")
+				println("[JOINER QUERY3] Store ", cols[1], " para memoria")
 				if len(cols) < 2 {
 					panic("No hay 2 columnas como se esperaba") //store_id, store_name
 				}
