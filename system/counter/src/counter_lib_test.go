@@ -17,7 +17,7 @@ func TestCountByUserAndStore(t *testing.T) {
 	pkt := packet.Packet{}
 	pkt = packet.ChangePayload(pkt, []string{input})[0]
 
-	worker := &Counter{}
+	worker := &counterQuery4{}
 	outs := worker.Process(pkt)
 	if len(outs) == 0 {
 		t.Fatalf("Process devolvió 0 paquetes")

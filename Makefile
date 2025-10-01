@@ -40,13 +40,16 @@ run-aggregator:
 run-concat:
 	cd system/concat; go run concat.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
+run-counter:
+	cd system/counter; go run counter.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
 run-joiner:
 	cd system/joiner; go run joiner.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
 run-sender:
 	cd system/sender; go run sender.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 #============================== Build directives ===============================
-build: build-server build-client build-gateway build-filter build-concat build-sender
+build: build-server build-client build-gateway build-filter build-concat build-sender build-counter
 build-client:
 	cd client; go build -o ${current_dir}/bin/client
 
@@ -70,6 +73,9 @@ build-aggregator:
 
 build-sender:
 	cd system/sender; go build -o ${current_dir}/bin/sender
+
+build-counter:
+	cd system/counter; go build -o ${current_dir}/bin/counter
 
 #=============================== Test directives ===============================
 

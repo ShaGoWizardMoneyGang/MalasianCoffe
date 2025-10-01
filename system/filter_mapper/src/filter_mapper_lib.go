@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/network"
+	"malasian_coffe/utils/colas"
 	"math"
 	"strconv"
 	"strings"
@@ -90,7 +90,7 @@ func filterFunctionQuery2b(input string) string {
 	return final
 }
 
-func mapStoreIdAndName(input string) string {
+func mapStoreIdAndName(input string) []string {
 	print("[FILTER STORES]:", input)
 	lines := strings.Split(input, "\n")
 	final := ""
@@ -102,9 +102,15 @@ func mapStoreIdAndName(input string) string {
 		if len(data) < 8 {
 			panic("Invalid data format")
 		}
+
+		if   data[0] == "" ||
+			data[1] == "" {
+			slog.Debug("Registro con campos de interes vacios, dropeado")
+			continue
+		}
 		final += data[0] + "," + data[1] + "\n"
 	}
-	return final
+	return []string{final, final}
 }
 
 func filterFunctionQuery3Transactions(input string) string {
@@ -158,6 +164,10 @@ func filterFunctionQuery4UsersBirthdates(input string) string {
 		if len(data) < 4 {
 			panic("Invalid data format")
 		}
+		if data[0]  == "" || data[2] == "" {
+			slog.Debug("Registro con menos de 9 columnas, dropeado")
+			continue
+		}
 		final += data[0] + "," + data[2] + "\n"
 	}
 	return final
@@ -203,37 +213,37 @@ func filterTransactions(input string) []string {
 	return []string{final_query1, final_query3, final_query4}
 }
 
-// Struct que asocia un paquete a enviar con la cola a la cual lo tiene que enviar
-type OutBoundMessage struct {
-	Packet packet.Packet
-	ColaSalida *middleware.MessageMiddlewareQueue
-}
 
-type TransactionFilterMapper struct {
+
+// =========================== TransactionFilter ==============================
+
+type transactionFilterMapper struct {
+	colaEntradaTransaction *middleware.MessageMiddlewareQueue
+
 	colaSalida1 *middleware.MessageMiddlewareQueue
 	colaSalida3 *middleware.MessageMiddlewareQueue
 	colaSalida4 *middleware.MessageMiddlewareQueue
 }
 
+func (tfm *transactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+	return tfm.colaEntradaTransaction
 
-func instanceQueue(inputQueueName string, rabbitAddr string) *middleware.MessageMiddlewareQueue {
-	cola, err := middleware.CreateQueue(inputQueueName, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(%s): %w", inputQueueName, err))
-	}
-	return cola
 }
 
-func (tfm *TransactionFilterMapper) Build(rabbitAddr string) {
-	colaSalida1 := instanceQueue("FilteredTransactions1", rabbitAddr)
-	colaSalida3 := instanceQueue("FilteredTransactions3", rabbitAddr)
-	colaSalida4 := instanceQueue("FilteredTransactions4", rabbitAddr)
+func (tfm *transactionFilterMapper) Build(rabbitAddr string) {
+	colaEntradaTransaction := colas.InstanceQueue("DataTransactions", rabbitAddr)
+
+	colaSalida1 := colas.InstanceQueue("FilteredTransactions1", rabbitAddr)
+	colaSalida3 := colas.InstanceQueue("FilteredTransactions3", rabbitAddr)
+	colaSalida4 := colas.InstanceQueue("FilteredTransactions4", rabbitAddr)
+
+	tfm.colaEntradaTransaction = colaEntradaTransaction
 
 	tfm.colaSalida1  = colaSalida1
 	tfm.colaSalida3  = colaSalida3
 	tfm.colaSalida4  = colaSalida4
 }
-func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []OutBoundMessage {
+func (tfm *transactionFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Vienen en este orden: final_query1, final_query3, final_query4
@@ -241,7 +251,7 @@ func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []OutBoundMessage
 
 	newPayload := packet.ChangePayload(pkt, payloadResults)
 
-	outBoundMessage := []OutBoundMessage{
+	outBoundMessage := []packet.OutBoundMessage{
 		{
 			Packet: newPayload[0],
 			ColaSalida: tfm.colaSalida1,
@@ -259,20 +269,114 @@ func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []OutBoundMessage
 	return outBoundMessage
 }
 
+// =========================== TransactionFilter ==============================
+
+// ============================== StoreFilter =================================
+
+type storeFilterMapper struct {
+	colaEntradaStore *middleware.MessageMiddlewareQueue
+
+	colaSalida3 *middleware.MessageMiddlewareQueue
+	colaSalida4 *middleware.MessageMiddlewareQueue
+}
+
+func (sfm *storeFilterMapper) Build(rabbitAddr string) {
+	colaEntradaStore := colas.InstanceQueue("DataStores", rabbitAddr)
+
+	colaSalida3 := colas.InstanceQueue("FilteredStores3", rabbitAddr)
+	colaSalida4 := colas.InstanceQueue("FilteredStores4", rabbitAddr)
+
+	sfm.colaEntradaStore = colaEntradaStore
+
+	sfm.colaSalida3  = colaSalida3
+	sfm.colaSalida4  = colaSalida4
+}
+
+func (sfm *storeFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+	return sfm.colaEntradaStore
+}
+
+func (sfm *storeFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	input := pkt.GetPayload()
+
+	// Ambas payloads iguales
+	mapped_stores := mapStoreIdAndName(input)
+	newPayload := packet.ChangePayload(pkt, mapped_stores)
+	outBoundMessage := []packet.OutBoundMessage{
+		{
+			Packet: newPayload[0],
+			ColaSalida: sfm.colaSalida3,
+		},
+		{
+			Packet: newPayload[1],
+			ColaSalida: sfm.colaSalida4,
+		},
+	}
+
+	return outBoundMessage
+}
+
+// ============================== StoreFilter =================================
+
+// =============================== UserFilter ==================================
+type userFilterMapper struct {
+	colaEntradaUsers *middleware.MessageMiddlewareQueue
+
+	colaSalida4 *middleware.MessageMiddlewareQueue
+}
+
+func (ufm *userFilterMapper) Build(rabbitAddr string) {
+	colaEntradaUsers := colas.InstanceQueue("DataUsers", rabbitAddr)
+
+	colaSalida4 := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
+
+	ufm.colaEntradaUsers  = colaEntradaUsers
+
+	ufm.colaSalida4  = colaSalida4
+}
+
+func (ufm *userFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+	return ufm.colaEntradaUsers
+}
+
+func (ufm *userFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	input := pkt.GetPayload()
+
+	// Ambas payloads iguales
+	filtered_users := []string{filterFunctionQuery4UsersBirthdates(input)}
+
+	newPayload := packet.ChangePayload(pkt, filtered_users)
+	outBoundMessage := []packet.OutBoundMessage{
+		{
+			Packet: newPayload[0],
+			ColaSalida: ufm.colaSalida4,
+		},
+	}
+
+	return outBoundMessage
+}
+
+// =============================== UserFilter ==================================
 type FilterMapper interface {
-	// Funcio que hace el filtrado
-	Process(pkt packet.Packet) []OutBoundMessage
 	// Funcion que inicializa las cosas que el filter necesita
 	Build(rabbitAddr string)
+
+	// Devuelve referencia de la cola de la cual tiene que consumir
+	GetInput() *middleware.MessageMiddlewareQueue
+
+	// Funcio que hace el filtrado
+	Process(pkt packet.Packet) []packet.OutBoundMessage
 }
 
 func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {
 	var filterMapper FilterMapper;
 	switch datasetName {
 	case "transactions":
-		filterMapper = &TransactionFilterMapper{}
-	// case "store":
-	// 	filterMapper = &StoreFilterMapper{}
+		filterMapper = &transactionFilterMapper{}
+	case "store":
+		filterMapper = &storeFilterMapper{}
+	case "users":
+		filterMapper = &userFilterMapper{}
 	default:
 		panic(fmt.Sprintf("Unknown 'dataset' %s", datasetName))
 	}
