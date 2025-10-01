@@ -11,9 +11,9 @@ import (
 
 func main() {
 	// Hay que ponerle el arg del rabbit
-	colaEntrada, err := middleware.CreateQueue("DataQuery1", middleware.ChannelOptionsDefault())
+	colaEntrada, err := middleware.CreateQueue("DataTransactions", middleware.ChannelOptionsDefault())
 	if err != nil {
-		panic(fmt.Errorf("CreateQueue(DataQuery1): %w", err))
+		panic(fmt.Errorf("CreateQueue(DataTransactions): %w", err))
 	}
 	// defer colaEntrada.Close()
 
