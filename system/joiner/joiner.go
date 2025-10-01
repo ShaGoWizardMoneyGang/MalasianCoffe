@@ -140,7 +140,7 @@ func main() {
 				panic(fmt.Errorf("Could not ack, %w", err))
 			}
 		}
-		println("[JOINER QUERY3] Leyendo global aggregations")
+		println("[JOINER QUERY3] Leyendo global aggregations ")
 		colaEntradaTransactions, err := middleware.CreateQueue("GlobalAggregation3", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 		if err != nil {
 			panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
