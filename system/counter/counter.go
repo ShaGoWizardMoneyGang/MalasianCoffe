@@ -54,6 +54,13 @@ func (c *Counter) countFunctionQuery4(input string) string {
 type Counter struct {
 }
 
+type CounterInt interface {
+	// Funcio que hace el filtrado
+	Process(pkt packet.Packet) []packet.OutBoundMessage
+	// Funcion que inicializa las cosas que el filter necesita
+	Build(rabbitAddr string)
+}
+
 func (c *Counter) Process(pkt packet.Packet) []packet.Packet {
 	// unica funcion de counter, va directo
 	input := pkt.GetPayload()

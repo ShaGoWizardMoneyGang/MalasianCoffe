@@ -1,6 +1,9 @@
 package dataset
 
-import "fmt"
+import (
+	"fmt"
+)
+
 
 // Helper function que traduce el nombre del directorio con datos a su ID corresponditente.
 // ADVERTENCIA: Programacion avanzada.

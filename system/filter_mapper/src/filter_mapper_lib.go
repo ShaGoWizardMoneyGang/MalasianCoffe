@@ -213,11 +213,6 @@ func filterTransactions(input string) []string {
 	return []string{final_query1, final_query3, final_query4}
 }
 
-// Struct que asocia un paquete a enviar con la cola a la cual lo tiene que enviar
-type OutBoundMessage struct {
-	Packet packet.Packet
-	ColaSalida *middleware.MessageMiddlewareQueue
-}
 
 func instanceQueue(inputQueueName string, rabbitAddr string) *middleware.MessageMiddlewareQueue {
 	cola, err := middleware.CreateQueue(inputQueueName, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
@@ -246,7 +241,7 @@ func (tfm *TransactionFilterMapper) Build(rabbitAddr string) {
 	tfm.colaSalida3  = colaSalida3
 	tfm.colaSalida4  = colaSalida4
 }
-func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []OutBoundMessage {
+func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Vienen en este orden: final_query1, final_query3, final_query4
@@ -254,7 +249,7 @@ func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []OutBoundMessage
 
 	newPayload := packet.ChangePayload(pkt, payloadResults)
 
-	outBoundMessage := []OutBoundMessage{
+	outBoundMessage := []packet.OutBoundMessage{
 		{
 			Packet: newPayload[0],
 			ColaSalida: tfm.colaSalida1,
@@ -288,13 +283,13 @@ func (sfm *StoreFilterMapper) Build(rabbitAddr string) {
 	sfm.colaSalida3  = colaSalida3
 	sfm.colaSalida4  = colaSalida4
 }
-func (sfm *StoreFilterMapper) Process(pkt packet.Packet) []OutBoundMessage {
+func (sfm *StoreFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
 	mapped_stores := mapStoreIdAndName(input)
 	newPayload := packet.ChangePayload(pkt, mapped_stores)
-	outBoundMessage := []OutBoundMessage{
+	outBoundMessage := []packet.OutBoundMessage{
 		{
 			Packet: newPayload[0],
 			ColaSalida: sfm.colaSalida3,
@@ -321,14 +316,14 @@ func (ufm *UserFilterMapper) Build(rabbitAddr string) {
 	ufm.colaSalida4  = colaSalida4
 }
 
-func (ufm *UserFilterMapper) Process(pkt packet.Packet) []OutBoundMessage {
+func (ufm *UserFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
 	filtered_users := []string{filterFunctionQuery4UsersBirthdates(input)}
 
 	newPayload := packet.ChangePayload(pkt, filtered_users)
-	outBoundMessage := []OutBoundMessage{
+	outBoundMessage := []packet.OutBoundMessage{
 		{
 			Packet: newPayload[0],
 			ColaSalida: ufm.colaSalida4,
@@ -341,7 +336,7 @@ func (ufm *UserFilterMapper) Process(pkt packet.Packet) []OutBoundMessage {
 // =============================== UserFilter ==================================
 type FilterMapper interface {
 	// Funcio que hace el filtrado
-	Process(pkt packet.Packet) []OutBoundMessage
+	Process(pkt packet.Packet) []packet.OutBoundMessage
 	// Funcion que inicializa las cosas que el filter necesita
 	Build(rabbitAddr string)
 }

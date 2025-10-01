@@ -1,6 +1,15 @@
 package packet
 
-import "strconv"
+import (
+	"malasian_coffe/system/middleware"
+	"strconv"
+)
+
+// Struct que asocia un paquete a enviar con la cola a la cual lo tiene que enviar
+type OutBoundMessage struct {
+	Packet Packet
+	ColaSalida *middleware.MessageMiddlewareQueue
+}
 
 // Formato:
 // String del estilo A.B.C.D...
@@ -13,6 +22,7 @@ type PacketUuid struct {
 	// End of file. Este paquete es el ultimo paquete del archivo correspondiente
 	eof bool
 }
+
 
 func (pu *PacketUuid) getDirID() string {
 	dir_id := string(pu.uuid[0])
