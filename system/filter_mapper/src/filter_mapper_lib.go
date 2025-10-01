@@ -88,9 +88,13 @@ func filterFunctionQuery2b(input string) string {
 }
 
 func mapStoreIdAndName(input string) string {
+	print("[FILTER STORES]:", input)
 	lines := strings.Split(input, "\n")
 	final := ""
 	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
 		data := strings.Split(line, ",")
 		if len(data) < 8 {
 			panic("Invalid data format")

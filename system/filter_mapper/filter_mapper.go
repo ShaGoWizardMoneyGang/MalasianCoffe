@@ -59,9 +59,10 @@ func main() {
 
 	switch filterFunction {
 	case "stores":
-		colaEntrada := instanceQueue("DataMenuItems", rabbitAddr)
+		println("[CASE STORES]")
+		colaEntrada := instanceQueue("DataStores", rabbitAddr)
 		msgQueue := consumeInput(colaEntrada)
-		colaSalida := instanceQueue("FilteredMenuItems", rabbitAddr)
+		colaSalida := instanceQueue("FilteredStores", rabbitAddr)
 		sendPackets(msgQueue, colaSalida, "stores")
 	case "transactions":
 		println("[CASE TRANSACTIONS]")
