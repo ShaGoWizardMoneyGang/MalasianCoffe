@@ -7,13 +7,17 @@ import (
 	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
 	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/network"
+	"os"
 )
 
 // Argumentos que recibe:
 // 1. Address de rabbit
 // 2. Nombre de la funcion que tiene que ejecutar
 func main() {
-	colaEntrada, err := middleware.CreateQueue("FilteredTransactions1", middleware.ChannelOptionsDefault())
+	rabbit_addr := os.Args[1]
+	print("Rabbit address: ", rabbit_addr, "\n")
+	colaEntrada, err := middleware.CreateQueue("FilteredTransactions1", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(FilteredTransactions1): %w", err))
 	}
