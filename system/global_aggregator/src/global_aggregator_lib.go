@@ -3,38 +3,54 @@ package global_aggregator
 import (
 	"fmt"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/colas"
 	"sort"
 	"strconv"
 	"strings"
 )
 
+type GlobalAggregator interface {
+	Build(rabbitAddr string)
+	GetInput() *middleware.MessageMiddlewareQueue
+	Process(pkt packet.Packet) []packet.OutBoundMessage
+}
+
 type key struct {
-	yearHalf string
+	yearHalf string // "YYYY-H1" o "YYYY-H2"
 	storeID  string
 }
 
-type GlobalAggregator struct {
-	acc map[key]float64
+type aggregator3Global struct {
+	colaEntrada *middleware.MessageMiddlewareQueue
+	colaSalida  *middleware.MessageMiddlewareQueue
+	acc         map[key]float64
 }
 
-func NewAggregator() *GlobalAggregator {
-	return &GlobalAggregator{acc: make(map[key]float64)}
+func (g *aggregator3Global) Build(rabbitAddr string) {
+	g.colaEntrada = colas.InstanceQueue("PartialAggregations3", rabbitAddr)
+	g.colaSalida = colas.InstanceQueue("SalidaQuery3", rabbitAddr) //IMPORTANTE ACA CAMBIAR POR DE LA QUE LEE EL JOIN
+	//g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
+	g.acc = make(map[key]float64)
 }
 
-// batch del parcial "YYYY-H{1|2},store_id,tpv"
-func (a *GlobalAggregator) ingestBatch(input string) {
-	lines := strings.Split(strings.TrimSpace(input), "\n")
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
+func (g *aggregator3Global) GetInput() *middleware.MessageMiddlewareQueue {
+	return g.colaEntrada
+}
+
+func (g *aggregator3Global) ingestBatch(input string) {
+	lines := strings.SplitSeq(input, "\n")
+	for line := range lines {
+		if line == "" {
 			continue
 		}
 		cols := strings.Split(line, ",")
 		if len(cols) != 3 {
-			panic("Se esperaban 3 columnas: YYYY-H{1|2},store_id,tpv")
+			panic("Se esperaban 3 columnas")
 		}
-		yh := strings.TrimSpace(cols[0])      // YYYY-H1 o YYYY-H2
-		storeID := strings.TrimSpace(cols[1]) // store_id
-		amountStr := strings.TrimSpace(cols[2])
+		yh := cols[0]
+		storeID := cols[1]
+		amountStr := cols[2]
 
 		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
@@ -42,17 +58,17 @@ func (a *GlobalAggregator) ingestBatch(input string) {
 		}
 
 		k := key{yearHalf: yh, storeID: storeID}
-		a.acc[k] += amount
+		g.acc[k] += amount
 	}
 }
 
-func (a *GlobalAggregator) flushAndBuild() string {
-	if len(a.acc) == 0 {
+func (g *aggregator3Global) flushAndBuild() string {
+	if len(g.acc) == 0 {
 		return ""
 	}
 
-	keys := make([]key, 0, len(a.acc))
-	for k := range a.acc {
+	keys := make([]key, 0, len(g.acc))
+	for k := range g.acc {
 		keys = append(keys, k)
 	}
 	sort.Slice(keys, func(i, j int) bool {
@@ -64,28 +80,44 @@ func (a *GlobalAggregator) flushAndBuild() string {
 
 	var b strings.Builder
 	for _, k := range keys {
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearHalf, k.storeID, a.acc[k])
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearHalf, k.storeID, g.acc[k])
 	}
 
-	a.acc = make(map[key]float64)
+	g.acc = make(map[key]float64)
 	return b.String()
 }
 
-func (a *GlobalAggregator) Process(pkt packet.Packet, function string) []packet.Packet {
-	input := strings.TrimSpace(pkt.GetPayload())
-	switch strings.ToLower(function) {
-	case "agregator3globalbysemestertpv":
-		if pkt.IsEOF() {
-			final := a.flushAndBuild()
-			if final == "" {
-				return nil
-			}
-			return packet.ChangePayload(pkt, []string{final})
-		}
-		a.ingestBatch(input)
-		return nil
+func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	input := pkt.GetPayload()
 
+	isEOF := pkt.IsEOF() || strings.EqualFold(input, "EOF")
+
+	if !isEOF {
+		g.ingestBatch(input)
+		return nil
+	}
+
+	final := g.flushAndBuild()
+	if final == "" {
+		return nil
+	}
+
+	newPkts := packet.ChangePayload(pkt, []string{final})
+	return []packet.OutBoundMessage{
+		{
+			Packet:     newPkts[0],
+			ColaSalida: g.colaSalida,
+		},
+	}
+}
+
+func GlobalAggregatorBuilder(name, rabbitAddr string) GlobalAggregator {
+	switch strings.ToLower(name) {
+	case "query3global":
+		worker := &aggregator3Global{}
+		worker.Build(rabbitAddr)
+		return worker
 	default:
-		panic("Funcion desconocida")
+		panic(fmt.Sprintf("Unknown global aggregator '%s'", name))
 	}
 }

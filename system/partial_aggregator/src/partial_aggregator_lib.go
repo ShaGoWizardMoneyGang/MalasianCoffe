@@ -23,9 +23,9 @@ func aggregator3BySemesterTPV(input string) string {
 	}
 	acc := make(map[key]float64)
 
-	lines := strings.Split(input, "\n")
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
+	lines := strings.SplitSeq(input, "\n")
+	for line := range lines {
+		if line == "" {
 			continue
 		}
 		cols := strings.Split(line, ",")
@@ -33,14 +33,14 @@ func aggregator3BySemesterTPV(input string) string {
 			panic("Se esperaban 3 columnas: store_id,final_amount,created_at")
 		}
 
-		storeID := strings.TrimSpace(cols[0])
+		storeID := cols[0]
 
-		amount, err := strconv.ParseFloat(strings.TrimSpace(cols[1]), 64)
+		amount, err := strconv.ParseFloat(cols[1], 64)
 		if err != nil {
 			panic("final_amount con formato inválido")
 		}
 
-		ts, err := time.Parse(layout, strings.TrimSpace(cols[2]))
+		ts, err := time.Parse(layout, cols[2])
 		if err != nil {
 			panic("created_at con formato inválido")
 		}
@@ -113,9 +113,9 @@ func (a *aggregator3Partial) Process(pkt packet.Packet) []packet.OutBoundMessage
 func PartialAggregatorBuilder(name string, rabbitAddr string) PartialAggregator {
 	switch strings.ToLower(name) {
 	case "query3":
-		partialAgg := &aggregator3Partial{}
-		partialAgg.Build(rabbitAddr)
-		return partialAgg
+		worker := &aggregator3Partial{}
+		worker.Build(rabbitAddr)
+		return worker
 	default:
 		panic(fmt.Sprintf("Funcion desconocida '%s'", name))
 	}
