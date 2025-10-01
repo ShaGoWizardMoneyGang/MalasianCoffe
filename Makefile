@@ -52,7 +52,7 @@ run-joiner:
 run-sender:
 	cd system/sender; go run sender.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 #============================== Build directives ===============================
-build: build-server build-client build-gateway build-filter build-concat build-sender build-counter
+build: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner
 build-client:
 	cd client; go build -o ${current_dir}/bin/client
 
