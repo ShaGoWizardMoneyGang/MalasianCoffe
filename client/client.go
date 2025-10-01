@@ -63,7 +63,7 @@ func createPackagesFrom(dir string, session_ID string, listen_addr string, send_
 
 func main() {
 	dataset_directory := os.Args[1]
-	// out_dir := os.Args[2]
+	out_dir := os.Args[2]
 	gateway_addr := os.Args[3]
 	listen_addr := os.Args[4]
 
@@ -101,7 +101,7 @@ func main() {
 
 	fmt.Println("All dataset sent, now waiting for replies")
 
-	error := waitForAnswers(listen_addr)
+	error := waitForAnswers(listen_addr, out_dir)
 	if error != nil {
 		panic(error)
 	}
@@ -120,27 +120,27 @@ type received_answers struct {
 func new_received_answers() received_answers {
 	buffer := make([]receive_answer, 6)
 	buffer[0] = receive_answer {
-		query_name: "Query 1",
+		query_name: "Query1",
 		received: false,
 	}
 	buffer[1] = receive_answer {
-		query_name: "Query 2a",
+		query_name: "Query2a",
 		received: false,
 	}
 	buffer[2] = receive_answer {
-		query_name: "Query 2b",
+		query_name: "Query2b",
 		received: false,
 	}
 	buffer[3] = receive_answer {
-		query_name: "Query 3",
+		query_name: "Query3",
 		received: false,
 	}
 	buffer[4] = receive_answer {
-		query_name: "Query 4",
+		query_name: "Query4",
 		received: false,
 	}
 	buffer[5] = receive_answer {
-		query_name: "Query 5",
+		query_name: "Query5",
 		received: false,
 	}
 
@@ -154,17 +154,17 @@ func new_received_answers() received_answers {
 func (ra *received_answers) addAnswer(pkt packetanswer.PacketAnswer) {
 	var index int
 	switch pkt.GetQuery() {
-	case "Query 1":
+	case "Query1":
 		index = 0
-	case "Query 2a":
+	case "Query2a":
 		index = 1
-	case "Query 2b":
+	case "Query2b":
 		index = 2
-	case "Query 3":
+	case "Query3":
 		index = 3
-	case "Query 4":
+	case "Query4":
 		index = 4
-	case "Query 5":
+	case "Query5":
 		index = 5
 	default:
 		panic(fmt.Sprintf("Unknown query: %s", pkt.GetQuery()))
@@ -188,7 +188,11 @@ func (ra *received_answers) display() {
 	}
 }
 
-func waitForAnswers(listen_addr string) error {
+func waitForAnswers(listen_addr string, out_dir string) error {
+	err := os.Mkdir(out_dir, 0777)
+	if err != nil {
+		panic(fmt.Errorf("Failed to create directory %s", out_dir))
+	}
 	received_answers := new_received_answers()
 
 	list, err := net.Listen("tcp", listen_addr)
@@ -214,6 +218,22 @@ func waitForAnswers(listen_addr string) error {
 			return fmt.Errorf("Failed to deserialize packet because of %s", err)
 		}
 
+		write_to_file(packet_answer, out_dir)
 		received_answers.addAnswer(packet_answer)
 	}
+}
+
+func write_to_file(pkt packetanswer.PacketAnswer, out_dir string) error {
+	result := []byte(pkt.GetPayload())
+
+	query := pkt.GetQuery()
+
+	out_file := out_dir + query
+
+	err := os.WriteFile(out_file, result, 0666)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/dataset"
 	"malasian_coffe/utils/network"
 )
 
@@ -51,21 +53,22 @@ func main() {
 
 		// TODO: esto esta hardcodeado asi porque es para la query 1.
 		// Aca deberia haber un switch que lo envie a la queue correspondiente
-
-		switch packet.GetDirID() {
-		case "0":
-			colaMenuItems.Send(packet.Serialize())
-		case "1":
-			colaStore.Send(packet.Serialize())
-		case "2":
-			colaTransactionItems.Send(packet.Serialize())
-		case "3":
-			colaTransactions.Send(packet.Serialize())
-		case "4":
-			colaUsers.Send(packet.Serialize())
-		default:
-			panic("ID de paquete desconocido")
+		packet_id, err := strconv.ParseUint(packet.GetDirID(), 10, 64)
+		dataset_name, err := dataset.IDtoDataset(packet_id)
+		if err != nil {
+			panic(err)
 		}
-
+		switch dataset_name {
+		case "menu_items":
+			colaMenuItems.Send(packet.Serialize())
+		case "stores":
+			colaStore.Send(packet.Serialize())
+		case "transaction_items":
+			colaTransactionItems.Send(packet.Serialize())
+		case "transactions":
+			colaTransactions.Send(packet.Serialize())
+		case "users":
+			colaUsers.Send(packet.Serialize())
+		}
 	}
 }

@@ -10,6 +10,8 @@
 #============================== Run directives =================================
 
 current_dir = $(shell pwd)
+distro = $(shell cat /etc/os-release | grep -w NAME | sed 's/NAME=//g' )
+
 
 DATADIR                ?=    ${current_dir}/dataset/
 OUTDIR                 ?=    ${current_dir}/out/
@@ -39,7 +41,7 @@ run-concat:
 	cd system/concat; go run concat.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
 run-sender:
-	cd system/sender; go run sender.go ${RABBIT_ADDR}
+	cd system/sender; go run sender.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 #============================== Build directives ===============================
 build: build-server build-client build-gateway build-filter build-concat build-sender
 build-client:
@@ -85,5 +87,16 @@ download-dataset:
 	rm -rf dataset/vouchers
 	rm -rf dataset/payment_methods
 
+download-reduced-dataset: download-dataset
+	find dataset/transaction_items -type f ! \( -name '*202401*' -o -name '*202501*' \) -exec rm {} +
+	find dataset/transactions -type f ! \( -name '*202401*' -o -name '*202501*' \) -exec rm {} +
+
 rabbit-gui:
 	xdg-open http://localhost:15672
+
+restart-rabbit:
+ifeq ($(distro),Gentoo)
+	sudo rc-service rabbitmq restart
+else
+	sudo systemctl restart rabbitmq-server
+endif
