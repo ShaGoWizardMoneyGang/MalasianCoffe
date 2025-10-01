@@ -214,9 +214,8 @@ func (c *FilterMapper) Process(pkt packet.Packet, function string) []packet.Pack
 	}
 
 	var new_packets []packet.Packet
-	for _, result := range output { //cada output tiene que ir a un paquete. Se multiplexa si hay mas de una respuesta
-		pkt_new := packet.Packet{}
-		new_packets = append(new_packets, packet.ChangePayload(pkt_new, []string{result})[0])
+	for _, result := range output {
+		new_packets = append(new_packets, packet.ChangePayload(pkt, []string{result})[0])
 	}
 
 	return new_packets

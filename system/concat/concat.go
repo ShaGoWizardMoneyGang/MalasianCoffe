@@ -33,18 +33,24 @@ func main() {
 
 		slog.Debug("Recibi mensaje")
 		packet_reader := bytes.NewReader(message.Body)
-		packet, _ := packet.DeserializePackage(packet_reader)
-
-		result = worker.Process(packet)
-		err := message.Ack(false)
+		packet, err := packet.DeserializePackage(packet_reader)
 		if err != nil {
-			panic(fmt.Errorf("Could not ack, %w", err))
+			panic(fmt.Errorf("Error deserializing packet: %w", err))
+		}
+
+		slog.Debug("Procesando packet", "eof", packet.IsEOF(), "payload_len", len(packet.GetPayload()))
+		result = worker.Process(packet)
+		ackErr := message.Ack(false)
+		if ackErr != nil {
+			panic(fmt.Errorf("Could not ack, %w", ackErr))
 		}
 		if len(result) != 0 {
 			slog.Info("Obtuve EOF, mando todo empaquetado a la cola de sending")
 			for _, pkt := range result {
 				err := colaSalida.Send(pkt.Serialize())
-				println(err)
+				if err != 0 {
+					panic(fmt.Errorf("Error sending packet: %d", err))
+				}
 			}
 		}
 	}

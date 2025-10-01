@@ -81,7 +81,8 @@ func main() {
 			fmt.Printf("PAQUETES SALIDA %v\n", paquetesSalida)
 
 			println("Mandando paquetes a las colas correspondientes")
-			fmt.Printf("PAQUETES PARA COLA 1%v\n", paquetesSalida[0])
+			fmt.Printf("PAQUETES PARA COLA 1: %v\n", paquetesSalida[0])
+
 			_ = colaSalida1.Send(paquetesSalida[0].Serialize())
 			_ = colaSalida3.Send(paquetesSalida[1].Serialize())
 			_ = colaSalida4.Send(paquetesSalida[2].Serialize())
