@@ -58,7 +58,30 @@ func (c *CounterQuery4) countFunctionQuery4(input string) string {
 }
 
 type CounterQuery4 struct {
-	colaCountedUsers4 *middleware.MessageMiddlewareQueue
+	colaEntradaFilteredTransactions4 *middleware.MessageMiddlewareQueue
+
+	colaSalidaCountedUsers4 *middleware.MessageMiddlewareQueue
+}
+
+func (c *CounterQuery4) Build(rabbitAddr string) {
+
+	colaEntrada, err := middleware.CreateQueue("FilteredTransactions4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactions4", err))
+	}
+
+	colaSalida, err := middleware.CreateQueue("CountedUsers4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(%s): %w", "CountedUsers4", err))
+	}
+
+	c.colaEntradaFilteredTransactions4 = colaEntrada
+
+	c.colaSalidaCountedUsers4 = colaSalida
+}
+
+func (c *CounterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
+	return c.colaEntradaFilteredTransactions4
 }
 
 func (c *CounterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
@@ -71,27 +94,24 @@ func (c *CounterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	outBoundMessage := []packet.OutBoundMessage{
 		{
 			Packet: newPayload[0],
-			ColaSalida: c.colaCountedUsers4,
+			ColaSalida: c.colaSalidaCountedUsers4,
 		},
 	}
 
 	return outBoundMessage
 }
-func (c *CounterQuery4) Build(rabbitAddr string) {
-	cola, err := middleware.CreateQueue("CountedUsers4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(%s): %w", "CountedUsers4", err))
-	}
-	c.colaCountedUsers4 = cola
-}
 
 // ============================= CounterQuery4 ================================
 
 type Counter interface {
-	// Funcio que hace el filtrado
-	Process(pkt packet.Packet) []packet.OutBoundMessage
 	// Funcion que inicializa las cosas que el filter necesita
 	Build(rabbitAddr string)
+
+	// Devuelve referencia de la cola de la cual tiene que consumir
+	GetInput() *middleware.MessageMiddlewareQueue
+
+	// Funcio que hace el filtrado
+	Process(pkt packet.Packet) []packet.OutBoundMessage
 }
 
 func CounterBuilder(counterName string, rabbitAddr string) Counter {

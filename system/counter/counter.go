@@ -3,35 +3,27 @@ package main
 import (
 	"bytes"
 	"fmt"
+
 	"malasian_coffe/packets/packet"
-	filter_mapper "malasian_coffe/system/filter_mapper/src"
-	"malasian_coffe/system/middleware"
+	counter "malasian_coffe/system/counter/src"
+	"malasian_coffe/utils/colas"
 	"os"
 )
 
-func consumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.ConsumeChannel {
-	msgQueue, consumeError := colaEntrada.StartConsuming()
-	if consumeError != 0 {
-		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
-	}
-	return msgQueue
-}
-
-// Cola input menu items: DataMenuItems TODO: constante global (utils)
-// Cola output menu items filtrados: FilteredMenuItems
 func main() {
-	filterFunction := os.Args[2]
-	if len(filterFunction) == 0 {
+	counterFunction := os.Args[2]
+	if len(counterFunction) == 0 {
 		panic(`No filter function provided, tiene que ser algo del estilo:
 make run-filter RUN_FUNCTION=transactions
 `)
 	}
 	rabbitAddr := os.Args[1]
 
-	worker := filter_mapper.FilterMapperBuilder(filterFunction, rabbitAddr)
+	worker := counter.CounterBuilder(counterFunction, rabbitAddr)
+
 	colaEntrada := worker.GetInput()
 
-	msgQueue := consumeInput(colaEntrada)
+	msgQueue := colas.ConsumeInput(colaEntrada)
 
 	for message := range *msgQueue { //while true hasta que terminen los mensajes
 		packetReader := bytes.NewReader(message.Body)
