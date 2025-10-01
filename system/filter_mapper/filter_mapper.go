@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"log/slog"
+	// "log/slog"
 	"malasian_coffe/packets/packet"
 	filter_mapper "malasian_coffe/system/filter_mapper/src"
 	"malasian_coffe/system/middleware"
@@ -27,27 +27,28 @@ func consumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.Con
 	return msgQueue
 }
 
-func sendPackets(msgQueue middleware.ConsumeChannel, colaSalida *middleware.MessageMiddlewareQueue, filterFunction string) {
-	worker := filter_mapper.FilterMapper{}
-	for message := range *msgQueue {
-		packetReader := bytes.NewReader(message.Body)
-		pkt, _ := packet.DeserializePackage(packetReader)
+// func sendPackets(msgQueue middleware.ConsumeChannel, colaSalida *middleware.MessageMiddlewareQueue, filterFunction string) {
+// 	worker := filter_mapper.FilterMapper{}
+// 	for message := range *msgQueue {
+// 		packetReader := bytes.NewReader(message.Body)
+// 		pkt, _ := packet.DeserializePackage(packetReader)
 
-		paquetesSalida := worker.Process(pkt, filterFunction)
+// 		paquetesSalida := worker.Process(pkt, filterFunction)
 
-		for _, pkt := range paquetesSalida {
-			slog.Info("Mando packet filtrado a siguiente cola")
-			_ = colaSalida.Send(pkt.Serialize())
-		}
-		err := message.Ack(false)
-		if err != nil {
-			panic(fmt.Errorf("Could not ack, %w", err))
-		}
-	}
-}
+// 		for _, pkt := range paquetesSalida {
+// 			slog.Info("Mando packet filtrado a siguiente cola")
+// 			_ = colaSalida.Send(pkt.Serialize())
+// 		}
+// 		err := message.Ack(false)
+// 		if err != nil {
+// 			panic(fmt.Errorf("Could not ack, %w", err))
+// 		}
+// 	}
+// }
 
 // Cola input menu items: DataMenuItems TODO: constante global (utils)
 // Cola output menu items filtrados: FilteredMenuItems
+
 
 func main() {
 	filterFunction := os.Args[2]
@@ -57,42 +58,31 @@ make run-filter RUN_FUNCTION=transactions
 `)
 	}
 	rabbitAddr := os.Args[1]
-	// Hay que ponerle el arg del rabbit
 
-	switch filterFunction {
-	case "stores":
-		colaEntrada := instanceQueue("DataMenuItems", rabbitAddr)
-		msgQueue := consumeInput(colaEntrada)
-		colaSalida := instanceQueue("FilteredMenuItems", rabbitAddr)
-		sendPackets(msgQueue, colaSalida, "stores")
-	case "transactions":
-		println("[CASE TRANSACTIONS]")
+	worker := filter_mapper.FilterMapperBuilder(filterFunction, rabbitAddr)
 
-		colaEntrada := instanceQueue("DataTransactions", rabbitAddr)
-		msgQueue := consumeInput(colaEntrada)
-		colaSalida1 := instanceQueue("FilteredTransactions1", rabbitAddr)
-		colaSalida3 := instanceQueue("FilteredTransactions3", rabbitAddr)
-		colaSalida4 := instanceQueue("FilteredTransactions4", rabbitAddr)
+	colaEntrada := instanceQueue("DataTransactions", rabbitAddr)
+	msgQueue := consumeInput(colaEntrada)
 
-		worker := filter_mapper.FilterMapper{}
-		for message := range *msgQueue { //while true hasta que terminen los mensajes
-			packetReader := bytes.NewReader(message.Body)
-			pkt, _ := packet.DeserializePackage(packetReader)
+	for message := range *msgQueue { //while true hasta que terminen los mensajes
+		packetReader := bytes.NewReader(message.Body)
+		pkt, _ := packet.DeserializePackage(packetReader)
 
-			paquetesSalida := worker.Process(pkt, "transactions")
-			fmt.Printf("PAQUETES SALIDA %v\n", paquetesSalida)
+		outboundMessages := worker.Process(pkt)
+		// fmt.Printf("PAQUETES SALIDA %v\n", paquetesSalida)
 
-			println("Mandando paquetes a las colas correspondientes")
-			fmt.Printf("PAQUETES PARA COLA 1: %v\n", paquetesSalida[0])
+		println("Mandando paquetes a las colas correspondientes")
+		// fmt.Printf("PAQUETES PARA COLA 1: %v\n", paquetesSalida[0])
 
-			_ = colaSalida1.Send(paquetesSalida[0].Serialize())
-			_ = colaSalida3.Send(paquetesSalida[1].Serialize())
-			_ = colaSalida4.Send(paquetesSalida[2].Serialize())
+		for _, outbound := range outboundMessages {
+			cola := outbound.ColaSalida
+			packet := outbound.Packet
+			cola.Send(packet.Serialize())
+		}
 
-			err := message.Ack(false)
-			if err != nil {
-				panic(fmt.Errorf("Could not ack, %w", err))
-			}
+		err := message.Ack(false)
+		if err != nil {
+			panic(fmt.Errorf("Could not ack, %w", err))
 		}
 	}
 }
