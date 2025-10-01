@@ -90,7 +90,7 @@ func filterFunctionQuery2b(input string) string {
 	return final
 }
 
-func mapStoreIdAndName(input string) string {
+func mapStoreIdAndName(input string) []string {
 	print("[FILTER STORES]:", input)
 	lines := strings.Split(input, "\n")
 	final := ""
@@ -102,9 +102,15 @@ func mapStoreIdAndName(input string) string {
 		if len(data) < 8 {
 			panic("Invalid data format")
 		}
+
+		if   data[0] == "" ||
+			data[1] == "" {
+			slog.Debug("Registro con campos de interes vacios, dropeado")
+			continue
+		}
 		final += data[0] + "," + data[1] + "\n"
 	}
-	return final
+	return []string{final, final}
 }
 
 func filterFunctionQuery3Transactions(input string) string {
@@ -209,19 +215,22 @@ type OutBoundMessage struct {
 	ColaSalida *middleware.MessageMiddlewareQueue
 }
 
-type TransactionFilterMapper struct {
-	colaSalida1 *middleware.MessageMiddlewareQueue
-	colaSalida3 *middleware.MessageMiddlewareQueue
-	colaSalida4 *middleware.MessageMiddlewareQueue
-}
-
-
 func instanceQueue(inputQueueName string, rabbitAddr string) *middleware.MessageMiddlewareQueue {
 	cola, err := middleware.CreateQueue(inputQueueName, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", inputQueueName, err))
 	}
 	return cola
+}
+
+
+
+// =========================== TransactionFilter ==============================
+
+type TransactionFilterMapper struct {
+	colaSalida1 *middleware.MessageMiddlewareQueue
+	colaSalida3 *middleware.MessageMiddlewareQueue
+	colaSalida4 *middleware.MessageMiddlewareQueue
 }
 
 func (tfm *TransactionFilterMapper) Build(rabbitAddr string) {
@@ -259,6 +268,44 @@ func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []OutBoundMessage
 	return outBoundMessage
 }
 
+// =========================== TransactionFilter ==============================
+
+// ============================== StoreFilter =================================
+
+type StoreFilterMapper struct {
+	colaSalida3 *middleware.MessageMiddlewareQueue
+	colaSalida4 *middleware.MessageMiddlewareQueue
+}
+
+func (sfm *StoreFilterMapper) Build(rabbitAddr string) {
+	colaSalida3 := instanceQueue("FilteredStores3", rabbitAddr)
+	colaSalida4 := instanceQueue("FilteredStores4", rabbitAddr)
+
+	sfm.colaSalida3  = colaSalida3
+	sfm.colaSalida4  = colaSalida4
+}
+func (sfm *StoreFilterMapper) Process(pkt packet.Packet) []OutBoundMessage {
+	input := pkt.GetPayload()
+
+	// Ambas payloads iguales
+	mapped_stores := mapStoreIdAndName(input)
+	newPayload := packet.ChangePayload(pkt, mapped_stores)
+	outBoundMessage := []OutBoundMessage{
+		{
+			Packet: newPayload[0],
+			ColaSalida: sfm.colaSalida3,
+		},
+		{
+			Packet: newPayload[1],
+			ColaSalida: sfm.colaSalida4,
+		},
+	}
+
+	return outBoundMessage
+}
+
+// ============================== StoreFilter =================================
+
 type FilterMapper interface {
 	// Funcio que hace el filtrado
 	Process(pkt packet.Packet) []OutBoundMessage
@@ -271,8 +318,8 @@ func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {
 	switch datasetName {
 	case "transactions":
 		filterMapper = &TransactionFilterMapper{}
-	// case "store":
-	// 	filterMapper = &StoreFilterMapper{}
+	case "store":
+		filterMapper = &StoreFilterMapper{}
 	default:
 		panic(fmt.Sprintf("Unknown 'dataset' %s", datasetName))
 	}
