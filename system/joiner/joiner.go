@@ -107,7 +107,6 @@ func main() {
 
 	switch joinFunction {
 	case "Query3":
-		println("[JOINER QUERY3]")
 		colaEntradaStores, err := middleware.CreateQueue("FilteredStores", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 		if err != nil {
 			panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
