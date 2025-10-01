@@ -179,7 +179,7 @@ func (ra *received_answers) display() {
 	fmt.Print("\033[H\033[2J")
 	for _, answer := range ra.received {
 		if answer.received {
-			color.Green("%s received", answer.query_name)
+			color.Green("%s received (saved in out/)", answer.query_name)
 		} else {
 			color.Red("%s not received", answer.query_name)
 		}
