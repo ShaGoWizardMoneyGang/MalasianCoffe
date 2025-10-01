@@ -7,19 +7,18 @@ import (
 	"os"
 
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/utils/network"
 	"malasian_coffe/system/middleware"
-
+	"malasian_coffe/utils/network"
 )
 
 func main() {
 	rabbit_addr := os.Args[2]
-
+	//QUERY 2 USA TRANSACTIONS Y STORES
 	colaTransactions, err := middleware.CreateQueue("DataTransactions", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
-	// colaUsers, err := middleware.CreateQueue("DataUsers", middleware.ChannelOptionsDefault())
-	// colaStore, err := middleware.CreateQueue("DataStore", middleware.ChannelOptionsDefault())
-	// colaTransactionItems, err := middleware.CreateQueue("DataTransactionItems", middleware.ChannelOptionsDefault())
-	// colaMenuItems, err := middleware.CreateQueue("DataMenuItems", middleware.ChannelOptionsDefault())
+	colaUsers, err := middleware.CreateQueue("DataUsers", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
+	colaStore, err := middleware.CreateQueue("DataStore", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
+	colaTransactionItems, err := middleware.CreateQueue("DataTransactionItems", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
+	colaMenuItems, err := middleware.CreateQueue("DataMenuItems", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
 	if err != nil {
 		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %s. Is the daemon active?
 		Try running:
@@ -52,9 +51,21 @@ func main() {
 
 		// TODO: esto esta hardcodeado asi porque es para la query 1.
 		// Aca deberia haber un switch que lo envie a la queue correspondiente
-		if packet.GetDirID() != "3"{
-			continue
+
+		switch packet.GetDirID() {
+		case "0":
+			colaMenuItems.Send(packet.Serialize())
+		case "1":
+			colaStore.Send(packet.Serialize())
+		case "2":
+			colaTransactionItems.Send(packet.Serialize())
+		case "3":
+			colaTransactions.Send(packet.Serialize())
+		case "4":
+			colaUsers.Send(packet.Serialize())
+		default:
+			panic("ID de paquete desconocido")
 		}
-		colaTransactions.Send(packet.Serialize())
+
 	}
 }
