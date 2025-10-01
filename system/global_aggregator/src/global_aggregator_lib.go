@@ -1,4 +1,4 @@
-package aggregator
+package global_aggregator
 
 import (
 	"fmt"
@@ -6,54 +6,46 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type Aggregator struct {
 }
 
-// Recibe store_id,final_amount,created_at y devuelve YYYY-MM,store_id,tpv ordenada
-func (a *Aggregator) Aggregator3ByMonthTPV(input string) string {
-	const layout = "2006-01-02 15:04:05"
-
+// ESTO YA RECIBE LAS COSITAS PARCIALES AAAAAAAAAAAAA
+func (a *Aggregator) AggregatorGlobal3ByMonthTPV(input string) string {
 	type key struct {
 		yearAndMonth string
 		storeID      string
 	}
-	accumulator := make(map[key]float64)
 
-	lines := strings.Split(input, "\n")
+	acc := make(map[key]float64)
+
+	lines := strings.Split(strings.TrimSpace(input), "\n")
 	for _, line := range lines {
-		print("[AGGREGATOR COLUMNAS linea recibida]:", line, "\n")
-		if line == "" {
+		if strings.TrimSpace(line) == "" {
 			continue
 		}
+
 		cols := strings.Split(line, ",")
 		if len(cols) != 3 {
-			panic("Se esperaban 3 columnas")
+			panic("Se esperaban 3 columnas: YYYY-MM,store_id,tpv")
 		}
 
-		storeID := cols[0]
-		amountStr := cols[1]
+		ym := cols[0]
+		storeID := cols[1]
+		amountStr := cols[2]
 		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
-			panic("final_amount con formato invalido")
+			panic("tpv con formato inválido")
 		}
 
-		tsStr := cols[2]
-		ts, err := time.Parse(layout, tsStr)
-		if err != nil {
-			panic("created_at con formato invalido")
-		}
-
-		ym := ts.Format("2006-01")
 		k := key{yearAndMonth: ym, storeID: storeID}
-		accumulator[k] += amount
+		acc[k] += amount
 	}
 
-	// ordeno por mes y despues por ttpv
-	keys := make([]key, 0, len(accumulator))
-	for k := range accumulator {
+	// ordenar por mes y luego por store_id
+	keys := make([]key, 0, len(acc))
+	for k := range acc {
 		keys = append(keys, k)
 	}
 	sort.Slice(keys, func(i, j int) bool {
@@ -65,7 +57,7 @@ func (a *Aggregator) Aggregator3ByMonthTPV(input string) string {
 
 	var b strings.Builder
 	for _, k := range keys {
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearAndMonth, k.storeID, accumulator[k])
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearAndMonth, k.storeID, acc[k])
 	}
 	return b.String()
 }
@@ -74,10 +66,8 @@ func (a *Aggregator) Process(pkt packet.Packet, function string) []packet.Packet
 	input := pkt.GetPayload()
 	var salida string
 	switch strings.ToLower(function) {
-	case "agregator3bymonthtpv":
-		salida = a.Aggregator3ByMonthTPV(input)
 	case "agregator3globalbymonthtpv":
-		salida = pkt.GetPayload()
+		salida = a.AggregatorGlobal3ByMonthTPV(input)
 	default:
 		panic("Funcion desconocida")
 	}

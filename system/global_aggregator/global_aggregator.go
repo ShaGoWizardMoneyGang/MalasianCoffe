@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"malasian_coffe/packets/packet"
-	aggregator "malasian_coffe/system/aggregator/src"
+	aggregator "malasian_coffe/system/global_aggregator/src"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
 	"os"
@@ -73,9 +73,9 @@ func main() {
 			panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
 		}
 
-		colaSalida, err := middleware.CreateQueue("GlobalAggregation3", middleware.ChannelOptionsDefault())
+		colaSalida, err := middleware.CreateQueue("SalidaQuery3", middleware.ChannelOptionsDefault())
 		if err != nil {
-			panic(fmt.Errorf("CreateQueue(GlobalAggregation3): %w", err))
+			panic(fmt.Errorf("CreateQueue(SalidaQuery3): %w", err))
 		}
 
 		worker := aggregator.Aggregator{}
