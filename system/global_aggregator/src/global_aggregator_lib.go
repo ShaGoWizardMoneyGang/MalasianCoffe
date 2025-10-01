@@ -9,8 +9,8 @@ import (
 )
 
 type key struct {
-	yearAndMonth string
-	storeID      string
+	yearHalf string
+	storeID  string
 }
 
 type GlobalAggregator struct {
@@ -21,19 +21,19 @@ func NewAggregator() *GlobalAggregator {
 	return &GlobalAggregator{acc: make(map[key]float64)}
 }
 
-// batch del parcial "YYYY-MM,store_id,tpv"
+// batch del parcial "YYYY-H{1|2},store_id,tpv"
 func (a *GlobalAggregator) ingestBatch(input string) {
-	lines := strings.SplitSeq(strings.TrimSpace(input), "\n")
-	for line := range lines {
+	lines := strings.Split(strings.TrimSpace(input), "\n")
+	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
 		cols := strings.Split(line, ",")
 		if len(cols) != 3 {
-			panic("Se esperaban 3 columnas: YYYY-MM,store_id,tpv")
+			panic("Se esperaban 3 columnas: YYYY-H{1|2},store_id,tpv")
 		}
-		ym := strings.TrimSpace(cols[0])
-		storeID := strings.TrimSpace(cols[1])
+		yh := strings.TrimSpace(cols[0])      // YYYY-H1 o YYYY-H2
+		storeID := strings.TrimSpace(cols[1]) // store_id
 		amountStr := strings.TrimSpace(cols[2])
 
 		amount, err := strconv.ParseFloat(amountStr, 64)
@@ -41,7 +41,7 @@ func (a *GlobalAggregator) ingestBatch(input string) {
 			panic("tpv con formato inválido")
 		}
 
-		k := key{yearAndMonth: ym, storeID: storeID}
+		k := key{yearHalf: yh, storeID: storeID}
 		a.acc[k] += amount
 	}
 }
@@ -56,15 +56,15 @@ func (a *GlobalAggregator) flushAndBuild() string {
 		keys = append(keys, k)
 	}
 	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].yearAndMonth == keys[j].yearAndMonth {
+		if keys[i].yearHalf == keys[j].yearHalf {
 			return keys[i].storeID < keys[j].storeID
 		}
-		return keys[i].yearAndMonth < keys[j].yearAndMonth
+		return keys[i].yearHalf < keys[j].yearHalf
 	})
 
 	var b strings.Builder
 	for _, k := range keys {
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearAndMonth, k.storeID, a.acc[k])
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearHalf, k.storeID, a.acc[k])
 	}
 
 	a.acc = make(map[key]float64)
@@ -74,18 +74,14 @@ func (a *GlobalAggregator) flushAndBuild() string {
 func (a *GlobalAggregator) Process(pkt packet.Packet, function string) []packet.Packet {
 	input := strings.TrimSpace(pkt.GetPayload())
 	switch strings.ToLower(function) {
-	case "agregator3globalbymonthtpv":
-		// 	EOF
+	case "agregator3globalbysemestertpv":
 		if pkt.IsEOF() {
 			final := a.flushAndBuild()
 			if final == "" {
 				return nil
 			}
-			fmt.Print(final)
 			return packet.ChangePayload(pkt, []string{final})
 		}
-
-		// caso que no es eof
 		a.ingestBatch(input)
 		return nil
 

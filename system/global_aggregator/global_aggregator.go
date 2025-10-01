@@ -53,7 +53,7 @@ func main() {
 			payload := pkt.GetPayload()
 			println("Pkt recibido (global):", payload)
 
-			result = worker.Process(pkt, "agregator3GlobalByMonthTPV")
+			result = worker.Process(pkt, "agregator3GlobalBySemesterTPV")
 
 			if err := message.Ack(false); err != nil {
 				panic(fmt.Errorf("Could not ack, %w", err))

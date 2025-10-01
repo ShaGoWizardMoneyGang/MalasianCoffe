@@ -13,13 +13,13 @@ import (
 )
 
 // Recibe: "store_id,final_amount,created_at" por línea
-// Devuelve: "YYYY-MM,store_id,tpv" ordenado por YYYY-MM y luego store_id
-func aggregator3ByMonthTPV(input string) string {
+// Devuelve: "YYYY-H{1|2},store_id,tpv" ordenado por semestre y luego store_id
+func aggregator3BySemesterTPV(input string) string {
 	const layout = "2006-01-02 15:04:05"
 
 	type key struct {
-		yearAndMonth string
-		storeID      string
+		yearHalf string
+		storeID  string
 	}
 	acc := make(map[key]float64)
 
@@ -33,38 +33,43 @@ func aggregator3ByMonthTPV(input string) string {
 			panic("Se esperaban 3 columnas: store_id,final_amount,created_at")
 		}
 
-		storeID := cols[0]
+		storeID := strings.TrimSpace(cols[0])
 
-		amount, err := strconv.ParseFloat(cols[1], 64)
+		amount, err := strconv.ParseFloat(strings.TrimSpace(cols[1]), 64)
 		if err != nil {
 			panic("final_amount con formato inválido")
 		}
 
-		ts, err := time.Parse(layout, cols[2])
+		ts, err := time.Parse(layout, strings.TrimSpace(cols[2]))
 		if err != nil {
 			panic("created_at con formato inválido")
 		}
 
-		ym := ts.Format("2006-01")
-		k := key{yearAndMonth: ym, storeID: storeID}
+		half := "H1"
+		if ts.Month() >= 7 {
+			half = "H2"
+		}
+		yh := fmt.Sprintf("%04d-%s", ts.Year(), half)
+
+		k := key{yearHalf: yh, storeID: storeID}
 		acc[k] += amount
 	}
 
-	// ordeno por mes y después por store_id
+	// ordeno por semestre y después por store_id
 	keys := make([]key, 0, len(acc))
 	for k := range acc {
 		keys = append(keys, k)
 	}
 	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].yearAndMonth == keys[j].yearAndMonth {
+		if keys[i].yearHalf == keys[j].yearHalf {
 			return keys[i].storeID < keys[j].storeID
 		}
-		return keys[i].yearAndMonth < keys[j].yearAndMonth
+		return keys[i].yearHalf < keys[j].yearHalf
 	})
 
 	var b strings.Builder
 	for _, k := range keys {
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearAndMonth, k.storeID, acc[k])
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearHalf, k.storeID, acc[k])
 	}
 	return b.String()
 }
@@ -94,7 +99,7 @@ func (a *aggregator3Partial) Process(pkt packet.Packet) []packet.OutBoundMessage
 	input := pkt.GetPayload()
 	slog.Debug("Aggregator3Partial.Process: recibí payload")
 
-	result := aggregator3ByMonthTPV(input)
+	result := aggregator3BySemesterTPV(input)
 
 	newPkts := packet.ChangePayload(pkt, []string{result})
 	return []packet.OutBoundMessage{
