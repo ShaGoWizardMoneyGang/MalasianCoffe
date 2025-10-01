@@ -52,7 +52,9 @@ func sendPackets(msgQueue middleware.ConsumeChannel, colaSalida *middleware.Mess
 func main() {
 	filterFunction := os.Args[2]
 	if len(filterFunction) == 0 {
-		panic("No filter function provided")
+		panic(`No filter function provided, tiene que ser algo del estilo:
+make run-filter RUN_FUNCTION=transactions
+`)
 	}
 	rabbitAddr := os.Args[1]
 	// Hay que ponerle el arg del rabbit

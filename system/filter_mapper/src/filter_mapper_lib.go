@@ -2,6 +2,7 @@ package filter_mapper
 
 import (
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
 	"math"
 	"strconv"
@@ -167,7 +168,9 @@ func filterTransactions(input string) []string {
 		}
 		data := strings.Split(line, ",")
 		if len(data) < 9 {
-			panic("Invalid data format")
+			slog.Debug("Registro con menos de 9 columnas, dropeado")
+			continue
+		}
 		}
 		amount, _ := strconv.ParseFloat(data[7], 64)
 		amount = math.Round(amount*10) / 10
