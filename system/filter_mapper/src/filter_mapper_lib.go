@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/network"
+	"malasian_coffe/utils/colas"
 	"math"
 	"strconv"
 	"strings"
@@ -214,15 +214,6 @@ func filterTransactions(input string) []string {
 }
 
 
-func instanceQueue(inputQueueName string, rabbitAddr string) *middleware.MessageMiddlewareQueue {
-	cola, err := middleware.CreateQueue(inputQueueName, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(%s): %w", inputQueueName, err))
-	}
-	return cola
-}
-
-
 
 // =========================== TransactionFilter ==============================
 
@@ -240,11 +231,11 @@ func (tfm *transactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueu
 }
 
 func (tfm *transactionFilterMapper) Build(rabbitAddr string) {
-	colaEntradaTransaction := instanceQueue("DataTransactions", rabbitAddr)
+	colaEntradaTransaction := colas.InstanceQueue("DataTransactions", rabbitAddr)
 
-	colaSalida1 := instanceQueue("FilteredTransactions1", rabbitAddr)
-	colaSalida3 := instanceQueue("FilteredTransactions3", rabbitAddr)
-	colaSalida4 := instanceQueue("FilteredTransactions4", rabbitAddr)
+	colaSalida1 := colas.InstanceQueue("FilteredTransactions1", rabbitAddr)
+	colaSalida3 := colas.InstanceQueue("FilteredTransactions3", rabbitAddr)
+	colaSalida4 := colas.InstanceQueue("FilteredTransactions4", rabbitAddr)
 
 	tfm.colaEntradaTransaction = colaEntradaTransaction
 
@@ -290,10 +281,10 @@ type storeFilterMapper struct {
 }
 
 func (sfm *storeFilterMapper) Build(rabbitAddr string) {
-	colaEntradaStore := instanceQueue("DataStores", rabbitAddr)
+	colaEntradaStore := colas.InstanceQueue("DataStores", rabbitAddr)
 
-	colaSalida3 := instanceQueue("FilteredStores3", rabbitAddr)
-	colaSalida4 := instanceQueue("FilteredStores4", rabbitAddr)
+	colaSalida3 := colas.InstanceQueue("FilteredStores3", rabbitAddr)
+	colaSalida4 := colas.InstanceQueue("FilteredStores4", rabbitAddr)
 
 	sfm.colaEntradaStore = colaEntradaStore
 
@@ -335,9 +326,9 @@ type userFilterMapper struct {
 }
 
 func (ufm *userFilterMapper) Build(rabbitAddr string) {
-	colaEntradaUsers := instanceQueue("DataUsers", rabbitAddr)
+	colaEntradaUsers := colas.InstanceQueue("DataUsers", rabbitAddr)
 
-	colaSalida4 := instanceQueue("FilteredUsers4", rabbitAddr)
+	colaSalida4 := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
 
 	ufm.colaEntradaUsers  = colaEntradaUsers
 
