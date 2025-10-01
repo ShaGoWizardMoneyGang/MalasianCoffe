@@ -101,3 +101,10 @@ func read(conn net.Conn, size int) ([]byte, error) {
 
 	return buffer, err
 }
+
+// NOTE: Esto no va a andar en Docker puede ser? Mepa que si.
+func AddrToRabbitURI(addr string) string {
+	rabbitURI := "amqp://guest:guest@"
+	rabbitURI += addr
+	return rabbitURI
+}

@@ -15,7 +15,11 @@ import (
 func main() {
 	rabbit_addr := os.Args[2]
 
-	colaInicial, err := middleware.CreateQueue("DataQuery1", middleware.ChannelOptionsDefault())
+	colaTransactions, err := middleware.CreateQueue("DataTransactions", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
+	// colaUsers, err := middleware.CreateQueue("DataUsers", middleware.ChannelOptionsDefault())
+	// colaStore, err := middleware.CreateQueue("DataStore", middleware.ChannelOptionsDefault())
+	// colaTransactionItems, err := middleware.CreateQueue("DataTransactionItems", middleware.ChannelOptionsDefault())
+	// colaMenuItems, err := middleware.CreateQueue("DataMenuItems", middleware.ChannelOptionsDefault())
 	if err != nil {
 		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %s. Is the daemon active?
 		Try running:
@@ -51,6 +55,6 @@ func main() {
 		if packet.GetDirID() != "3"{
 			continue
 		}
-		colaInicial.Send(packet.Serialize())
+		colaTransactions.Send(packet.Serialize())
 	}
 }
