@@ -36,7 +36,7 @@ run-concat:
 	cd system/concat; go run concat.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
 run-sender:
-	cd system/sender; go run sender.go ${RABBIT_ADDR}
+	cd system/sender; go run sender.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 #============================== Build directives ===============================
 build: build-server build-client build-gateway build-filter build-concat build-sender
 build-client:

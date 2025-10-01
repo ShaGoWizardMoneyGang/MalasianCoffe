@@ -37,3 +37,7 @@ func From (packet packet.Packet, query string) PacketAnswer {
 func (p* PacketAnswer) GetQuery() string {
 	return p.header.query
 }
+
+func (p* PacketAnswer) GetPayload() string {
+	return p.payload
+}
