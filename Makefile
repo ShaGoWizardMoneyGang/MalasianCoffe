@@ -82,5 +82,9 @@ download-dataset:
 	rm -rf dataset/vouchers
 	rm -rf dataset/payment_methods
 
+download-reduced-dataset: download-dataset
+	find dataset/transaction_items -type f ! \( -name '*202401*' -o -name '*202501*' \) -exec rm {} +
+	find dataset/transactions -type f ! \( -name '*202401*' -o -name '*202501*' \) -exec rm {} +
+
 rabbit-gui:
 	xdg-open http://localhost:15672
