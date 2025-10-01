@@ -226,7 +226,7 @@ func instanceQueue(inputQueueName string, rabbitAddr string) *middleware.Message
 
 // =========================== TransactionFilter ==============================
 
-type TransactionFilterMapper struct {
+type transactionFilterMapper struct {
 	colaEntradaTransaction *middleware.MessageMiddlewareQueue
 
 	colaSalida1 *middleware.MessageMiddlewareQueue
@@ -234,12 +234,12 @@ type TransactionFilterMapper struct {
 	colaSalida4 *middleware.MessageMiddlewareQueue
 }
 
-func (tfm *TransactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+func (tfm *transactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
 	return tfm.colaEntradaTransaction
 
 }
 
-func (tfm *TransactionFilterMapper) Build(rabbitAddr string) {
+func (tfm *transactionFilterMapper) Build(rabbitAddr string) {
 	colaEntradaTransaction := instanceQueue("DataTransactions", rabbitAddr)
 
 	colaSalida1 := instanceQueue("FilteredTransactions1", rabbitAddr)
@@ -252,7 +252,7 @@ func (tfm *TransactionFilterMapper) Build(rabbitAddr string) {
 	tfm.colaSalida3  = colaSalida3
 	tfm.colaSalida4  = colaSalida4
 }
-func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (tfm *transactionFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Vienen en este orden: final_query1, final_query3, final_query4
@@ -282,14 +282,14 @@ func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []packet.OutBound
 
 // ============================== StoreFilter =================================
 
-type StoreFilterMapper struct {
+type storeFilterMapper struct {
 	colaEntradaStore *middleware.MessageMiddlewareQueue
 
 	colaSalida3 *middleware.MessageMiddlewareQueue
 	colaSalida4 *middleware.MessageMiddlewareQueue
 }
 
-func (sfm *StoreFilterMapper) Build(rabbitAddr string) {
+func (sfm *storeFilterMapper) Build(rabbitAddr string) {
 	colaEntradaStore := instanceQueue("DataStores", rabbitAddr)
 
 	colaSalida3 := instanceQueue("FilteredStores3", rabbitAddr)
@@ -301,11 +301,11 @@ func (sfm *StoreFilterMapper) Build(rabbitAddr string) {
 	sfm.colaSalida4  = colaSalida4
 }
 
-func (sfm *StoreFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+func (sfm *storeFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
 	return sfm.colaEntradaStore
 }
 
-func (sfm *StoreFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (sfm *storeFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
@@ -328,13 +328,13 @@ func (sfm *StoreFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessag
 // ============================== StoreFilter =================================
 
 // =============================== UserFilter ==================================
-type UserFilterMapper struct {
+type userFilterMapper struct {
 	colaEntradaUsers *middleware.MessageMiddlewareQueue
 
 	colaSalida4 *middleware.MessageMiddlewareQueue
 }
 
-func (ufm *UserFilterMapper) Build(rabbitAddr string) {
+func (ufm *userFilterMapper) Build(rabbitAddr string) {
 	colaEntradaUsers := instanceQueue("DataUsers", rabbitAddr)
 
 	colaSalida4 := instanceQueue("FilteredUsers4", rabbitAddr)
@@ -344,11 +344,11 @@ func (ufm *UserFilterMapper) Build(rabbitAddr string) {
 	ufm.colaSalida4  = colaSalida4
 }
 
-func (ufm *UserFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+func (ufm *userFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
 	return ufm.colaEntradaUsers
 }
 
-func (ufm *UserFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (ufm *userFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
@@ -381,11 +381,11 @@ func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {
 	var filterMapper FilterMapper;
 	switch datasetName {
 	case "transactions":
-		filterMapper = &TransactionFilterMapper{}
+		filterMapper = &transactionFilterMapper{}
 	case "store":
-		filterMapper = &StoreFilterMapper{}
+		filterMapper = &storeFilterMapper{}
 	case "users":
-		filterMapper = &UserFilterMapper{}
+		filterMapper = &userFilterMapper{}
 	default:
 		panic(fmt.Sprintf("Unknown 'dataset' %s", datasetName))
 	}

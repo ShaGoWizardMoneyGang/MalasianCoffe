@@ -13,7 +13,7 @@ import (
 // NOTE: Gracias Mari por anadir estas lineas de input output
 // Recibe transaction_id, store_id, user_id
 // Devuelve user_id,store_id,cantidad por línea, ordenado por store_id y luego user_id para mantenerlo determinístico
-func (c *CounterQuery4) countFunctionQuery4(input string) string {
+func (c *counterQuery4) countFunctionQuery4(input string) string {
 	rows := strings.Split(input, "\n")
 	rows = rows[:len(rows)-1] // El split me genera 1 linea de mas vacia por el ultimo /n, la ignoro
 
@@ -57,13 +57,13 @@ func (c *CounterQuery4) countFunctionQuery4(input string) string {
 	return b.String()
 }
 
-type CounterQuery4 struct {
+type counterQuery4 struct {
 	colaEntradaFilteredTransactions4 *middleware.MessageMiddlewareQueue
 
 	colaSalidaCountedUsers4 *middleware.MessageMiddlewareQueue
 }
 
-func (c *CounterQuery4) Build(rabbitAddr string) {
+func (c *counterQuery4) Build(rabbitAddr string) {
 
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactions4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
@@ -80,11 +80,11 @@ func (c *CounterQuery4) Build(rabbitAddr string) {
 	c.colaSalidaCountedUsers4 = colaSalida
 }
 
-func (c *CounterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
+func (c *counterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
 	return c.colaEntradaFilteredTransactions4
 }
 
-func (c *CounterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (c *counterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	counted_result := []string{c.countFunctionQuery4(input)}
@@ -118,7 +118,7 @@ func CounterBuilder(counterName string, rabbitAddr string) Counter {
 	var counter Counter;
 	switch counterName {
 	case "counter4":
-		counter = &CounterQuery4{}
+		counter = &counterQuery4{}
 	default:
 		panic(fmt.Sprintf("Unknown counter %s", counterName))
 	}
