@@ -2,7 +2,10 @@ package filter_mapper
 
 import (
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/network"
 	"math"
 	"strconv"
 	"strings"
@@ -171,8 +174,20 @@ func filterTransactions(input string) []string {
 		}
 		data := strings.Split(line, ",")
 		if len(data) < 9 {
-			panic("Invalid data format")
+			slog.Debug("Registro con menos de 9 columnas, dropeado")
+			continue
 		}
+
+		// TODO(fabri): Revisar como handlear el dropeo, tal vez tiene que ser mas quirurquico.
+		if   data[0] == "" ||
+			data[1] == "" ||
+			data[4] == "" ||
+			data[7] == "" ||
+			data[8] == "" {
+			slog.Debug("Registro con campos de interes vacios, dropeado")
+			continue
+		}
+
 		amount, _ := strconv.ParseFloat(data[7], 64)
 		amount = math.Round(amount*10) / 10
 		layout := "2006-01-02 15:04:05" // Go's reference layout
@@ -188,43 +203,80 @@ func filterTransactions(input string) []string {
 	return []string{final_query1, final_query3, final_query4}
 }
 
-type FilterMapper struct {
+// Struct que asocia un paquete a enviar con la cola a la cual lo tiene que enviar
+type OutBoundMessage struct {
+	Packet packet.Packet
+	ColaSalida *middleware.MessageMiddlewareQueue
 }
 
-func (c *FilterMapper) Process(pkt packet.Packet, function string) []packet.Packet {
+type TransactionFilterMapper struct {
+	colaSalida1 *middleware.MessageMiddlewareQueue
+	colaSalida3 *middleware.MessageMiddlewareQueue
+	colaSalida4 *middleware.MessageMiddlewareQueue
+}
+
+
+func instanceQueue(inputQueueName string, rabbitAddr string) *middleware.MessageMiddlewareQueue {
+	cola, err := middleware.CreateQueue(inputQueueName, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(%s): %w", inputQueueName, err))
+	}
+	return cola
+}
+
+func (tfm *TransactionFilterMapper) Build(rabbitAddr string) {
+	colaSalida1 := instanceQueue("FilteredTransactions1", rabbitAddr)
+	colaSalida3 := instanceQueue("FilteredTransactions3", rabbitAddr)
+	colaSalida4 := instanceQueue("FilteredTransactions4", rabbitAddr)
+
+	tfm.colaSalida1  = colaSalida1
+	tfm.colaSalida3  = colaSalida3
+	tfm.colaSalida4  = colaSalida4
+}
+func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []OutBoundMessage {
 	input := pkt.GetPayload()
-	function_name := strings.ToLower(function)
 
-	var output []string
-	switch function_name {
+	// Vienen en este orden: final_query1, final_query3, final_query4
+	payloadResults := filterTransactions(input)
+
+	newPayload := packet.ChangePayload(pkt, payloadResults)
+
+	outBoundMessage := []OutBoundMessage{
+		{
+			Packet: newPayload[0],
+			ColaSalida: tfm.colaSalida1,
+		},
+		{
+			Packet: newPayload[1],
+			ColaSalida: tfm.colaSalida3,
+		},
+		{
+			Packet: newPayload[2],
+			ColaSalida: tfm.colaSalida4,
+		},
+	}
+
+	return outBoundMessage
+}
+
+type FilterMapper interface {
+	// Funcio que hace el filtrado
+	Process(pkt packet.Packet) []OutBoundMessage
+	// Funcion que inicializa las cosas que el filter necesita
+	Build(rabbitAddr string)
+}
+
+func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {
+	var filterMapper FilterMapper;
+	switch datasetName {
 	case "transactions":
-		output = filterTransactions(input)
-	case "yearfilter":
-		output = []string{filterByYearCommon(input)}
-	case "query1yearandamount":
-		output = []string{filterFunctionQuery1(input)}
-	case "query2ayearandquantity":
-		output = []string{filterFunctionQuery2a(input)}
-	case "query2byearandsubtotal":
-		output = []string{filterFunctionQuery2b(input)}
-	case "stores":
-		output = []string{mapStoreIdAndName(input)}
-	case "query3mapstoreidandname":
-		output = []string{mapStoreIdAndName(input)}
-	case "query3transactions":
-		output = []string{filterFunctionQuery3Transactions(input)}
-	case "query4transactions":
-		output = []string{filterFunctionQuery4Transactions(input)}
-	case "query4usersbirthdates":
-		output = []string{filterFunctionQuery4UsersBirthdates(input)}
+		filterMapper = &TransactionFilterMapper{}
+	// case "store":
+	// 	filterMapper = &StoreFilterMapper{}
 	default:
-		panic(fmt.Sprintf("Unknown function %s", function))
+		panic(fmt.Sprintf("Unknown 'dataset' %s", datasetName))
 	}
 
-	var new_packets []packet.Packet
-	for _, result := range output {
-		new_packets = append(new_packets, packet.ChangePayload(pkt, []string{result})[0])
-	}
-
-	return new_packets
+	filterMapper.Build(rabbitAddr)
+	return filterMapper
 }

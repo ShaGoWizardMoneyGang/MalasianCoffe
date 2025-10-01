@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"strconv"
@@ -47,9 +48,8 @@ func main() {
 		}
 		packet, err := packet.DeserializePackage(packet_reader)
 		if err != nil {
-			fmt.Errorf("Error deserializing package: %s", err)
+			fmt.Errorf("Error deserializing package: %w", err)
 		}
-		fmt.Printf("%v\n", packet)
 
 		// TODO: esto esta hardcodeado asi porque es para la query 1.
 		// Aca deberia haber un switch que lo envie a la queue correspondiente
@@ -60,14 +60,19 @@ func main() {
 		}
 		switch dataset_name {
 		case "menu_items":
+			slog.Debug("Envio a cola de menu items")
 			colaMenuItems.Send(packet.Serialize())
 		case "stores":
+			slog.Debug("Envio a cola de stores")
 			colaStores.Send(packet.Serialize())
 		case "transaction_items":
+			slog.Debug("Envio a cola de transaccions items")
 			colaTransactionItems.Send(packet.Serialize())
 		case "transactions":
+			slog.Debug("Envio a cola de transactions")
 			colaTransactions.Send(packet.Serialize())
 		case "users":
+			slog.Debug("Envio a cola de users")
 			colaUsers.Send(packet.Serialize())
 		}
 	}
