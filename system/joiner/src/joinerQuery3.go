@@ -14,12 +14,26 @@ type JoinerQuery3 struct {
 	// Tenemos una go routine por cada session
 	sessions map[string] (chan packet.Packet)
 
-	canalSalida chan packet.Packet
+	colaStoresInput   *middleware.MessageMiddlewareQueue
+	colaAggTransInput *middleware.MessageMiddlewareQueue
 
+	// TODO(fabri): puede que no haga falta
+	// canalSalida chan packet.Packet
 	colaSalidaQuery3  *middleware.MessageMiddlewareQueue
 }
 
-func joinQuery3()
+func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
+	var pkt_joineado packet.Packet
+	for {
+		pkt :=  <- inputChannel
+		// TODO aca hacer el join
+		if pkt.IsEOF() {
+			break
+		}
+	}
+
+	outputQueue.Send(pkt_joineado.Serialize())
+}
 
 func (jq3 *JoinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 	sessionID := pkt.GetSessionID()
@@ -31,14 +45,8 @@ func (jq3 *JoinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 	if !exists {
 		// Joiner
 		assigned_channel := make(chan packet.Packet)
+		go joinQuery3(assigned_channel, jq3.colaSalidaQuery3)
 		go func() {
-			for {
-				pkt :=  <- assigned_channel
-				// TODO aca hacer el join
-				if pkt.IsEOF() {
-					break
-				}
-			}
 		}()
 		// No hace falta un mutex porque este diccionario se accede de forma
 		// secuencial
@@ -54,15 +62,20 @@ func (jq3 *JoinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 func (jq3 *JoinerQuery3) Build(rabbitAddr string) {
 	// SessionID -> channel
 	sessionHandler           := make(map[string](chan packet.Packet))
-	canalSalida              := make(chan packet.Packet)
+	// canalSalida              := make(chan packet.Packet)
 
 	colaSalidaQuery3  := colas.InstanceQueue("SalidaQuery3", rabbitAddr)
 
+	colaStoresInput   := colas.InstanceQueue("FilteredStores3", rabbitAddr)
+	colaAggTransInput := colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
+
 	jq3.sessions = sessionHandler
 
-	jq3.colaSalidaQuery3 = colaSalidaQuery3
+	jq3.colaStoresInput = colaStoresInput
+	jq3.colaAggTransInput = colaAggTransInput
 
-	jq3.canalSalida = canalSalida
+	// jq3.canalSalida = canalSalida
+	jq3.colaSalidaQuery3 = colaSalidaQuery3
 }
 
 func (jq3 *JoinerQuery3) send(pkt packet.Packet) {
@@ -70,14 +83,14 @@ func (jq3 *JoinerQuery3) send(pkt packet.Packet) {
 	jq3.colaSalidaQuery3.Send(pkt.Serialize())
 }
 
-func (jq3 *JoinerQuery3) Process(rabbitAddr string) {
+func (jq3 *JoinerQuery3) Process() {
 	storeListener            := make(chan packet.Packet)
 	aggregatorGlobalListener := make(chan packet.Packet)
 
 
 	// Stores
 	go func() {
-		colasEntrada := colas.InstanceQueue("FilteredStores3", rabbitAddr)
+		colasEntrada := jq3.colaStoresInput
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
@@ -96,7 +109,7 @@ func (jq3 *JoinerQuery3) Process(rabbitAddr string) {
 	// Aggregated Filtered Transactions
 	go func() {
 		// TODO: Maybe guardar en el struct
-		colasEntrada := colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
+		colasEntrada := jq3.colaAggTransInput
 
 		messages := colas.ConsumeInput(colasEntrada)
 
@@ -119,8 +132,8 @@ func (jq3 *JoinerQuery3) Process(rabbitAddr string) {
 			jq3.passPacketToJoiner(storePacket)
 		case aggregatedPacket := <-aggregatorGlobalListener:
 			jq3.passPacketToJoiner(aggregatedPacket)
-		case packetJoineado := <-jq3.canalSalida:
-			jq3.send(packetJoineado)
+		// case packetJoineado := <-jq3.canalSalida:
+		// 	jq3.send(packetJoineado)
 		}
 	}
 }
@@ -238,8 +251,6 @@ func main() {
 
 // 	return new_packet
 // }
-
-// func main() {
 // 	joinFunction := os.Args[2]
 // 	if len(joinFunction) == 0 {
 // 		panic("No join function provided")
