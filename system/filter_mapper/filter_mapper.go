@@ -29,15 +29,13 @@ func consumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.Con
 
 func sendPackets(msgQueue middleware.ConsumeChannel, colaSalida *middleware.MessageMiddlewareQueue, filterFunction string) {
 	worker := filter_mapper.FilterMapper{}
-	var result []packet.Packet
 	for message := range *msgQueue {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
-		paqueteSalida := worker.Process(pkt, filterFunction)
-		result = []packet.Packet{paqueteSalida}
+		paquetesSalida := worker.Process(pkt, filterFunction)
 
-		for _, pkt := range result {
+		for _, pkt := range paquetesSalida {
 			slog.Info("Mando packet filtrado a siguiente cola")
 			_ = colaSalida.Send(pkt.Serialize())
 		}
@@ -48,7 +46,7 @@ func sendPackets(msgQueue middleware.ConsumeChannel, colaSalida *middleware.Mess
 	}
 }
 
-// Cola input menu items: DataMenuItems
+// Cola input menu items: DataMenuItems TODO: constante global (utils)
 // Cola output menu items filtrados: FilteredMenuItems
 
 func main() {
@@ -64,11 +62,39 @@ func main() {
 		colaEntrada := instanceQueue("DataMenuItems", rabbitAddr)
 		msgQueue := consumeInput(colaEntrada)
 		colaSalida := instanceQueue("FilteredMenuItems", rabbitAddr)
-		sendPackets(msgQueue, colaSalida, "query2MenuItems")
+		sendPackets(msgQueue, colaSalida, "filterStores")
 	case "transactions":
+		println("[CASE TRANSACTIONS]")
+
 		colaEntrada := instanceQueue("DataTransactions", rabbitAddr)
 		msgQueue := consumeInput(colaEntrada)
-		colaSalida := instanceQueue("FilteredTransactions", rabbitAddr)
-		sendPackets(msgQueue, colaSalida, "query1Transactions")
+		colaSalida1 := instanceQueue("FilteredTransactions1", rabbitAddr)
+		colaSalida3 := instanceQueue("FilteredTransactions3", rabbitAddr)
+		colaSalida4 := instanceQueue("FilteredTransactions4", rabbitAddr)
+
+		worker := filter_mapper.FilterMapper{}
+		for message := range *msgQueue { //while true hasta que terminen los mensajes
+			packetReader := bytes.NewReader(message.Body)
+			pkt, _ := packet.DeserializePackage(packetReader)
+
+			paquetesSalida := worker.Process(pkt, "transactions")
+			fmt.Printf("PAQUETES SALIDA %v\n", paquetesSalida)
+
+			println("Mandando paquetes a las colas correspondientes")
+			fmt.Printf("PAQUETES PARA COLA 1%v\n", paquetesSalida[0])
+			_ = colaSalida1.Send(paquetesSalida[0].Serialize())
+			_ = colaSalida3.Send(paquetesSalida[1].Serialize())
+			_ = colaSalida4.Send(paquetesSalida[2].Serialize())
+
+			err := message.Ack(false)
+			if err != nil {
+				panic(fmt.Errorf("Could not ack, %w", err))
+			}
+		}
+		//resultados[3] = procesarTransactions
+		//mandar a la cola que toque (resultados)
+		// sendPackets(msgQueue, colaSalida, "query1Transactions") CON SEND PACKETS NO FUNCA
+		//implemento para repartir entre las 3 colas que tocan
+
 	}
 }

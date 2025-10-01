@@ -70,7 +70,7 @@ func (a *Aggregator) Process(pkt packet.Packet, function string) []packet.Packet
 	input := pkt.GetPayload()
 	var salida string
 	switch strings.ToLower(function) {
-	case "AggregatorByMonthTPV":
+	case "Aggregator3ByMonthTPV":
 		salida = a.Aggregator3ByMonthTPV(input)
 	default:
 		panic("Funcion desconocida")

@@ -8,24 +8,31 @@ import (
 	concat "malasian_coffe/system/concat/src"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
+	"os"
 )
 
 // Argumentos que recibe:
 // 1. Address de rabbit
 // 2. Nombre de la funcion que tiene que ejecutar
 func main() {
-	colaEntrada, err := middleware.CreateQueue("FilterMapper1YearAndAmount", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+
+	aggregatorFunction := os.Args[2]
+	if len(aggregatorFunction) == 0 {
+		panic("No filter function provided")
+	}
+	rabbitAddr := os.Args[1]
+	colaEntrada, err := middleware.CreateQueue("COLA DE ENTRADA", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
+		panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
 	}
 	msgQueue, consumeError := colaEntrada.StartConsuming()
 	if consumeError != 0 {
 		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
 	}
 
-	colaSalida, err := middleware.CreateQueue("SalidaQuery1", middleware.ChannelOptionsDefault())
+	colaSalida, err := middleware.CreateQueue("COLA DE SALIDA", middleware.ChannelOptionsDefault())
 	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
+		panic(fmt.Errorf("CreateQueue(COLA DE SALIDA): %w", err))
 	}
 
 	worker := concat.Concat{}

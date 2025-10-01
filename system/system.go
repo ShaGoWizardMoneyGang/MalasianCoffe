@@ -14,11 +14,11 @@ import (
 func main() {
 	rabbit_addr := os.Args[2]
 	//QUERY 2 USA TRANSACTIONS Y STORES
-	colaTransactions, err := middleware.CreateQueue("DataTransactions", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
-	colaUsers, err := middleware.CreateQueue("DataUsers", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
-	colaStore, err := middleware.CreateQueue("DataStore", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
-	colaTransactionItems, err := middleware.CreateQueue("DataTransactionItems", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
-	colaMenuItems, err := middleware.CreateQueue("DataMenuItems", middleware.ChannelOptions{network.AddrToRabbitURI(rabbit_addr)})
+	colaTransactions, err := middleware.CreateQueue("DataTransactions", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	colaUsers, err := middleware.CreateQueue("DataUsers", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	colaStore, err := middleware.CreateQueue("DataStore", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	colaTransactionItems, err := middleware.CreateQueue("DataTransactionItems", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	colaMenuItems, err := middleware.CreateQueue("DataMenuItems", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
 	if err != nil {
 		panic(fmt.Errorf(`failed to rconnect to RabbitMQ: %s. Is the daemon active?
 		Try running:

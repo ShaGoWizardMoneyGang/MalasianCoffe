@@ -156,6 +156,30 @@ func filterFunctionQuery4UsersBirthdates(input string) string {
 	return final
 }
 
+func filterTransactions(input string) []string {
+	lines := strings.Split(input, "\n")
+	final_query1 := ""
+	final_query3 := ""
+	final_query4 := ""
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		data := strings.Split(line, ",")
+		if len(data) < 9 {
+			panic("Invalid data format")
+		}
+		amount, _ := strconv.ParseFloat(data[7], 64)
+		amount = math.Round(amount*10) / 10
+		if yearCondition(data) {
+			final_query1 += data[0] + "," + data[1] + "," + data[4] + "\n"                                 //mapeo query 1
+			final_query3 += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n" //mapeo query 3
+			final_query4 += data[0] + "," + data[1] + "," + data[4] + "\n"                                 //mapeo query 4
+		}
+	}
+	return []string{final_query1, final_query3, final_query4}
+}
+
 type FilterMapper struct {
 }
 
@@ -165,6 +189,8 @@ func (c *FilterMapper) Process(pkt packet.Packet, function string) []packet.Pack
 
 	var output []string
 	switch function_name {
+	case "transactions":
+		output = filterTransactions(input)
 	case "yearfilter":
 		output = []string{filterByYearCommon(input)}
 	case "query1yearandamount":
@@ -188,7 +214,7 @@ func (c *FilterMapper) Process(pkt packet.Packet, function string) []packet.Pack
 	}
 
 	var new_packets []packet.Packet
-	for _, result := range output {
+	for _, result := range output { //cada output tiene que ir a un paquete. Se multiplexa si hay mas de una respuesta
 		pkt_new := packet.Packet{}
 		new_packets = append(new_packets, packet.ChangePayload(pkt_new, []string{result})[0])
 	}

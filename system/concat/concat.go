@@ -13,9 +13,9 @@ import (
 // 1. Address de rabbit
 // 2. Nombre de la funcion que tiene que ejecutar
 func main() {
-	colaEntrada, err := middleware.CreateQueue("FilterMapper1YearAndAmount", middleware.ChannelOptionsDefault())
+	colaEntrada, err := middleware.CreateQueue("FilteredTransactions1", middleware.ChannelOptionsDefault())
 	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
+		panic(fmt.Errorf("CreateQueue(FilteredTransactions1): %w", err))
 	}
 	msgQueue, consumeError := colaEntrada.StartConsuming()
 	if consumeError != 0 {

@@ -15,7 +15,7 @@ sleep 0.5
 
 # Add filter
 tmux split-window -v -t 0
-tmux send-keys "make run-filter" C-m
+tmux send-keys "make run-filter RUN_FUNCTION=transactions" C-m
 sleep 0.5
 
 # Add concat
