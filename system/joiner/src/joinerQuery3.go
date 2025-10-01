@@ -10,7 +10,7 @@ import (
 	"malasian_coffe/utils/colas"
 )
 
-type JoinerQuery3 struct {
+type joinerQuery3 struct {
 	// Tenemos una go routine por cada session
 	sessions map[string] (chan packet.Packet)
 
@@ -35,7 +35,7 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 	outputQueue.Send(pkt_joineado.Serialize())
 }
 
-func (jq3 *JoinerQuery3) passPacketToJoiner(pkt packet.Packet) {
+func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 	sessionID := pkt.GetSessionID()
 	channel, exists := jq3.sessions[sessionID]
 
@@ -59,7 +59,7 @@ func (jq3 *JoinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 	channel <- pkt
 }
 
-func (jq3 *JoinerQuery3) Build(rabbitAddr string) {
+func (jq3 *joinerQuery3) Build(rabbitAddr string) {
 	// SessionID -> channel
 	sessionHandler           := make(map[string](chan packet.Packet))
 	// canalSalida              := make(chan packet.Packet)
@@ -78,12 +78,12 @@ func (jq3 *JoinerQuery3) Build(rabbitAddr string) {
 	jq3.colaSalidaQuery3 = colaSalidaQuery3
 }
 
-func (jq3 *JoinerQuery3) send(pkt packet.Packet) {
+func (jq3 *joinerQuery3) send(pkt packet.Packet) {
 	// SessionID -> channel
 	jq3.colaSalidaQuery3.Send(pkt.Serialize())
 }
 
-func (jq3 *JoinerQuery3) Process() {
+func (jq3 *joinerQuery3) Process() {
 	storeListener            := make(chan packet.Packet)
 	aggregatorGlobalListener := make(chan packet.Packet)
 

@@ -16,7 +16,7 @@ func JoinerBuilder(joinerName string, rabbitAddr string) Joiner {
 
 	switch joinerName {
 	case "Query3":
-		joiner = &JoinerQuery3{}
+		joiner = &joinerQuery3{}
 	default:
 		panic(fmt.Sprintf("Unknown 'joiner' %s", joinerName))
 	}
