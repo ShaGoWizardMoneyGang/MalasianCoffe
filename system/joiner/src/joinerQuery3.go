@@ -3,7 +3,6 @@ package joiner
 import (
 	"bytes"
 	"fmt"
-	"os"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
@@ -135,20 +134,6 @@ func (jq3 *joinerQuery3) Process() {
 		// case packetJoineado := <-jq3.canalSalida:
 		// 	jq3.send(packetJoineado)
 		}
-	}
-}
-
-func main() {
-	joinFunction := os.Args[2]
-	if len(joinFunction) == 0 {
-		panic("No join function provided")
-	}
-	rabbitAddr := os.Args[1]
-
-	switch joinFunction {
-	case "Query3":
-		println("[JOINER QUERY3]")
-		joinQuery3()
 	}
 }
 
