@@ -34,6 +34,9 @@ run-server:
 run-filter:
 	cd system/filter_mapper; go run filter_mapper.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
+run-aggregator:
+	cd system/aggregator; go run aggregator.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
 run-concat:
 	cd system/concat; go run concat.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 

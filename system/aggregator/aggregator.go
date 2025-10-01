@@ -7,24 +7,32 @@ import (
 	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
 	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/network"
+	"os"
 )
 
 // Argumentos que recibe:
 // 1. Address de rabbit
 // 2. Nombre de la funcion que tiene que ejecutar
 func main() {
-	colaEntrada, err := middleware.CreateQueue("FilteredTransactions1", middleware.ChannelOptionsDefault())
+
+	aggregatorFunction := os.Args[2]
+	if len(aggregatorFunction) == 0 {
+		panic("No filter function provided")
+	}
+	rabbitAddr := os.Args[1]
+	colaEntrada, err := middleware.CreateQueue("COLA DE ENTRADA", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilteredTransactions1): %w", err))
+		panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
 	}
 	msgQueue, consumeError := colaEntrada.StartConsuming()
 	if consumeError != 0 {
 		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
 	}
 
-	colaSalida, err := middleware.CreateQueue("SalidaQuery1", middleware.ChannelOptionsDefault())
+	colaSalida, err := middleware.CreateQueue("COLA DE SALIDA", middleware.ChannelOptionsDefault())
 	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
+		panic(fmt.Errorf("CreateQueue(COLA DE SALIDA): %w", err))
 	}
 
 	worker := concat.Concat{}
@@ -33,24 +41,18 @@ func main() {
 
 		slog.Debug("Recibi mensaje")
 		packet_reader := bytes.NewReader(message.Body)
-		packet, err := packet.DeserializePackage(packet_reader)
-		if err != nil {
-			panic(fmt.Errorf("Error deserializing packet: %w", err))
-		}
+		packet, _ := packet.DeserializePackage(packet_reader)
 
-		slog.Debug("Procesando packet", "eof", packet.IsEOF(), "payload_len", len(packet.GetPayload()))
 		result = worker.Process(packet)
-		ackErr := message.Ack(false)
-		if ackErr != nil {
-			panic(fmt.Errorf("Could not ack, %w", ackErr))
+		err := message.Ack(false)
+		if err != nil {
+			panic(fmt.Errorf("Could not ack, %w", err))
 		}
 		if len(result) != 0 {
 			slog.Info("Obtuve EOF, mando todo empaquetado a la cola de sending")
 			for _, pkt := range result {
 				err := colaSalida.Send(pkt.Serialize())
-				if err != 0 {
-					panic(fmt.Errorf("Error sending packet: %d", err))
-				}
+				println(err)
 			}
 		}
 	}
