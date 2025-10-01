@@ -3,10 +3,13 @@ package joiner
 import (
 	"bytes"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
+	"malasian_coffe/utils/dataset"
 )
 
 type joinerQuery3 struct {
@@ -21,17 +24,91 @@ type joinerQuery3 struct {
 	colaSalidaQuery3  *middleware.MessageMiddlewareQueue
 }
 
+// Devuelve true cuando quedan recibio todos los paquetes, sino false
+func addStoreToMap(storePkt packet.Packet, storeMap map[string]string) bool {
+	stores := storePkt.GetPayload()
+	lines := strings.Split(stores, "\n")
+	lines = lines[:len(lines)-1]
+	for _, line := range lines {
+		// store_id , store_name
+		cols := strings.Split(line, ",")
+		store_id, store_name := cols[0], cols[1]
+		storeMap[store_id] = store_name
+	}
+
+	// TODO: verificar paquetes fuera de orden. En teoria se deberia poder
+	// aislar en esta funcion o packet receiver en el directorio de packets
+	// Ver: https://github.com/ShaGoWizardMoneyGang/MalasianCoffe/issues/46
+	if storePkt.IsEOF() {
+		// Me llegaron todos
+		return true
+	} else {
+		return false
+	}
+}
+
 func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
-	var pkt_joineado packet.Packet
+	// store_id -> store_name
+	stores              := make(map[string]string)
+	all_stores_received := false
+
+	all_transactions_received := false
+	// Aca me guardo todos los packets de transactions que llegaron antes de los
+	// stores. Deberian ser pocos (si es que existen)
+	var transactions strings.Builder
+
+	// Resultado final
+	var joinedTransactions strings.Builder
+
+	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
+	// jugosa metadata
+	var last_packet packet.Packet
+
 	for {
 		pkt :=  <- inputChannel
-		// TODO aca hacer el join
-		if pkt.IsEOF() {
+
+		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
+		dataset_name, err := dataset.IDtoDataset(packet_id)
+		if err != nil {
+			panic(err)
+		}
+
+		if dataset_name == "stores" {
+			all_stores_received =  addStoreToMap(pkt, stores)
+		} else if dataset_name == "transactions" {
+
+			// Nos guardamos los que llegaron
+			_, err := transactions.WriteString(pkt.GetPayload())
+			if err != nil {
+				panic("Joiner failed to add payload to transaction buffer")
+			}
+
+			// No joineamos hasta tener todos las stores
+			if all_stores_received == true {
+				// WARNING: transactions queda vacio despues de esta funcion
+				joinerFunctionQuery3(transactions, stores, joinedTransactions)
+			}
+
+			all_transactions_received = pkt.IsEOF()
+
+		} else {
+			panic(fmt.Errorf("JoinerQuery3 received packet from dataset that was not expecting: %s", dataset_name))
+		}
+
+		if all_stores_received && all_transactions_received {
+			last_packet = pkt
 			break
 		}
 	}
 
-	outputQueue.Send(pkt_joineado.Serialize())
+	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"stores", "transactions"}, []string{joinedTransactions.String()})
+	// Liberamos
+	joinedTransactions.Reset()
+
+	// Deberia ser 1 solo
+	for _, pkt := range pkt_joineado {
+	   outputQueue.Send(pkt.Serialize())
+	}
 }
 
 func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
@@ -45,8 +122,7 @@ func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 		// Joiner
 		assigned_channel := make(chan packet.Packet)
 		go joinQuery3(assigned_channel, jq3.colaSalidaQuery3)
-		go func() {
-		}()
+
 		// No hace falta un mutex porque este diccionario se accede de forma
 		// secuencial
 		jq3.sessions[sessionID] = assigned_channel
@@ -161,21 +237,25 @@ func (jq3 *joinerQuery3) Process() {
 // // Recibe year_half_created_at, store_id, tpv
 // // joinea con stores.csv cargado en memoria con store_id, store_name
 // // y me devuelve year_half_created_at, store_name, tpv
-// func (j *Joiner) joinerFunctionQuery3(input string) string {
-// 	lines := strings.Split(input, "\n")
-// 	lines = lines[:len(lines)-1]
-// 	var b strings.Builder
-// 	for _, r := range lines {
-// 		cols := strings.Split(r, ",")
-// 		if len(cols) < 3 {
-// 			panic("No hay 3 columnas como se esperaba")
-// 		}
-// 		semester, storeID, tpv := cols[0], cols[1], cols[2]
-// 		storeName := j.Stores[storeID]
-// 		fmt.Fprintf(&b, "%s,%s,%s\n", semester, storeName, tpv)
-// 	}
-// 	return b.String()
-// }
+func joinerFunctionQuery3(inputTransaction strings.Builder, storeMap map[string]string, joinedResult strings.Builder) {
+	input := inputTransaction.String()
+
+	// Liberamos el buffer de input
+	inputTransaction.Reset()
+
+	lines := strings.Split(input, "\n")
+	lines = lines[:len(lines)-1]
+	for _, r := range lines {
+		cols := strings.Split(r, ",")
+		if len(cols) < 3 {
+			panic("No hay 3 columnas como se esperaba")
+		}
+		semester, storeID, tpv := cols[0], cols[1], cols[2]
+		storeName := storeMap[storeID]
+
+		fmt.Fprintf(&joinedResult, "%s,%s,%s\n", semester, storeName, tpv)
+	}
+}
 
 // // Recibe year_month_created_at, item_id, quantity
 // // joinea con stores.csv cargado en memoria con item_id, item_name

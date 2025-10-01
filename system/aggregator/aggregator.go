@@ -15,7 +15,6 @@ import (
 // 1. Address de rabbit
 // 2. Nombre de la funcion que tiene que ejecutar
 func main() {
-
 	aggregatorFunction := os.Args[2]
 	if len(aggregatorFunction) == 0 {
 		panic("No filter function provided")
