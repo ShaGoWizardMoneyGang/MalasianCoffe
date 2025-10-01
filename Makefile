@@ -10,6 +10,8 @@
 #============================== Run directives =================================
 
 current_dir = $(shell pwd)
+distro = $(shell cat /etc/os-release | grep -w NAME | sed 's/NAME=//g' )
+
 
 DATADIR                ?=    ${current_dir}/dataset/
 OUTDIR                 ?=    ${current_dir}/out/
@@ -88,3 +90,10 @@ download-reduced-dataset: download-dataset
 
 rabbit-gui:
 	xdg-open http://localhost:15672
+
+restart-rabbit:
+ifeq ($(distro),Gentoo)
+	sudo rc-service rabbitmq restart
+else
+	sudo systemctl restart rabbitmq-server
+endif
