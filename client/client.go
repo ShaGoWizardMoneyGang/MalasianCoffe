@@ -9,13 +9,12 @@ import (
 	"path/filepath"
 
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_answer"
+	packetanswer "malasian_coffe/packets/packet_answer"
 	"malasian_coffe/protocol"
 	"malasian_coffe/utils/network"
 
 	"github.com/fatih/color"
 )
-
 
 func createPackagesFrom(dir string, session_ID string, listen_addr string, send_addr net.Conn) error {
 	directory_name := filepath.Base(dir)
@@ -69,7 +68,6 @@ func main() {
 
 	conn, err := net.Dial("tcp", gateway_addr)
 
-
 	string_b, err := network.ReceiveFromNetwork(conn)
 	if err != nil {
 		panic(err)
@@ -110,41 +108,41 @@ func main() {
 
 type receive_answer struct {
 	query_name string
-	received bool
+	received   bool
 }
 
 type received_answers struct {
-	received [] receive_answer
+	received []receive_answer
 }
 
 func new_received_answers() received_answers {
 	buffer := make([]receive_answer, 6)
-	buffer[0] = receive_answer {
+	buffer[0] = receive_answer{
 		query_name: "Query1",
-		received: false,
+		received:   false,
 	}
-	buffer[1] = receive_answer {
+	buffer[1] = receive_answer{
 		query_name: "Query2a",
-		received: false,
+		received:   false,
 	}
-	buffer[2] = receive_answer {
+	buffer[2] = receive_answer{
 		query_name: "Query2b",
-		received: false,
+		received:   false,
 	}
-	buffer[3] = receive_answer {
+	buffer[3] = receive_answer{
 		query_name: "Query3",
-		received: false,
+		received:   false,
 	}
-	buffer[4] = receive_answer {
+	buffer[4] = receive_answer{
 		query_name: "Query4",
-		received: false,
+		received:   false,
 	}
-	buffer[5] = receive_answer {
+	buffer[5] = receive_answer{
 		query_name: "Query5",
-		received: false,
+		received:   false,
 	}
 
-	received_answers := received_answers {
+	received_answers := received_answers{
 		received: buffer,
 	}
 
@@ -189,7 +187,7 @@ func (ra *received_answers) display() {
 }
 
 func waitForAnswers(listen_addr string, out_dir string) error {
-	err := os.Mkdir(out_dir, 0777)
+	err := os.MkdirAll(out_dir, 0777)
 	if err != nil {
 		panic(fmt.Errorf("Failed to create directory %s", out_dir))
 	}
@@ -228,7 +226,7 @@ func write_to_file(pkt packetanswer.PacketAnswer, out_dir string) error {
 
 	query := pkt.GetQuery()
 
-	out_file := out_dir + query
+	out_file := out_dir + query + ".csv"
 
 	err := os.WriteFile(out_file, result, 0666)
 	if err != nil {

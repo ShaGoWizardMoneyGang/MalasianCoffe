@@ -25,7 +25,7 @@ sleep 0.5
 
 # Add sender
 tmux split-window -v -t 3
-tmux send-keys "make run-sender" C-m
+tmux send-keys "make run-sender RUN_FUNCTION=Query1" C-m
 
 # Enable mouse and attach
 tmux set-option -t query1_e2e mouse on

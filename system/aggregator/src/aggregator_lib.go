@@ -24,6 +24,10 @@ func (a *Aggregator) Aggregator3ByMonthTPV(input string) string {
 
 	lines := strings.Split(input, "\n")
 	for _, line := range lines {
+		print("[AGGREGATOR COLUMNAS linea recibida]:", line, "\n")
+		if line == "" {
+			continue
+		}
 		cols := strings.Split(line, ",")
 		if len(cols) != 3 {
 			panic("Se esperaban 3 columnas")
@@ -70,7 +74,7 @@ func (a *Aggregator) Process(pkt packet.Packet, function string) []packet.Packet
 	input := pkt.GetPayload()
 	var salida string
 	switch strings.ToLower(function) {
-	case "Aggregator3ByMonthTPV":
+	case "agregator3bymonthtpv":
 		salida = a.Aggregator3ByMonthTPV(input)
 	default:
 		panic("Funcion desconocida")

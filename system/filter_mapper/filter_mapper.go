@@ -62,7 +62,7 @@ func main() {
 		colaEntrada := instanceQueue("DataMenuItems", rabbitAddr)
 		msgQueue := consumeInput(colaEntrada)
 		colaSalida := instanceQueue("FilteredMenuItems", rabbitAddr)
-		sendPackets(msgQueue, colaSalida, "filterStores")
+		sendPackets(msgQueue, colaSalida, "stores")
 	case "transactions":
 		println("[CASE TRANSACTIONS]")
 

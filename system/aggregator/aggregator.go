@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"malasian_coffe/packets/packet"
-	concat "malasian_coffe/system/concat/src"
+	aggregator "malasian_coffe/system/aggregator/src"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
 	"os"
@@ -21,38 +21,45 @@ func main() {
 		panic("No filter function provided")
 	}
 	rabbitAddr := os.Args[1]
-	colaEntrada, err := middleware.CreateQueue("COLA DE ENTRADA", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
-	}
-	msgQueue, consumeError := colaEntrada.StartConsuming()
-	if consumeError != 0 {
-		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
-	}
 
-	colaSalida, err := middleware.CreateQueue("COLA DE SALIDA", middleware.ChannelOptionsDefault())
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(COLA DE SALIDA): %w", err))
-	}
-
-	worker := concat.Concat{}
-	var result []packet.Packet
-	for message := range *msgQueue {
-
-		slog.Debug("Recibi mensaje")
-		packet_reader := bytes.NewReader(message.Body)
-		packet, _ := packet.DeserializePackage(packet_reader)
-
-		result = worker.Process(packet)
-		err := message.Ack(false)
+	switch aggregatorFunction {
+	case "query3":
+		println("[GORDO AGGREGATOR QUERY3]")
+		colaEntrada, err := middleware.CreateQueue("FilteredTransactions3", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 		if err != nil {
-			panic(fmt.Errorf("Could not ack, %w", err))
+			panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
 		}
-		if len(result) != 0 {
-			slog.Info("Obtuve EOF, mando todo empaquetado a la cola de sending")
-			for _, pkt := range result {
-				err := colaSalida.Send(pkt.Serialize())
-				println(err)
+		msgQueue, consumeError := colaEntrada.StartConsuming()
+		if consumeError != 0 {
+			panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
+		}
+
+		colaSalida, err := middleware.CreateQueue("PartialAggregations3", middleware.ChannelOptionsDefault())
+		if err != nil {
+			panic(fmt.Errorf("CreateQueue(COLA DE SALIDA): %w", err))
+		}
+
+		worker := aggregator.Aggregator{}
+		var result []packet.Packet
+		for message := range *msgQueue {
+
+			slog.Debug("Recibi mensaje")
+			packet_reader := bytes.NewReader(message.Body)
+			packet, _ := packet.DeserializePackage(packet_reader)
+
+			println("Pkt enviado al aggregator:", packet.GetPayload())
+			result = worker.Process(packet, "agregator3ByMonthTPV")
+			println("Resultado de aggregator:", result[0].GetPayload())
+			err := message.Ack(false)
+			if err != nil {
+				panic(fmt.Errorf("Could not ack, %w", err))
+			}
+			if len(result) != 0 {
+				slog.Info("Obtuve EOF, mando todo empaquetado a la cola de sending")
+				for _, pkt := range result {
+					err := colaSalida.Send(pkt.Serialize())
+					println(err)
+				}
 			}
 		}
 	}

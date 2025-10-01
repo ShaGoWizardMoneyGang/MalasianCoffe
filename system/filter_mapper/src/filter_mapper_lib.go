@@ -171,10 +171,14 @@ func filterTransactions(input string) []string {
 		}
 		amount, _ := strconv.ParseFloat(data[7], 64)
 		amount = math.Round(amount*10) / 10
+		layout := "2006-01-02 15:04:05" // Go's reference layout
+		t, _ := time.Parse(layout, data[8])
 		if yearCondition(data) {
-			final_query1 += data[0] + "," + data[1] + "," + data[4] + "\n"                                 //mapeo query 1
-			final_query3 += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n" //mapeo query 3
-			final_query4 += data[0] + "," + data[1] + "," + data[4] + "\n"                                 //mapeo query 4
+			final_query1 += data[0] + "," + data[1] + "," + data[4] + "\n" //mapeo query 1
+			final_query4 += data[0] + "," + data[1] + "," + data[4] + "\n" //mapeo query 4
+			if t.Hour() >= 6 && t.Hour() <= 23 {
+				final_query3 += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n" //mapeo query 3
+			}
 		}
 	}
 	return []string{final_query1, final_query3, final_query4}
@@ -199,7 +203,7 @@ func (c *FilterMapper) Process(pkt packet.Packet, function string) []packet.Pack
 		output = []string{filterFunctionQuery2a(input)}
 	case "query2byearandsubtotal":
 		output = []string{filterFunctionQuery2b(input)}
-	case "filterstores":
+	case "stores":
 		output = []string{mapStoreIdAndName(input)}
 	case "query3mapstoreidandname":
 		output = []string{mapStoreIdAndName(input)}
