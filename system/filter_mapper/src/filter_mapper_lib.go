@@ -171,7 +171,19 @@ func filterTransactions(input string) []string {
 			slog.Debug("Registro con menos de 9 columnas, dropeado")
 			continue
 		}
+
+		// TODO(fabri): Revisar como handlear el dropeo, tal vez tiene que ser mas quirurquico.
+		if   data[0] == "" ||
+			data[1] == "" ||
+			data[4] == "" ||
+			data[7] == "" ||
+			data[8] == "" {
+			slog.Debug("Registro con campos de interes vacios, dropeado")
+			continue
 		}
+
+
+
 		amount, _ := strconv.ParseFloat(data[7], 64)
 		amount = math.Round(amount*10) / 10
 		layout := "2006-01-02 15:04:05" // Go's reference layout
