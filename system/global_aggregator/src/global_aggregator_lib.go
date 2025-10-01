@@ -8,44 +8,51 @@ import (
 	"strings"
 )
 
-type Aggregator struct {
+type key struct {
+	yearAndMonth string
+	storeID      string
 }
 
-// ESTO YA RECIBE LAS COSITAS PARCIALES AAAAAAAAAAAAA
-func (a *Aggregator) AggregatorGlobal3ByMonthTPV(input string) string {
-	type key struct {
-		yearAndMonth string
-		storeID      string
-	}
+type GlobalAggregator struct {
+	acc map[key]float64
+}
 
-	acc := make(map[key]float64)
+func NewAggregator() *GlobalAggregator {
+	return &GlobalAggregator{acc: make(map[key]float64)}
+}
 
-	lines := strings.Split(strings.TrimSpace(input), "\n")
-	for _, line := range lines {
+// batch del parcial "YYYY-MM,store_id,tpv"
+func (a *GlobalAggregator) ingestBatch(input string) {
+	lines := strings.SplitSeq(strings.TrimSpace(input), "\n")
+	for line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-
 		cols := strings.Split(line, ",")
 		if len(cols) != 3 {
 			panic("Se esperaban 3 columnas: YYYY-MM,store_id,tpv")
 		}
+		ym := strings.TrimSpace(cols[0])
+		storeID := strings.TrimSpace(cols[1])
+		amountStr := strings.TrimSpace(cols[2])
 
-		ym := cols[0]
-		storeID := cols[1]
-		amountStr := cols[2]
 		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
 			panic("tpv con formato inválido")
 		}
 
 		k := key{yearAndMonth: ym, storeID: storeID}
-		acc[k] += amount
+		a.acc[k] += amount
+	}
+}
+
+func (a *GlobalAggregator) flushAndBuild() string {
+	if len(a.acc) == 0 {
+		return ""
 	}
 
-	// ordenar por mes y luego por store_id
-	keys := make([]key, 0, len(acc))
-	for k := range acc {
+	keys := make([]key, 0, len(a.acc))
+	for k := range a.acc {
 		keys = append(keys, k)
 	}
 	sort.Slice(keys, func(i, j int) bool {
@@ -57,19 +64,32 @@ func (a *Aggregator) AggregatorGlobal3ByMonthTPV(input string) string {
 
 	var b strings.Builder
 	for _, k := range keys {
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearAndMonth, k.storeID, acc[k])
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearAndMonth, k.storeID, a.acc[k])
 	}
+
+	a.acc = make(map[key]float64)
 	return b.String()
 }
 
-func (a *Aggregator) Process(pkt packet.Packet, function string) []packet.Packet {
-	input := pkt.GetPayload()
-	var salida string
+func (a *GlobalAggregator) Process(pkt packet.Packet, function string) []packet.Packet {
+	input := strings.TrimSpace(pkt.GetPayload())
 	switch strings.ToLower(function) {
 	case "agregator3globalbymonthtpv":
-		salida = a.AggregatorGlobal3ByMonthTPV(input)
+		// 	EOF
+		if pkt.IsEOF() {
+			final := a.flushAndBuild()
+			if final == "" {
+				return nil
+			}
+			fmt.Print(final)
+			return packet.ChangePayload(pkt, []string{final})
+		}
+
+		// caso que no es eof
+		a.ingestBatch(input)
+		return nil
+
 	default:
 		panic("Funcion desconocida")
 	}
-	return packet.ChangePayload(pkt, []string{salida})
 }

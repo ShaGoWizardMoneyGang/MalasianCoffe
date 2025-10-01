@@ -13,9 +13,8 @@ import (
 
 // Argumentos que recibe:
 // 1. Address de rabbit
-// 2. Nombre de la funcion que tiene que ejecutar
+// 2. Nombre de la funcion que tiene que ejecutar (query3Global)
 func main() {
-
 	aggregatorFunction := os.Args[2]
 	if len(aggregatorFunction) == 0 {
 		panic("No filter function provided")
@@ -25,10 +24,14 @@ func main() {
 	switch aggregatorFunction {
 	case "query3Global":
 		println("[GORDO AGGREGATOR QUERY3 GLOBAL]")
-		colaEntrada, err := middleware.CreateQueue("PartialAggregations3", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+		colaEntrada, err := middleware.CreateQueue(
+			"PartialAggregations3",
+			middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)},
+		)
 		if err != nil {
 			panic(fmt.Errorf("CreateQueue(COLA PartialAggregations3 ENTRADA): %w", err))
 		}
+
 		msgQueue, consumeError := colaEntrada.StartConsuming()
 		if consumeError != 0 {
 			panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
@@ -39,26 +42,29 @@ func main() {
 			panic(fmt.Errorf("CreateQueue(SalidaQuery3): %w", err))
 		}
 
-		worker := aggregator.Aggregator{}
+		worker := aggregator.NewAggregator()
 		var result []packet.Packet
+
 		for message := range *msgQueue {
-
 			slog.Debug("Recibi mensaje")
-			packet_reader := bytes.NewReader(message.Body)
-			packet, _ := packet.DeserializePackage(packet_reader)
+			packetReader := bytes.NewReader(message.Body)
+			pkt, _ := packet.DeserializePackage(packetReader)
 
-			println("Pkt enviado al aggregator:", packet.GetPayload())
-			result = worker.Process(packet, "agregator3GlobalByMonthTPV")
-			println("Resultado de aggregator:", result[0].GetPayload())
-			err := message.Ack(false)
-			if err != nil {
+			payload := pkt.GetPayload()
+			println("Pkt recibido (global):", payload)
+
+			result = worker.Process(pkt, "agregator3GlobalByMonthTPV")
+
+			if err := message.Ack(false); err != nil {
 				panic(fmt.Errorf("Could not ack, %w", err))
 			}
+
 			if len(result) != 0 {
 				slog.Info("Obtuve EOF, mando todo empaquetado a la cola de sending")
-				for _, pkt := range result {
-					err := colaSalida.Send(pkt.Serialize())
-					println(err)
+				for _, out := range result {
+					if err := colaSalida.Send(out.Serialize()); err != 0 {
+						slog.Error("Error enviando a cola de salida", "err", err)
+					}
 				}
 			}
 		}
