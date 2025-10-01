@@ -58,7 +58,7 @@ func main() {
 	// Hay que ponerle el arg del rabbit
 
 	switch filterFunction {
-	case "menuItems":
+	case "stores":
 		colaEntrada := instanceQueue("DataMenuItems", rabbitAddr)
 		msgQueue := consumeInput(colaEntrada)
 		colaSalida := instanceQueue("FilteredMenuItems", rabbitAddr)
@@ -92,10 +92,5 @@ func main() {
 				panic(fmt.Errorf("Could not ack, %w", err))
 			}
 		}
-		//resultados[3] = procesarTransactions
-		//mandar a la cola que toque (resultados)
-		// sendPackets(msgQueue, colaSalida, "query1Transactions") CON SEND PACKETS NO FUNCA
-		//implemento para repartir entre las 3 colas que tocan
-
 	}
 }
