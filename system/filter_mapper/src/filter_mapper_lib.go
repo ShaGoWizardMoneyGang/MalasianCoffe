@@ -227,15 +227,26 @@ func instanceQueue(inputQueueName string, rabbitAddr string) *middleware.Message
 // =========================== TransactionFilter ==============================
 
 type TransactionFilterMapper struct {
+	colaEntradaTransaction *middleware.MessageMiddlewareQueue
+
 	colaSalida1 *middleware.MessageMiddlewareQueue
 	colaSalida3 *middleware.MessageMiddlewareQueue
 	colaSalida4 *middleware.MessageMiddlewareQueue
 }
 
+func (tfm *TransactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+	return tfm.colaEntradaTransaction
+
+}
+
 func (tfm *TransactionFilterMapper) Build(rabbitAddr string) {
+	colaEntradaTransaction := instanceQueue("DataTransactions", rabbitAddr)
+
 	colaSalida1 := instanceQueue("FilteredTransactions1", rabbitAddr)
 	colaSalida3 := instanceQueue("FilteredTransactions3", rabbitAddr)
 	colaSalida4 := instanceQueue("FilteredTransactions4", rabbitAddr)
+
+	tfm.colaEntradaTransaction = colaEntradaTransaction
 
 	tfm.colaSalida1  = colaSalida1
 	tfm.colaSalida3  = colaSalida3
@@ -272,17 +283,28 @@ func (tfm *TransactionFilterMapper) Process(pkt packet.Packet) []packet.OutBound
 // ============================== StoreFilter =================================
 
 type StoreFilterMapper struct {
+	colaEntradaStore *middleware.MessageMiddlewareQueue
+
 	colaSalida3 *middleware.MessageMiddlewareQueue
 	colaSalida4 *middleware.MessageMiddlewareQueue
 }
 
 func (sfm *StoreFilterMapper) Build(rabbitAddr string) {
+	colaEntradaStore := instanceQueue("DataStores", rabbitAddr)
+
 	colaSalida3 := instanceQueue("FilteredStores3", rabbitAddr)
 	colaSalida4 := instanceQueue("FilteredStores4", rabbitAddr)
+
+	sfm.colaEntradaStore = colaEntradaStore
 
 	sfm.colaSalida3  = colaSalida3
 	sfm.colaSalida4  = colaSalida4
 }
+
+func (sfm *StoreFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+	return sfm.colaEntradaStore
+}
+
 func (sfm *StoreFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
@@ -307,13 +329,23 @@ func (sfm *StoreFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessag
 
 // =============================== UserFilter ==================================
 type UserFilterMapper struct {
+	colaEntradaUsers *middleware.MessageMiddlewareQueue
+
 	colaSalida4 *middleware.MessageMiddlewareQueue
 }
 
 func (ufm *UserFilterMapper) Build(rabbitAddr string) {
+	colaEntradaUsers := instanceQueue("DataUsers", rabbitAddr)
+
 	colaSalida4 := instanceQueue("FilteredUsers4", rabbitAddr)
 
+	ufm.colaEntradaUsers  = colaEntradaUsers
+
 	ufm.colaSalida4  = colaSalida4
+}
+
+func (ufm *UserFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+	return ufm.colaEntradaUsers
 }
 
 func (ufm *UserFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
@@ -335,10 +367,14 @@ func (ufm *UserFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage
 
 // =============================== UserFilter ==================================
 type FilterMapper interface {
-	// Funcio que hace el filtrado
-	Process(pkt packet.Packet) []packet.OutBoundMessage
 	// Funcion que inicializa las cosas que el filter necesita
 	Build(rabbitAddr string)
+
+	// Devuelve referencia de la cola de la cual tiene que consumir
+	GetInput() *middleware.MessageMiddlewareQueue
+
+	// Funcio que hace el filtrado
+	Process(pkt packet.Packet) []packet.OutBoundMessage
 }
 
 func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {

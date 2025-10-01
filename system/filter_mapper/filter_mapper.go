@@ -60,8 +60,8 @@ make run-filter RUN_FUNCTION=transactions
 	rabbitAddr := os.Args[1]
 
 	worker := filter_mapper.FilterMapperBuilder(filterFunction, rabbitAddr)
+	colaEntrada := worker.GetInput()
 
-	colaEntrada := instanceQueue("DataTransactions", rabbitAddr)
 	msgQueue := consumeInput(colaEntrada)
 
 	for message := range *msgQueue { //while true hasta que terminen los mensajes
