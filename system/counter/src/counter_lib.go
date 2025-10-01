@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/network"
 	"strings"
 )
+
+// ============================= CounterQuery4 ================================
 
 // NOTE: Gracias Mari por anadir estas lineas de input output
 // Recibe transaction_id, store_id, user_id
@@ -54,10 +57,6 @@ func (c *CounterQuery4) countFunctionQuery4(input string) string {
 	return b.String()
 }
 
-// ============================= CounterQuery4 ================================
-
-// ============================= CounterQuery4 ================================
-
 type CounterQuery4 struct {
 	colaCountedUsers4 *middleware.MessageMiddlewareQueue
 }
@@ -78,19 +77,33 @@ func (c *CounterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
 
 	return outBoundMessage
 }
-type CounterInt interface {
+func (c *CounterQuery4) Build(rabbitAddr string) {
+	cola, err := middleware.CreateQueue("CountedUsers4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue(%s): %w", "CountedUsers4", err))
+	}
+	c.colaCountedUsers4 = cola
+}
+
+// ============================= CounterQuery4 ================================
+
+type Counter interface {
 	// Funcio que hace el filtrado
 	Process(pkt packet.Packet) []packet.OutBoundMessage
 	// Funcion que inicializa las cosas que el filter necesita
 	Build(rabbitAddr string)
 }
 
-func (c *CounterQuery4) Process(pkt packet.Packet) []packet.Packet {
-	// unica funcion de counter, va directo
-	input := pkt.GetPayload()
-	output := c.countFunctionQuery4(input)
-	outputs := []string{output}
-	newPacket := packet.ChangePayload(pkt, outputs)
+func CounterBuilder(counterName string, rabbitAddr string) Counter {
+	var counter Counter;
+	switch counterName {
+	case "counter4":
+		counter = &CounterQuery4{}
+	default:
+		panic(fmt.Sprintf("Unknown counter %s", counterName))
+	}
 
-	return newPacket
+	counter.Build(rabbitAddr)
+
+	return counter
 }
