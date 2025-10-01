@@ -76,6 +76,8 @@ func (a *Aggregator) Process(pkt packet.Packet, function string) []packet.Packet
 	switch strings.ToLower(function) {
 	case "agregator3bymonthtpv":
 		salida = a.Aggregator3ByMonthTPV(input)
+	case "agregator3globalbymonthtpv":
+		salida = pkt.GetPayload()
 	default:
 		panic("Funcion desconocida")
 	}

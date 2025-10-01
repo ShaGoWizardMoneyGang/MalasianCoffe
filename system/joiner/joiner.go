@@ -1,8 +1,13 @@
-package joiner
+package main
 
 import (
+	"bytes"
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/network"
+	"os"
 	"strings"
 )
 
@@ -91,4 +96,77 @@ func (c *Joiner) Process(pkt packet.Packet, function string) []packet.Packet {
 	new_packet := packet.ChangePayload(pkt, outputs)
 
 	return new_packet
+}
+
+func main() {
+	joinFunction := os.Args[2]
+	if len(joinFunction) == 0 {
+		panic("No join function provided")
+	}
+	rabbitAddr := os.Args[1]
+
+	switch joinFunction {
+	case "Query3":
+		println("[JOINER QUERY3]")
+		colaEntradaStores, err := middleware.CreateQueue("FilteredStores", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+		if err != nil {
+			panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
+		}
+		msgQueue, consumeError := colaEntradaStores.StartConsuming()
+		if consumeError != 0 {
+			panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
+		}
+		worker := Joiner{}
+		worker.Stores = make(map[string]string) //genero el map vacío
+
+		for message := range *msgQueue { //idealmente esto sería solo una vez para cargar las 10 stores en memoria
+			println("[JOINER QUERY3] Leyendo stores para memoria")
+			// slog.Debug("[Joiner Q3] Leyendo stores para memoria")
+			packet_reader := bytes.NewReader(message.Body)
+			packet, _ := packet.DeserializePackage(packet_reader)
+			lines := strings.Split(packet.GetPayload(), "\n") //leo el paquete
+			lines = lines[:len(lines)-1]
+			for _, r := range lines { //por cada linea del paquete
+				cols := strings.Split(r, ",")
+				if len(cols) < 2 {
+					panic("No hay 2 columnas como se esperaba") //store_id, store_name
+				}
+				worker.Stores[cols[0]] = cols[1] //lo guardo en memoria
+			}
+			err := message.Ack(false)
+			if err != nil {
+				panic(fmt.Errorf("Could not ack, %w", err))
+			}
+		}
+		println("[JOINER QUERY3] Leyendo global aggregations")
+		colaEntradaTransactions, err := middleware.CreateQueue("GlobalAggregation3", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+		if err != nil {
+			panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
+		}
+		msgQueueTransactions, consumeErrorT := colaEntradaTransactions.StartConsuming()
+		if consumeErrorT != 0 {
+			panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
+		}
+		for message := range *msgQueueTransactions { //acá debería haber solo 1 paquete del global aggregator
+			packetReader := bytes.NewReader(message.Body)
+			pkt, _ := packet.DeserializePackage(packetReader)
+
+			paquetesSalida := worker.Process(pkt, "query3")
+			fmt.Printf("PAQUETES SALIDA %v\n", paquetesSalida)
+			for _, pkt := range paquetesSalida {
+				slog.Info("[Joiner Q3] Mando packet joineado a siguiente cola")
+				colaSalida, err := middleware.CreateQueue("SalidaQuery3", middleware.ChannelOptionsDefault())
+				if err != nil {
+					panic(fmt.Errorf("CreateQueue(SalidaQuery3): %w", err))
+				}
+				_ = colaSalida.Send(pkt.Serialize())
+			}
+
+			err := message.Ack(false)
+			if err != nil {
+				panic(fmt.Errorf("Could not ack, %w", err))
+			}
+		}
+	}
+
 }
