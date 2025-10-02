@@ -399,17 +399,21 @@ func (ufm *userFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage
 type menuItemFilterMapper struct {
 	colaEntradaStore *middleware.MessageMiddlewareQueue
 
-	colaSalida2 *middleware.MessageMiddlewareQueue
+	colaSalida2a *middleware.MessageMiddlewareQueue
+	colaSalida2b *middleware.MessageMiddlewareQueue
 }
 
 func (mifm *menuItemFilterMapper) Build(rabbitAddr string) {
 	colaEntradaStore := colas.InstanceQueue("DataMenuItems", rabbitAddr)
 
-	colaSalida2 := colas.InstanceQueue("FilteredMenuItems2", rabbitAddr)
+	colaSalida2a := colas.InstanceQueue("FilteredMenuItems2a", rabbitAddr)
+	colaSalida2b := colas.InstanceQueue("FilteredMenuItems2b", rabbitAddr)
 
 	mifm.colaEntradaStore = colaEntradaStore
 
-	mifm.colaSalida2 = colaSalida2
+	mifm.colaSalida2a = colaSalida2a
+	mifm.colaSalida2b = colaSalida2b
+
 }
 
 func (mifm *menuItemFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
@@ -425,7 +429,11 @@ func (mifm *menuItemFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMe
 	outBoundMessage := []packet.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
-			ColaSalida: mifm.colaSalida2,
+			ColaSalida: mifm.colaSalida2a,
+		},
+		{
+			Packet:     newPayload[0],
+			ColaSalida: mifm.colaSalida2b,
 		},
 	}
 
