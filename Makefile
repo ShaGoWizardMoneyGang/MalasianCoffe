@@ -52,15 +52,16 @@ run-joiner:
 run-sender:
 	cd system/sender; go run sender.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 #============================== Build directives ===============================
-build: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner
+# Poner en order
+build: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator
+build-server:
+	cd system; go build -o ${current_dir}/bin/server
+
 build-client:
 	cd client; go build -o ${current_dir}/bin/client
 
 build-gateway:
 	cd gateway; go build -o ${current_dir}/bin/gateway
-
-build-server:
-	cd system; go build -o ${current_dir}/bin/server
 
 build-filter:
 	cd system/filter_mapper; go build -o ${current_dir}/bin/filter_mapper
@@ -68,17 +69,21 @@ build-filter:
 build-concat:
 	cd system/concat; go build -o ${current_dir}/bin/concat
 
-build-joiner:
-	cd system/joiner; go build -o ${current_dir}/bin/joiner
-
-build-aggregator:
-	cd system/aggregator; go build -o ${current_dir}/bin/aggregator
-
 build-sender:
 	cd system/sender; go build -o ${current_dir}/bin/sender
 
 build-counter:
 	cd system/counter; go build -o ${current_dir}/bin/counter
+
+build-joiner:
+	cd system/joiner; go build -o ${current_dir}/bin/joiner
+
+build-partial-aggregator:
+	cd system/partial_aggregator; go build -o ${current_dir}/bin/partial_aggregator
+
+build-global-aggregator:
+	cd system/global_aggregator; go build -o ${current_dir}/bin/global_aggregator
+
 
 #=============================== Test directives ===============================
 

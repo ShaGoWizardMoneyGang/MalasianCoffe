@@ -27,7 +27,7 @@ make run-filter RUN_FUNCTION=transactions
 `)
 	}
 	rabbitAddr := os.Args[1]
-
+	print("Filter function: ", filterFunction, "\n")
 	worker := filter_mapper.FilterMapperBuilder(filterFunction, rabbitAddr)
 	colaEntrada := worker.GetInput()
 

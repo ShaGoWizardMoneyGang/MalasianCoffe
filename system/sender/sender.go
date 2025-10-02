@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_answer"
+	packetanswer "malasian_coffe/packets/packet_answer"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
 )
@@ -26,7 +26,7 @@ func main() {
 	if numeroQuery == "" {
 		panic("No se le paso Query al sender, tiene que ser algo del estilo make run-sender RUN_FUNCTION=Query1")
 	}
-	queue, err := middleware.CreateQueue("Salida" + numeroQuery, middleware.ChannelOptions {DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	queue, err := middleware.CreateQueue("Salida"+numeroQuery, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
 	if err != nil {
 		panic("Couldn't create " + numeroQuery)
 	}
@@ -41,6 +41,7 @@ func main() {
 		pkt, _ := packet.DeserializePackage(packetReader)
 
 		client_receiver := pkt.GetClientAddr()
+		print("Client receiver address: ", client_receiver, "\n")
 		conn, err := net.Dial("tcp", client_receiver)
 		if err != nil {
 			panic(err)

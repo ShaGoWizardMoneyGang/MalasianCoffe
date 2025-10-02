@@ -1,6 +1,12 @@
 name: tp1
+include:
+  - docker-compose-rabbit.yml
+  - docker-compose-client.yml
+  - docker-compose-filter-transactions.yml
+  - docker-compose-partial-aggregator3.yml
+  
 services:
-  server:
+  server: #no escala
     container_name: server
     image: ubuntu:24.04
     working_dir: /app
@@ -13,43 +19,84 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  gateway:
+  gateway: #no escala
     container_name: gateway
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./gateway_bin 0.0.0.0:9090 server:9091
+    entrypoint: ./bin/gateway 0.0.0.0:9090 server:9091
     volumes:
-      - ./bin/gateway:/app/gateway_bin
+      - ./bin/gateway:/app/bin/gateway
     networks:
       - testing_net
     depends_on:
       - server
 
-  client1:
-    container_name: client1
+  filter_stores: #no escala
+    container_name: filter_stores
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./client_bin ../dataset/ gateway:9090 gateway:9091
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 stores
     volumes:
-      - ./bin/client:/app/client_bin
-      - ./dataset:/dataset
+      - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+      - testing_net
     depends_on:
-      - gateway
-    networks:
-      - testing_net
+      - server
 
-  rabbitmq:
-    container_name: rabbitmq_test
-    image: rabbitmq:4.1.4-management
-    ports:
-      - "5673:5672"
-      - "15673:15672"
+  concat: #no escala
+    container_name: concat
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/concat rabbitmq:5672
+    volumes:
+      - ./bin/concat:/app/bin/concat
     networks:
       - testing_net
-    healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
-      interval: 5s
-      retries: 5
+    depends_on:
+      - server
+      - rabbitmq
+      - filter_transactions
+
+  global_aggregator3: #no escala
+    container_name: global_aggregator3
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 query3Global
+    volumes:
+      - ./bin/global_aggregator:/app/bin/global_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - concat
+      - partial_aggregator3
+  
+  sender1: #no escala
+    container_name: sender1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/sender rabbitmq:5672 Query1
+    volumes:
+      - ./bin/sender:/app/bin/sender
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - concat
+
+  sender3: #no escala
+    container_name: sender3
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/sender rabbitmq:5672 Query3
+    volumes:
+      - ./bin/sender:/app/bin/sender
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - global_aggregator3
+      - filter_stores
 
 networks:
   testing_net:
