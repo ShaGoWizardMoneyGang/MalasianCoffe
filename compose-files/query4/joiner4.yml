@@ -1,0 +1,12 @@
+services:
+  joiner4: #no escala
+    container_name: joiner4
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/joiner rabbitmq:5672 Query4
+    volumes:
+      - ../../bin/joiner:/app/bin/joiner
+    networks:
+      - testing_net
+    depends_on:
+      - server
