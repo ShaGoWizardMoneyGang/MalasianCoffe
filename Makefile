@@ -10,6 +10,8 @@
 #============================== Run directives =================================
 
 current_dir = $(shell pwd)
+distro = $(shell cat /etc/os-release | grep -w NAME | sed 's/NAME=//g' )
+
 
 DATADIR                ?=    ${current_dir}/dataset/
 OUTDIR                 ?=    ${current_dir}/out/
@@ -32,21 +34,34 @@ run-server:
 run-filter:
 	cd system/filter_mapper; go run filter_mapper.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
+run-partial-aggregator:
+	cd system/partial_aggregator; go run partial_aggregator.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
+run-global-aggregator:
+	cd system/global_aggregator; go run global_aggregator.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
 run-concat:
 	cd system/concat; go run concat.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
+run-counter:
+	cd system/counter; go run counter.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
+run-joiner:
+	cd system/joiner; go run joiner.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
 run-sender:
-	cd system/sender; go run sender.go ${RABBIT_ADDR}
+	cd system/sender; go run sender.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 #============================== Build directives ===============================
-build: build-server build-client build-gateway build-filter build-concat build-sender
+# Poner en order
+build: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator
+build-server:
+	cd system; go build -o ${current_dir}/bin/server
+
 build-client:
 	cd client; go build -o ${current_dir}/bin/client
 
 build-gateway:
 	cd gateway; go build -o ${current_dir}/bin/gateway
-
-build-server:
-	cd system; go build -o ${current_dir}/bin/server
 
 build-filter:
 	cd system/filter_mapper; go build -o ${current_dir}/bin/filter_mapper
@@ -56,6 +71,19 @@ build-concat:
 
 build-sender:
 	cd system/sender; go build -o ${current_dir}/bin/sender
+
+build-counter:
+	cd system/counter; go build -o ${current_dir}/bin/counter
+
+build-joiner:
+	cd system/joiner; go build -o ${current_dir}/bin/joiner
+
+build-partial-aggregator:
+	cd system/partial_aggregator; go build -o ${current_dir}/bin/partial_aggregator
+
+build-global-aggregator:
+	cd system/global_aggregator; go build -o ${current_dir}/bin/global_aggregator
+
 
 #=============================== Test directives ===============================
 
@@ -82,5 +110,16 @@ download-dataset:
 	rm -rf dataset/vouchers
 	rm -rf dataset/payment_methods
 
+download-reduced-dataset: download-dataset
+	find dataset/transaction_items -type f ! \( -name '*202401*' -o -name '*202501*' \) -exec rm {} +
+	find dataset/transactions -type f ! \( -name '*202401*' -o -name '*202501*' \) -exec rm {} +
+
 rabbit-gui:
 	xdg-open http://localhost:15672
+
+restart-rabbit:
+ifeq ($(distro),Gentoo)
+	sudo rc-service rabbitmq restart
+else
+	sudo systemctl restart rabbitmq-server
+endif

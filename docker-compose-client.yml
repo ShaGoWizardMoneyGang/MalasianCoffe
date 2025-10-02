@@ -1,0 +1,13 @@
+services:
+  client1:
+    container_name: client1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/client ../dataset/ ../out/ gateway:9090 client1:9093
+    volumes:
+      - ./bin/client:/app/bin/client
+      - ./dataset:/dataset
+    depends_on:
+      - gateway
+    networks:
+      - testing_net

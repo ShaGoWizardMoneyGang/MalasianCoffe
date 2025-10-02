@@ -3,9 +3,10 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
-	filter_mapper "malasian_coffe/system/filter_mapper/src"
 	"malasian_coffe/system/middleware"
+	aggregator "malasian_coffe/system/partial_aggregator/src"
 	"os"
 )
 
@@ -17,23 +18,19 @@ func consumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.Con
 	return msgQueue
 }
 
-// Cola input menu items: DataMenuItems TODO: constante global (utils)
-// Cola output menu items filtrados: FilteredMenuItems
 func main() {
-	filterFunction := os.Args[2]
-	if len(filterFunction) == 0 {
-		panic(`No filter function provided, tiene que ser algo del estilo:
-make run-filter RUN_FUNCTION=transactions
-`)
-	}
-	rabbitAddr := os.Args[1]
-	print("Filter function: ", filterFunction, "\n")
-	worker := filter_mapper.FilterMapperBuilder(filterFunction, rabbitAddr)
-	colaEntrada := worker.GetInput()
 
+	rabbitAddr := os.Args[1]
+	function := os.Args[2]
+	if len(function) == 0 {
+		panic("No aggregator function provided")
+	}
+
+	worker := aggregator.PartialAggregatorBuilder(function, rabbitAddr)
+	colaEntrada := worker.GetInput()
 	msgQueue := consumeInput(colaEntrada)
 
-	for message := range *msgQueue { //while true hasta que terminen los mensajes
+	for message := range *msgQueue {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
@@ -41,12 +38,13 @@ make run-filter RUN_FUNCTION=transactions
 
 		for _, outbound := range outboundMessages {
 			cola := outbound.ColaSalida
-			packet := outbound.Packet
-			cola.Send(packet.Serialize())
+			p := outbound.Packet
+			if err := cola.Send(p.Serialize()); err != 0 {
+				slog.Error("Error enviando a cola de salida", "err", err)
+			}
 		}
 
-		err := message.Ack(false)
-		if err != nil {
+		if err := message.Ack(false); err != nil {
 			panic(fmt.Errorf("Could not ack, %w", err))
 		}
 	}

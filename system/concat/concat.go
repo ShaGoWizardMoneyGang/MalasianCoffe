@@ -6,26 +6,27 @@ import (
 	"log/slog"
 	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
-	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/colas"
+	"os"
 )
 
 // Argumentos que recibe:
 // 1. Address de rabbit
 // 2. Nombre de la funcion que tiene que ejecutar
 func main() {
-	colaEntrada, err := middleware.CreateQueue("FilterMapper1YearAndAmount", middleware.ChannelOptionsDefault())
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
-	}
+	rabbit_addr := os.Args[1]
+	print("Rabbit address: ", rabbit_addr, "\n")
+	colaEntrada := colas.InstanceQueue("FilteredTransactions1", rabbit_addr)
+	// colaEntrada, err := middleware.CreateQueue("FilteredTransactions1", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	// if err != nil {
+	// 	panic(fmt.Errorf("CreateQueue(FilteredTransactions1): %w", err))
+	// }
 	msgQueue, consumeError := colaEntrada.StartConsuming()
 	if consumeError != 0 {
 		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
 	}
 
-	colaSalida, err := middleware.CreateQueue("SalidaQuery1", middleware.ChannelOptionsDefault())
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
-	}
+	colaSalida := colas.InstanceQueue("SalidaQuery1", rabbit_addr)
 
 	worker := concat.Concat{}
 	var result []packet.Packet
@@ -33,18 +34,24 @@ func main() {
 
 		slog.Debug("Recibi mensaje")
 		packet_reader := bytes.NewReader(message.Body)
-		packet, _ := packet.DeserializePackage(packet_reader)
-
-		result = worker.Process(packet)
-		err := message.Ack(false)
+		packet, err := packet.DeserializePackage(packet_reader)
 		if err != nil {
-			panic(fmt.Errorf("Could not ack, %w", err))
+			panic(fmt.Errorf("Error deserializing packet: %w", err))
+		}
+
+		slog.Debug("Procesando packet", "eof", packet.IsEOF(), "payload_len", len(packet.GetPayload()))
+		result = worker.Process(packet)
+		ackErr := message.Ack(false)
+		if ackErr != nil {
+			panic(fmt.Errorf("Could not ack, %w", ackErr))
 		}
 		if len(result) != 0 {
 			slog.Info("Obtuve EOF, mando todo empaquetado a la cola de sending")
 			for _, pkt := range result {
 				err := colaSalida.Send(pkt.Serialize())
-				println(err)
+				if err != 0 {
+					panic(fmt.Errorf("Error sending packet: %d", err))
+				}
 			}
 		}
 	}

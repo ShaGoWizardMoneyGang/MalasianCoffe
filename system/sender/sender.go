@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"time"
 
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_answer"
+	packetanswer "malasian_coffe/packets/packet_answer"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
 )
@@ -18,28 +19,36 @@ import (
 func main() {
 	// TODO: Esto no esta bueno para el sender porque tiene que escuchar de mas
 	// de una cola a la vez, onda regex.
-	queue, err := middleware.CreateQueue("SalidaQuery1", middleware.ChannelOptionsDefault())
+	rabbit_addr := os.Args[1]
+
+	// Esto tiene un nombre del Query1
+	numeroQuery := os.Args[2]
+	if numeroQuery == "" {
+		panic("No se le paso Query al sender, tiene que ser algo del estilo make run-sender RUN_FUNCTION=Query1")
+	}
+	queue, err := middleware.CreateQueue("Salida"+numeroQuery, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
 	if err != nil {
-		panic("Couldn't create query 1 queu")
+		panic("Couldn't create " + numeroQuery)
 	}
 	msgs, err_2 := queue.StartConsuming()
 	if err_2 != 0 {
-		panic("Couldn't start consuming queue 2")
-	}
-	// NOTE: Este sleep lo pongo porque si el dataset es corto, el cliente envia todo y no le da tiempo a crear un socket
-	time.Sleep(10 * time.Second)
+		  panic("Couldn't start consuming queue 2")
+	   }
+	   // NOTE: Este sleep lo pongo porque si el dataset es corto, el cliente envia todo y no le da tiempo a crear un socket
+	   time.Sleep(10 * time.Second)
 	for message := range *msgs {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
 		client_receiver := pkt.GetClientAddr()
+		print("Client receiver address: ", client_receiver, "\n")
 		conn, err := net.Dial("tcp", client_receiver)
 		if err != nil {
 			panic(err)
 		}
 
 		// TODO: Como averiguo de que cola vino?
-		pkt_answer := packetanswer.From(pkt, "Query 1")
+		pkt_answer := packetanswer.From(pkt, numeroQuery)
 		pkt_answer_b := pkt_answer.Serialize()
 
 		slog.Info("Sending answer packet back to client")
