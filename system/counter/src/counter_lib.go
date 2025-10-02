@@ -29,19 +29,19 @@ func countFunctionQuery2(input string) string {
 		yearMonth string
 		itemID    string
 	}
-	// tengo un map donde voy contando las apariciones por mes e item
-	counts := map[key]int{}
+	counts := map[key]float64{}
 
 	for _, r := range rows {
-
-		cols := strings.Split(r, ",") // este comportamiento podria modularizarlo para todos
+		cols := strings.Split(r, ",")
 		if len(cols) < 3 {
 			panic("Invalid data format")
 		}
 
-		// NOTE: Estos no deberian estar vacios. Si lo estan, buscar error en el filter mapper
 		itemID := cols[0]
-		acumulatorValue, _ := strconv.Atoi(cols[1])
+		acumulatorValue, err := strconv.ParseFloat(cols[1], 64)
+		if err != nil {
+			panic(fmt.Sprintf("Error parsing accumulator value '%s': %s", cols[1], err))
+		}
 		date := cols[2]
 		key := key{yearMonth: toYearMonth(date), itemID: itemID}
 		counts[key] += acumulatorValue
@@ -49,7 +49,7 @@ func countFunctionQuery2(input string) string {
 
 	var b strings.Builder
 	for k, val := range counts {
-		fmt.Fprintf(&b, "%s,%s,%d\n", k.yearMonth, k.itemID, val)
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearMonth, k.itemID, val)
 	}
 	return b.String()
 }
