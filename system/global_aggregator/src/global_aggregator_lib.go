@@ -2,6 +2,7 @@ package global_aggregator
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -15,7 +16,8 @@ import (
 type aggregator4Global struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
-	acc         map[query4.Key]float64
+	// acc         map[query4.Key]uint64
+	acc         map[string]map[string]uint64
 }
 
 func (g *aggregator4Global) Build(rabbitAddr string) {
@@ -23,7 +25,8 @@ func (g *aggregator4Global) Build(rabbitAddr string) {
 
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
 
-	g.acc = make(map[query4.Key]float64)
+	// g.acc = make(map[query4.Key]uint64)
+	g.acc = make(map[string]map[string]uint64)
 }
 
 // user_id | store_id | #transactions
@@ -64,13 +67,14 @@ func (g *aggregator4Global) ingestBatch(input string) {
 		}
 		user_id, store_id, transaction_number := cols[0], cols[1], cols[2]
 
-		amount, err := strconv.ParseFloat(transaction_number, 64)
+		amount, err := strconv.ParseUint(transaction_number, 10, 64)
 		if err != nil {
 			panic("tpv con formato inválido")
 		}
 
-		k := query4.Key{Store: store_id, User: user_id}
-		g.acc[k] += amount
+		// k := query4.Key{Store: store_id, User: user_id}
+		g.acc[store_id][user_id] += amount
+		// g.acc[k] += amount
 	}
 }
 
@@ -79,13 +83,34 @@ func (g *aggregator4Global) flushAndBuild() string {
 		return ""
 	}
 
-	var b strings.Builder
-	for k, val := range g.acc {
-		store := k.Store
-		user  := k.User
-		value := val
+	type kv struct {
+		user   string
+		amount uint64
+	}
 
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", user, store, value)
+	var b strings.Builder
+	for store, user2amount := range g.acc {
+		var sortedSlice []kv
+		for user, amount := range user2amount {
+			sortedSlice = append(sortedSlice, kv{
+				user,
+				amount})
+		}
+
+		sort.Slice(sortedSlice, func(i, j int) bool {
+			return sortedSlice[i].amount > sortedSlice[j].amount
+		})
+
+		var size int
+		if len(sortedSlice) < 3 {
+			size = len(sortedSlice)
+		} else {
+			size = 3
+		}
+
+		for i := 0; i < size; i++ {
+			fmt.Fprintf(&b, "%s,%d\n", store, sortedSlice[i].user)
+		}
 	}
 	// QUESTION(fabri): Por que sorteamos?
 	// sort.Slice(keys, func(i, j int) bool {
@@ -95,7 +120,7 @@ func (g *aggregator4Global) flushAndBuild() string {
 	// 	return keys[i].yearHalf < keys[j].yearHalf
 	// })
 
-	g.acc = make(map[query4.Key]float64)
+	g.acc = make(map[string]map[string]uint64)
 	return b.String()
 }
 

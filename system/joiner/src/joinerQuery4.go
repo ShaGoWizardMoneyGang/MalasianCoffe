@@ -70,7 +70,7 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 
 	for {
 		pkt :=  <- inputChannel
-		fmt.Printf("Recibi %v\n")
+		// println(pkt.GetPayload())
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -199,7 +199,7 @@ func (jq4 *joinerQuery4) Process() {
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de stores")
+			slog.Info("Recibi mensaje de cola de users")
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
@@ -224,6 +224,8 @@ func (jq4 *joinerQuery4) Process() {
 
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
+			fmt.Printf("%+v\n", pkt)
+			fmt.Printf("TUKI")
 
 			err := message.Ack(false)
 			if err != nil {
