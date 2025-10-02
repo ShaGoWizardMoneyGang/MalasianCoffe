@@ -2,6 +2,7 @@ package global_aggregator
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
@@ -255,8 +256,8 @@ func (g *aggregator3Global) flushAndBuild() string {
 	var b strings.Builder
 	for k, val := range g.acc {
 		yearHalf := k.yearHalf
-		storeID  := k.storeID
-		value    := val
+		storeID := k.storeID
+		value := val
 
 		fmt.Fprintf(&b, "%s,%s,%.2f\n", yearHalf, storeID, value)
 	}
@@ -266,6 +267,7 @@ func (g *aggregator3Global) flushAndBuild() string {
 }
 
 func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	slog.Info("Processing packet in Global Aggregator 3")
 	input := pkt.GetPayload()
 
 	isEOF := pkt.IsEOF()
@@ -288,6 +290,7 @@ func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage 
 		},
 	}
 }
+
 // ============================ AggregatorQuery3 ===============================
 
 type GlobalAggregator interface {
