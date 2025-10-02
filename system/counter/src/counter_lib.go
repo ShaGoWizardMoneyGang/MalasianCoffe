@@ -64,9 +64,9 @@ type CounterQuery2b struct {
 
 func (c *CounterQuery2b) Build(rabbitAddr string) {
 
-	colaEntrada, err := middleware.CreateQueue("FilteredTransactionItems2a", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+	colaEntrada, err := middleware.CreateQueue("FilteredTransactionItems2b", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
-		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactionItems2a", err))
+		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactionItems2b", err))
 	}
 	//CountedItems2a
 	colaSalida, err := middleware.CreateQueue("CountedItems2b", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
