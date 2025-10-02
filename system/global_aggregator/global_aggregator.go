@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
 	aggregator "malasian_coffe/system/global_aggregator/src"
 	"malasian_coffe/system/middleware"
@@ -35,6 +36,8 @@ func main() {
 		outMsgs := worker.Process(pkt)
 
 		for _, out := range outMsgs {
+			slog.Info("Sending packet to joiner")
+			fmt.Printf("%v", pkt)
 			_ = out.ColaSalida.Send(out.Packet.Serialize())
 		}
 

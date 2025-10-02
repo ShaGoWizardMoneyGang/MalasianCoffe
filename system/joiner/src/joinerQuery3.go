@@ -86,6 +86,7 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 
 			// No joineamos hasta tener todos las stores
 			if all_stores_received == true {
+				slog.Info("Joineo")
 				// WARNING: transactions queda vacio despues de esta funcion
 				joinerFunctionQuery3(transactions, stores, joinedTransactions)
 			}
@@ -106,8 +107,10 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 	// Liberamos
 	joinedTransactions.Reset()
 
+				slog.Info("Envio pkt joineado al sender")
 	// Deberia ser 1 solo
 	for _, pkt := range pkt_joineado {
+		fmt.Printf("%+v\n", pkt)
 	   outputQueue.Send(pkt.Serialize())
 	}
 }
@@ -121,6 +124,7 @@ func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 	// paquetes correspondientes a cada rutina
 	if !exists {
 		// Joiner
+		slog.Info("Creo un hilo joiner")
 		assigned_channel := make(chan packet.Packet)
 		go joinQuery3(assigned_channel, jq3.colaSalidaQuery3)
 
@@ -193,7 +197,7 @@ func (jq3 *joinerQuery3) Process() {
 		messages := colas.ConsumeInput(colasEntrada)
 
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de stores")
+			slog.Info("Recibi mensaje de cola de aggregated filtered transactions")
 
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
