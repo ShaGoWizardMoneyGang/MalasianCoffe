@@ -2,21 +2,110 @@ package global_aggregator
 
 import (
 	"fmt"
-	"malasian_coffe/packets/packet"
-	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/colas"
-	"sort"
 	"strconv"
 	"strings"
+
+	"malasian_coffe/packets/packet"
+	"malasian_coffe/system/middleware"
+	"malasian_coffe/system/queries/query4"
+	"malasian_coffe/utils/colas"
 )
 
-type GlobalAggregator interface {
-	Build(rabbitAddr string)
-	GetInput() *middleware.MessageMiddlewareQueue
-	Process(pkt packet.Packet) []packet.OutBoundMessage
+// ============================ AggregatorQuery3 ===============================
+type aggregator4Global struct {
+	colaEntrada *middleware.MessageMiddlewareQueue
+	colaSalida  *middleware.MessageMiddlewareQueue
+	acc         map[query4.Key]float64
 }
 
-type key struct {
+func (g *aggregator4Global) Build(rabbitAddr string) {
+	g.colaEntrada = colas.InstanceQueue("PartialCountedUsers4", rabbitAddr)
+
+	g.colaSalida = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
+
+	g.acc = make(map[query4.Key]float64)
+}
+
+// user_id | store_id | #transactions
+func (g *aggregator4Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	input := pkt.GetPayload()
+
+	isEOF := pkt.IsEOF()
+
+	if !isEOF {
+		g.ingestBatch(input)
+		return nil
+	}
+
+	final := g.flushAndBuild()
+	if final == "" {
+		return nil
+	}
+
+	newPkts := packet.ChangePayload(pkt, []string{final})
+	return []packet.OutBoundMessage{
+		{
+			Packet:     newPkts[0],
+			ColaSalida: g.colaSalida,
+		},
+	}
+}
+
+// user_id | store_id | #transactions
+func (g *aggregator4Global) ingestBatch(input string) {
+	lines := strings.SplitSeq(input, "\n")
+	for line := range lines {
+		if line == "" {
+			continue
+		}
+		cols := strings.Split(line, ",")
+		if len(cols) != 3 {
+			panic("Se esperaban 3 columnas")
+		}
+		user_id, store_id, transaction_number := cols[0], cols[1], cols[2]
+
+		amount, err := strconv.ParseFloat(transaction_number, 64)
+		if err != nil {
+			panic("tpv con formato inválido")
+		}
+
+		k := query4.Key{Store: store_id, User: user_id}
+		g.acc[k] += amount
+	}
+}
+
+func (g *aggregator4Global) flushAndBuild() string {
+	if len(g.acc) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	for k, val := range g.acc {
+		store := k.Store
+		user  := k.User
+		value := val
+
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", user, store, value)
+	}
+	// QUESTION(fabri): Por que sorteamos?
+	// sort.Slice(keys, func(i, j int) bool {
+	// 	if keys[i].yearHalf == keys[j].yearHalf {
+	// 		return keys[i].storeID < keys[j].storeID
+	// 	}
+	// 	return keys[i].yearHalf < keys[j].yearHalf
+	// })
+
+	g.acc = make(map[query4.Key]float64)
+	return b.String()
+}
+
+func (g *aggregator4Global) GetInput() *middleware.MessageMiddlewareQueue {
+	return g.colaEntrada
+}
+
+// ============================ AggregatorQuery3 ===============================
+
+type keyQuery3 struct {
 	yearHalf string // "YYYY-H1" o "YYYY-H2"
 	storeID  string
 }
@@ -24,14 +113,14 @@ type key struct {
 type aggregator3Global struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
-	acc         map[key]float64
+	acc         map[keyQuery3]float64
 }
 
 func (g *aggregator3Global) Build(rabbitAddr string) {
 	g.colaEntrada = colas.InstanceQueue("PartialAggregations3", rabbitAddr)
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 	//g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
-	g.acc = make(map[key]float64)
+	g.acc = make(map[keyQuery3]float64)
 }
 
 func (g *aggregator3Global) GetInput() *middleware.MessageMiddlewareQueue {
@@ -57,43 +146,51 @@ func (g *aggregator3Global) ingestBatch(input string) {
 			panic("tpv con formato inválido")
 		}
 
-		k := key{yearHalf: yh, storeID: storeID}
+		k := keyQuery3{yearHalf: yh, storeID: storeID}
 		g.acc[k] += amount
 	}
 }
 
 func (g *aggregator3Global) flushAndBuild() string {
 	if len(g.acc) == 0 {
+		fmt.Println("No recibidi ningun dato. Raro. Ojo")
 		return ""
 	}
 
-	keys := make([]key, 0, len(g.acc))
-	for k := range g.acc {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].yearHalf == keys[j].yearHalf {
-			return keys[i].storeID < keys[j].storeID
-		}
-		return keys[i].yearHalf < keys[j].yearHalf
-	})
 
 	var b strings.Builder
-	for _, k := range keys {
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearHalf, k.storeID, g.acc[k])
+	for k, val := range g.acc {
+		yearHalf := k.yearHalf
+		storeID  := k.storeID
+		value    := val
+
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", yearHalf, storeID, value)
 	}
 
-	g.acc = make(map[key]float64)
+	// keys := make([]keyQuery3, 0, len(g.acc))
+	// for k := range g.acc {
+	// 	keys = append(keys, k)
+	// }
+	// QUESTION(fabri): Por que sorteamos?
+	// sort.Slice(keys, func(i, j int) bool {
+	// 	if keys[i].yearHalf == keys[j].yearHalf {
+	// 		return keys[i].storeID < keys[j].storeID
+	// 	}
+	// 	return keys[i].yearHalf < keys[j].yearHalf
+	// })
+
+	// Resetear
+	g.acc = make(map[keyQuery3]float64)
 	return b.String()
 }
 
 func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
-	isEOF := pkt.IsEOF() || strings.EqualFold(input, "EOF")
+	isEOF := pkt.IsEOF()
 
+	g.ingestBatch(input)
 	if !isEOF {
-		g.ingestBatch(input)
 		return nil
 	}
 
@@ -110,14 +207,24 @@ func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage 
 		},
 	}
 }
+// ============================ AggregatorQuery3 ===============================
+
+type GlobalAggregator interface {
+	Build(rabbitAddr string)
+	GetInput() *middleware.MessageMiddlewareQueue
+	Process(pkt packet.Packet) []packet.OutBoundMessage
+}
 
 func GlobalAggregatorBuilder(name, rabbitAddr string) GlobalAggregator {
+	var worker GlobalAggregator
 	switch strings.ToLower(name) {
 	case "query3global":
-		worker := &aggregator3Global{}
-		worker.Build(rabbitAddr)
-		return worker
+		worker = &aggregator3Global{}
+	case "query4global":
+		worker = &aggregator4Global{}
 	default:
 		panic(fmt.Sprintf("Unknown global aggregator '%s'", name))
 	}
+	worker.Build(rabbitAddr)
+	return worker
 }
