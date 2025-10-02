@@ -247,7 +247,9 @@ func filterTransactions(input string) []string {
 		t, _ := time.Parse(layout, data[8])
 
 		if yearCondition(data) {
-			final_query4 += data[0] + "," + data[1] + "," + data[4] + "\n" //mapeo query 4
+			id_float := data[4]
+			id_int   := id_float[:len(id_float)-2]
+			final_query4 += data[0] + "," + data[1] + "," + id_int + "\n" //mapeo query 4
 			if t.Hour() >= 6 && t.Hour() <= 23 {
 				final_query3 += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n" //mapeo query 3
 				if amount >= 75.0 {
