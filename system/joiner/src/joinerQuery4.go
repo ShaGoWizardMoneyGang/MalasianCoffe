@@ -13,29 +13,55 @@ import (
 	"malasian_coffe/utils/dataset"
 )
 
-type joinerQuery3 struct {
+type joinerQuery4 struct {
 	// Tenemos una go routine por cada session
-	sessions map[string](chan packet.Packet)
+	sessions map[string] (chan packet.Packet)
 
 	colaStoresInput   *middleware.MessageMiddlewareQueue
+	colaUsersInput   *middleware.MessageMiddlewareQueue
 	colaAggTransInput *middleware.MessageMiddlewareQueue
 
-	// TODO(fabri): puede que no haga falta
-	// canalSalida chan packet.Packet
-	colaSalidaQuery3 *middleware.MessageMiddlewareQueue
+	colaSalidaQuery4  *middleware.MessageMiddlewareQueue
 }
 
 
-func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
+func addUserToMap(storePkt packet.Packet, storeMap map[string]string) bool {
+	stores := storePkt.GetPayload()
+	lines := strings.Split(stores, "\n")
+	lines = lines[:len(lines)-1]
+	for _, line := range lines {
+		// store_id , store_name
+		cols := strings.Split(line, ",")
+		store_id, store_name := cols[0], cols[1]
+		storeMap[store_id] = store_name
+	}
+
+	// TODO: verificar paquetes fuera de orden. En teoria se deberia poder
+	// aislar en esta funcion o packet receiver en el directorio de packets
+	// Ver: https://github.com/ShaGoWizardMoneyGang/MalasianCoffe/issues/46
+	if storePkt.IsEOF() {
+		// Me llegaron todos
+		return true
+	} else {
+		return false
+	}
+}
+
+func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
 	// store_id -> store_name
 	storeID2Name        := make(map[string]string)
 	all_stores_received := false
 
+	// store_id -> store_name
+	userID2Birthday     := make(map[string]string)
+	all_users_received  := false
 
+	all_transactions_received := false
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
 	// stores. Deberian ser pocos (si es que existen)
 	var transactions strings.Builder
-	all_transactions_received := false
+
+	// Resultado final
 	var joinedTransactions strings.Builder
 
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
@@ -43,8 +69,8 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 	var last_packet packet.Packet
 
 	for {
-		pkt := <-inputChannel
-		fmt.Printf("Recibi %v\n", pkt)
+		pkt :=  <- inputChannel
+		// println(pkt.GetPayload())
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -53,7 +79,9 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 		}
 
 		if dataset_name == "stores" {
-			all_stores_received =  addStoreToMap(pkt, storeID2Name)
+			all_stores_received = addStoreToMap(pkt, storeID2Name)
+		} else if dataset_name == "users" {
+			all_users_received = addUserToMap(pkt, userID2Birthday)
 		} else if dataset_name == "transactions" {
 
 			// Nos guardamos los que llegaron
@@ -63,25 +91,26 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 			}
 
 			// No joineamos hasta tener todos las stores
-			if all_stores_received == true {
+			if all_stores_received == true && all_users_received == true {
 				slog.Info("Joineo")
 				// WARNING: transactions queda vacio despues de esta funcion
-				joinerFunctionQuery3(&transactions, storeID2Name, &joinedTransactions)
+				joinerFunctionQuery4(&transactions, storeID2Name, userID2Birthday, &joinedTransactions)
 			}
 
 			all_transactions_received = pkt.IsEOF()
 
 		} else {
-			panic(fmt.Errorf("JoinerQuery3 received packet from dataset that was not expecting: %s", dataset_name))
+			panic(fmt.Errorf("JoinerQuery4 received packet from dataset that was not expecting: %s", dataset_name))
 		}
 
-		if all_stores_received && all_transactions_received {
+		if all_stores_received && all_users_received && all_transactions_received {
 			last_packet = pkt
 			break
 		}
 	}
 
-	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"stores", "transactions"}, []string{joinedTransactions.String()})
+	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"users", "stores", "transactions"}, []string{joinedTransactions.String()})
+
 	// Liberamos
 	joinedTransactions.Reset()
 
@@ -89,14 +118,15 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 	// Deberia ser 1 solo
 	for _, pkt := range pkt_joineado {
 		fmt.Printf("%+v\n", pkt)
-		outputQueue.Send(pkt.Serialize())
+	   outputQueue.Send(pkt.Serialize())
 	}
 }
 
-func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
+func (jq4 *joinerQuery4) passPacketToJoiner(pkt packet.Packet) {
 	slog.Info("Envio packete a la session")
 	sessionID := pkt.GetSessionID()
-	channel, exists := jq3.sessions[sessionID]
+	channel, exists := jq4.sessions[sessionID]
+
 
 	// Nos creamos una rutina por cada session. Nosotros le enviamos los
 	// paquetes correspondientes a cada rutina
@@ -104,11 +134,11 @@ func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 		// Joiner
 		slog.Info("Creo un hilo joiner")
 		assigned_channel := make(chan packet.Packet)
-		go joinQuery4(assigned_channel, jq3.colaSalidaQuery3)
+		go joinQuery4(assigned_channel, jq4.colaSalidaQuery4)
 
 		// No hace falta un mutex porque este diccionario se accede de forma
 		// secuencial
-		jq3.sessions[sessionID] = assigned_channel
+		jq4.sessions[sessionID] = assigned_channel
 
 		// Ahora que lo tenemos, sobre escribimos el valor basura que obtuvimos antes.
 		channel = assigned_channel
@@ -117,34 +147,36 @@ func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 	channel <- pkt
 }
 
-func (jq3 *joinerQuery3) Build(rabbitAddr string) {
-	slog.Info("Inicializo el Joiner 3")
+func (jq4 *joinerQuery4) Build(rabbitAddr string) {
+	slog.Info("Inicializo el Joiner 4")
 	// SessionID -> channel
-	sessionHandler := make(map[string](chan packet.Packet))
-	// canalSalida              := make(chan packet.Packet)
+	sessionHandler           := make(map[string](chan packet.Packet))
 
-	colaSalidaQuery3 := colas.InstanceQueue("SalidaQuery3", rabbitAddr)
+	colaSalidaQuery4  := colas.InstanceQueue("SalidaQuery4", rabbitAddr)
 
-	colaStoresInput := colas.InstanceQueue("FilteredStores3", rabbitAddr)
-	colaAggTransInput := colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
+	colaStoresInput   := colas.InstanceQueue("FilteredStores4", rabbitAddr)
+	colaUsersInput    := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
+	colaAggTransInput := colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
 
-	jq3.sessions = sessionHandler
+	jq4.sessions = sessionHandler
 
-	jq3.colaStoresInput = colaStoresInput
-	jq3.colaAggTransInput = colaAggTransInput
+	jq4.colaStoresInput = colaStoresInput
+	jq4.colaUsersInput = colaUsersInput
+	jq4.colaAggTransInput = colaAggTransInput
 
-	// jq3.canalSalida = canalSalida
-	jq3.colaSalidaQuery3 = colaSalidaQuery3
+	jq4.colaSalidaQuery4 = colaSalidaQuery4
 }
 
-func (jq3 *joinerQuery3) Process() {
-	slog.Info("Arranca procesamiento del joiner 3")
-	storeListener := make(chan packet.Packet)
+func (jq4 *joinerQuery4) Process() {
+	slog.Info("Arranca procesamiento del joiner 4")
+	storeListener            := make(chan packet.Packet)
+	userListener             := make(chan packet.Packet)
 	aggregatorGlobalListener := make(chan packet.Packet)
+
 
 	// Stores
 	go func() {
-		colasEntrada := jq3.colaStoresInput
+		colasEntrada := jq4.colaStoresInput
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
@@ -161,10 +193,29 @@ func (jq3 *joinerQuery3) Process() {
 		}
 	}()
 
+	// Users
+	go func() {
+		colasEntrada := jq4.colaUsersInput
+
+		messages := colas.ConsumeInput(colasEntrada)
+		for message := range *messages {
+			slog.Info("Recibi mensaje de cola de users")
+			packetReader := bytes.NewReader(message.Body)
+			pkt, _ := packet.DeserializePackage(packetReader)
+
+			err := message.Ack(false)
+			if err != nil {
+				panic(fmt.Errorf("Could not ack, %w", err))
+			}
+
+			userListener <- pkt
+		}
+	}()
+
 	// Aggregated Filtered Transactions
 	go func() {
 		// TODO: Maybe guardar en el struct
-		colasEntrada := jq3.colaAggTransInput
+		colasEntrada := jq4.colaAggTransInput
 
 		messages := colas.ConsumeInput(colasEntrada)
 
@@ -173,6 +224,8 @@ func (jq3 *joinerQuery3) Process() {
 
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
+			fmt.Printf("%+v\n", pkt)
+			fmt.Printf("TUKI")
 
 			err := message.Ack(false)
 			if err != nil {
@@ -186,11 +239,11 @@ func (jq3 *joinerQuery3) Process() {
 	for {
 		select {
 		case storePacket := <-storeListener:
-			jq3.passPacketToJoiner(storePacket)
+			jq4.passPacketToJoiner(storePacket)
 		case aggregatedPacket := <-aggregatorGlobalListener:
-			jq3.passPacketToJoiner(aggregatedPacket)
-			// case packetJoineado := <-jq3.canalSalida:
-			// 	jq3.send(packetJoineado)
+			jq4.passPacketToJoiner(aggregatedPacket)
+		case userPacket := <-userListener:
+			jq4.passPacketToJoiner(userPacket)
 		}
 	}
 }
@@ -219,7 +272,7 @@ func (jq3 *joinerQuery3) Process() {
 // // Recibe year_half_created_at, store_id, tpv
 // // joinea con stores.csv cargado en memoria con store_id, store_name
 // // y me devuelve year_half_created_at, store_name, tpv
-func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string]string, joinedResult *strings.Builder) {
+func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string]string, userMap map[string]string, joinedResult *strings.Builder) {
 	input := inputTransaction.String()
 
 	// Liberamos el buffer de input
@@ -229,13 +282,20 @@ func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string
 	lines = lines[:len(lines)-1]
 	for _, r := range lines {
 		cols := strings.Split(r, ",")
-		if len(cols) < 3 {
+		if len(cols) < 2 {
 			panic("No hay 3 columnas como se esperaba")
 		}
-		semester, storeID, tpv := cols[0], cols[1], cols[2]
-		storeName := storeMap[storeID]
+		// transactionID, storeID, userID
+		// TODO: EN ESTA PORONGA EL USER ID ES UN FLOAT
+		storeID, userID := cols[0], cols[1]
+		storeName    := storeMap[storeID]
+		userBirthday, exits := userMap[userID]
+		if !exits {
+			userBirthday = "2002-12-08"
+		}
 
-		fmt.Fprintf(joinedResult, "%s,%s,%s\n", semester, storeName, tpv)
+		// Necesito algo del estilo: storeName, birthday
+		fmt.Fprintf(joinedResult, "%s,%s\n", storeName, userBirthday)
 	}
 }
 
@@ -284,7 +344,7 @@ func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string
 // 	var output string
 // 	switch function_name {
 // 	case "query3":
-// 		output = c.joinerFunctionQuery3(input)
+// 		output = c.joinerFunctionQuery4(input)
 // 	case "query2quantity":
 // 		output = c.joinerFunctionQuery2Quantity(input)
 // 	case "query2subtotal":
@@ -305,7 +365,7 @@ func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string
 // 	rabbitAddr := os.Args[1]
 
 // 	switch joinFunction {
-// 	case "Query3":
+// 	case "Query4":
 // 		colaEntradaStores, err := middleware.CreateQueue("FilteredStores", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 // 		if err != nil {
 // 			panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
@@ -355,9 +415,9 @@ func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string
 // 			fmt.Printf("PAQUETES SALIDA %v\n", paquetesSalida)
 // 			for _, pkt := range paquetesSalida {
 // 				slog.Info("[Joiner Q3] Mando packet joineado a siguiente cola")
-// 				colaSalida, err := middleware.CreateQueue("SalidaQuery3", middleware.ChannelOptionsDefault())
+// 				colaSalida, err := middleware.CreateQueue("SalidaQuery4", middleware.ChannelOptionsDefault())
 // 				if err != nil {
-// 					panic(fmt.Errorf("CreateQueue(SalidaQuery3): %w", err))
+// 					panic(fmt.Errorf("CreateQueue(SalidaQuery4): %w", err))
 // 				}
 // 				_ = colaSalida.Send(pkt.Serialize())
 // 			}

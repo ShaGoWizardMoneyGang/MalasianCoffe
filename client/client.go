@@ -116,7 +116,7 @@ type received_answers struct {
 }
 
 func new_received_answers() received_answers {
-	buffer := make([]receive_answer, 6)
+	buffer := make([]receive_answer, 5)
 	buffer[0] = receive_answer{
 		query_name: "Query1",
 		received:   false,
@@ -135,10 +135,6 @@ func new_received_answers() received_answers {
 	}
 	buffer[4] = receive_answer{
 		query_name: "Query4",
-		received:   false,
-	}
-	buffer[5] = receive_answer{
-		query_name: "Query5",
 		received:   false,
 	}
 
@@ -162,8 +158,6 @@ func (ra *received_answers) addAnswer(pkt packetanswer.PacketAnswer) {
 		index = 3
 	case "Query4":
 		index = 4
-	case "Query5":
-		index = 5
 	default:
 		panic(fmt.Sprintf("Unknown query: %s", pkt.GetQuery()))
 	}

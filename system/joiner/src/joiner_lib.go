@@ -14,12 +14,14 @@ func JoinerBuilder(joinerName string, rabbitAddr string) Joiner {
 	var joiner Joiner
 
 	switch joinerName {
-	case "Query3":
-		joiner = &joinerQuery3{}
 	case "Query2a":
 		joiner = &joinerQuery2a{}
 	case "Query2b":
 		joiner = &joinerQuery2b{}
+	case "Query3":
+		joiner = &joinerQuery3{}
+	case "Query4":
+		joiner = &joinerQuery4{}
 	default:
 		panic(fmt.Sprintf("Unknown 'joiner' %s", joinerName))
 	}

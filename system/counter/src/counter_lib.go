@@ -2,11 +2,13 @@ package counter
 
 import (
 	"fmt"
+	"strings"
+
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
+	"malasian_coffe/system/queries/query4"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -159,12 +161,8 @@ func (c *CounterQuery4) countFunctionQuery4(input string) string {
 	rows := strings.Split(input, "\n")
 	rows = rows[:len(rows)-1] // El split me genera 1 linea de mas vacia por el ultimo /n, la ignoro
 
-	type key struct {
-		store string
-		user  string
-	}
 	// tengo un map donde voy contando las apariciones por store y user
-	counts := map[key]int{}
+	counts := map[query4.Key]int{}
 
 	for _, r := range rows {
 
@@ -176,11 +174,11 @@ func (c *CounterQuery4) countFunctionQuery4(input string) string {
 		// NOTE: Estos no deberian estar vacios. Si lo estan, buscar error en el filter mapper
 		storeID := cols[1]
 		userID := cols[2]
-		counts[key{store: storeID, user: userID}]++
+		counts[query4.Key{Store: storeID, User: userID}]++
 	}
 
 	// ordeno, esto podria modularizarlo???
-	keys := make([]key, 0, len(counts))
+	keys := make([]query4.Key, 0, len(counts))
 	for k := range counts {
 		keys = append(keys, k)
 	}
@@ -194,7 +192,7 @@ func (c *CounterQuery4) countFunctionQuery4(input string) string {
 
 	var b strings.Builder
 	for _, k := range keys {
-		fmt.Fprintf(&b, "%s,%s,%d\n", k.user, k.store, counts[k])
+		fmt.Fprintf(&b, "%s,%s,%d\n", k.User, k.Store, counts[k])
 	}
 	return b.String()
 }
@@ -202,7 +200,7 @@ func (c *CounterQuery4) countFunctionQuery4(input string) string {
 type CounterQuery4 struct {
 	colaEntradaFilteredTransactions4 *middleware.MessageMiddlewareQueue
 
-	colaSalidaCountedUsers4 *middleware.MessageMiddlewareQueue
+	colaSalidaPartialCountedUsers4 *middleware.MessageMiddlewareQueue
 }
 
 func (c *CounterQuery4) Build(rabbitAddr string) {
@@ -211,15 +209,15 @@ func (c *CounterQuery4) Build(rabbitAddr string) {
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactions4", err))
 	}
-	//CountedUsers4
-	colaSalida, err := middleware.CreateQueue("CountedUsers4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+	colaSalida, err := middleware.CreateQueue("PartialCountedUsers4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+
 	if err != nil {
-		panic(fmt.Errorf("CreateQueue(%s): %w", "CountedUsers4", err))
+		panic(fmt.Errorf("CreateQueue(%s): %w", "PartialCountedUsers4", err))
 	}
 
 	c.colaEntradaFilteredTransactions4 = colaEntrada
 
-	c.colaSalidaCountedUsers4 = colaSalida
+	c.colaSalidaPartialCountedUsers4 = colaSalida
 }
 
 func (c *CounterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
@@ -234,8 +232,8 @@ func (c *CounterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	newPayload := packet.ChangePayload(pkt, counted_result)
 	outBoundMessage := []packet.OutBoundMessage{
 		{
-			Packet:     newPayload[0],
-			ColaSalida: c.colaSalidaCountedUsers4,
+			Packet: newPayload[0],
+			ColaSalida: c.colaSalidaPartialCountedUsers4,
 		},
 	}
 

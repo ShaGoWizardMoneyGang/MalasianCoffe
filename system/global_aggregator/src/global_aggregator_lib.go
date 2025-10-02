@@ -2,19 +2,19 @@ package global_aggregator
 
 import (
 	"fmt"
-	"malasian_coffe/packets/packet"
-	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/colas"
 	"sort"
 	"strconv"
 	"strings"
+
+	"malasian_coffe/packets/packet"
+	"malasian_coffe/system/middleware"
+
+	// "malasian_coffe/system/queries/query4"
+	"malasian_coffe/utils/colas"
 )
 
-type GlobalAggregator interface {
-	Build(rabbitAddr string)
-	GetInput() *middleware.MessageMiddlewareQueue
-	Process(pkt packet.Packet) []packet.OutBoundMessage
-}
+// ============================ AggregatorQuery3 ===============================
+// ============================ AggregatorQuery3 ===============================
 
 // AggregatorGLobal de la query2a ES LA SUBTOTAL
 type keyQuery2b struct {
@@ -236,6 +236,7 @@ func (g *aggregator3Global) ingestBatch(input string) {
 
 func (g *aggregator3Global) flushAndBuild() string {
 	if len(g.acc) == 0 {
+		fmt.Println("No recibidi ningun dato. Raro. Ojo")
 		return ""
 	}
 
@@ -250,9 +251,14 @@ func (g *aggregator3Global) flushAndBuild() string {
 		return keys[i].yearHalf < keys[j].yearHalf
 	})
 
+	// // NOTE: Usar despues de la entrega
 	var b strings.Builder
-	for _, k := range keys {
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearHalf, k.storeID, g.acc[k])
+	for k, val := range g.acc {
+		yearHalf := k.yearHalf
+		storeID  := k.storeID
+		value    := val
+
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", yearHalf, storeID, value)
 	}
 
 	g.acc = make(map[keyQuery3]float64)
@@ -262,10 +268,10 @@ func (g *aggregator3Global) flushAndBuild() string {
 func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
-	isEOF := pkt.IsEOF() || strings.EqualFold(input, "EOF")
+	isEOF := pkt.IsEOF()
 
+	g.ingestBatch(input)
 	if !isEOF {
-		g.ingestBatch(input)
 		return nil
 	}
 
@@ -282,16 +288,25 @@ func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage 
 		},
 	}
 }
+// ============================ AggregatorQuery3 ===============================
+
+type GlobalAggregator interface {
+	Build(rabbitAddr string)
+	GetInput() *middleware.MessageMiddlewareQueue
+	Process(pkt packet.Packet) []packet.OutBoundMessage
+}
 
 func GlobalAggregatorBuilder(name, rabbitAddr string) GlobalAggregator {
 	var globalAggregator GlobalAggregator
 	switch strings.ToLower(name) {
-	case "query3global":
-		globalAggregator = &aggregator3Global{}
 	case "query2aglobal":
 		globalAggregator = &aggregator2aGlobal{}
 	case "query2bglobal":
 		globalAggregator = &aggregator2bGlobal{}
+	case "query3global":
+		globalAggregator = &aggregator3Global{}
+	case "query4global":
+		globalAggregator = &aggregator4Global{}
 	default:
 		panic(fmt.Sprintf("Unknown global aggregator '%s'", name))
 	}
