@@ -146,7 +146,7 @@ func (jq2a *joinerQuery2a) Build(rabbitAddr string) {
 
 	colaSalidaQuery2a := colas.InstanceQueue("SalidaQuery2a", rabbitAddr)
 
-	colaMenuItemsInput := colas.InstanceQueue("FilteredMenuItems2", rabbitAddr)
+	colaMenuItemsInput := colas.InstanceQueue("FilteredMenuItems2a", rabbitAddr)
 	colaAggTransItems := colas.InstanceQueue("GlobalAggregation2a", rabbitAddr)
 
 	jq2a.sessions = sessionHandler
