@@ -20,9 +20,9 @@ func main() {
 	// TODO: Esto no esta bueno para el sender porque tiene que escuchar de mas
 	// de una cola a la vez, onda regex.
 	rabbit_addr := os.Args[1]
-
 	// Esto tiene un nombre del Query1
 	numeroQuery := os.Args[2]
+	slog.Info("Iniciando sender para la query " + numeroQuery)
 	if numeroQuery == "" {
 		panic("No se le paso Query al sender, tiene que ser algo del estilo make run-sender RUN_FUNCTION=Query1")
 	}
@@ -32,10 +32,10 @@ func main() {
 	}
 	msgs, err_2 := queue.StartConsuming()
 	if err_2 != 0 {
-		  panic("Couldn't start consuming queue 2")
-	   }
-	   // NOTE: Este sleep lo pongo porque si el dataset es corto, el cliente envia todo y no le da tiempo a crear un socket
-	   time.Sleep(10 * time.Second)
+		panic("Couldn't start consuming queue 2")
+	}
+	// NOTE: Este sleep lo pongo porque si el dataset es corto, el cliente envia todo y no le da tiempo a crear un socket
+	time.Sleep(10 * time.Second)
 	for message := range *msgs {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)

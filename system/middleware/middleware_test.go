@@ -19,7 +19,7 @@ func TestWorkingQueue1To1(t *testing.T) {
 	go func() {
 		msgs, _ := queue.StartConsuming()
 		hasStarted := false
-		for message := range *(*(msgs)) {
+		for message := range *msgs {
 			// Starts reading messages
 			if hasStarted == false {
 				hasStarted = <-started
@@ -133,13 +133,16 @@ func TestWorkingQueue1ToN(t *testing.T) {
 	for i := range N {
 		id := fmt.Sprintf("consumidor%d", i+1)
 		go func(id string) {
-			msgs, _ := queue.StartConsuming()
+			msgs, err := queue.StartConsuming()
+			if err != 0 {
+				fmt.Printf("Error: failed to start consuming, %v\n", err)
+			}
 			// Aviso de consumidor listo
 			ready <- struct{}{}
 			// Sincronizacion de arranque
 			<-start
 			// Se consumen todos los mensajes y se envía cada consumición
-			for range *(*(msgs)) {
+			for range *msgs {
 				consumer <- id
 			}
 		}(id)

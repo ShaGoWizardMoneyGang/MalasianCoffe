@@ -2,6 +2,7 @@ package global_aggregator
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
@@ -320,6 +321,7 @@ func (g *aggregator3Global) flushAndBuild() string {
 }
 
 func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	slog.Info("Processing packet in Global Aggregator 3")
 	input := pkt.GetPayload()
 
 	isEOF := pkt.IsEOF()

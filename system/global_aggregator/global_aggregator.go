@@ -26,10 +26,12 @@ func main() {
 	aggName := os.Args[2]
 
 	worker := aggregator.GlobalAggregatorBuilder(aggName, rabbitAddr)
+	slog.Info("Starting global aggregator", "name", aggName)
 	colaEntrada := worker.GetInput()
 	msgQueue := consumeInput(colaEntrada)
-
+	slog.Info("Queue to consume", "queue", colaEntrada)
 	for message := range *msgQueue {
+		slog.Info("Received message", "queue", msgQueue)
 		reader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(reader)
 
