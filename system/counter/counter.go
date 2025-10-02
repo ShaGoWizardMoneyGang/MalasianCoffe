@@ -30,7 +30,6 @@ make run-filter RUN_FUNCTION=transactions
 		pkt, _ := packet.DeserializePackage(packetReader)
 
 		outboundMessages := worker.Process(pkt)
-
 		for _, outbound := range outboundMessages {
 			cola := outbound.ColaSalida
 			packet := outbound.Packet
