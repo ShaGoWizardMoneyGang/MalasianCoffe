@@ -21,13 +21,11 @@ type joinerQuery4 struct {
 	colaUsersInput   *middleware.MessageMiddlewareQueue
 	colaAggTransInput *middleware.MessageMiddlewareQueue
 
-	// TODO(fabri): puede que no haga falta
-	// canalSalida chan packet.Packet
 	colaSalidaQuery4  *middleware.MessageMiddlewareQueue
 }
 
-// Devuelve true cuando quedan recibio todos los paquetes, sino false
-func addStoreToMap(storePkt packet.Packet, storeMap map[string]string) bool {
+
+func addUserToMap(storePkt packet.Packet, storeMap map[string]string) bool {
 	stores := storePkt.GetPayload()
 	lines := strings.Split(stores, "\n")
 	lines = lines[:len(lines)-1]
@@ -49,10 +47,14 @@ func addStoreToMap(storePkt packet.Packet, storeMap map[string]string) bool {
 	}
 }
 
-func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
+func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
 	// store_id -> store_name
-	stores              := make(map[string]string)
+	storeID2Name        := make(map[string]string)
 	all_stores_received := false
+
+	// store_id -> store_name
+	userID2Birthday     := make(map[string]string)
+	all_users_received  := false
 
 	all_transactions_received := false
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
@@ -77,7 +79,9 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 		}
 
 		if dataset_name == "stores" {
-			all_stores_received =  addStoreToMap(pkt, stores)
+			all_stores_received = addStoreToMap(pkt, storeID2Name)
+		} else if dataset_name == "users" {
+			all_users_received = addUserToMap(pkt, userID2Birthday)
 		} else if dataset_name == "transactions" {
 
 			// Nos guardamos los que llegaron
@@ -87,29 +91,30 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 			}
 
 			// No joineamos hasta tener todos las stores
-			if all_stores_received == true {
+			if all_stores_received == true && all_users_received == true {
 				slog.Info("Joineo")
 				// WARNING: transactions queda vacio despues de esta funcion
-				joinerFunctionQuery3(&transactions, stores, &joinedTransactions)
+				joinerFunctionQuery4(&transactions, storeID2Name, userID2Birthday, &joinedTransactions)
 			}
 
 			all_transactions_received = pkt.IsEOF()
 
 		} else {
-			panic(fmt.Errorf("JoinerQuery3 received packet from dataset that was not expecting: %s", dataset_name))
+			panic(fmt.Errorf("JoinerQuery4 received packet from dataset that was not expecting: %s", dataset_name))
 		}
 
-		if all_stores_received && all_transactions_received {
+		if all_stores_received && all_users_received && all_transactions_received {
 			last_packet = pkt
 			break
 		}
 	}
 
-	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"stores", "transactions"}, []string{joinedTransactions.String()})
+	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"users", "stores", "transactions"}, []string{joinedTransactions.String()})
+
 	// Liberamos
 	joinedTransactions.Reset()
 
-				slog.Info("Envio pkt joineado al sender")
+	slog.Info("Envio pkt joineado al sender")
 	// Deberia ser 1 solo
 	for _, pkt := range pkt_joineado {
 		fmt.Printf("%+v\n", pkt)
@@ -129,7 +134,7 @@ func (jq4 *joinerQuery4) passPacketToJoiner(pkt packet.Packet) {
 		// Joiner
 		slog.Info("Creo un hilo joiner")
 		assigned_channel := make(chan packet.Packet)
-		go joinQuery3(assigned_channel, jq4.colaSalidaQuery4)
+		go joinQuery4(assigned_channel, jq4.colaSalidaQuery4)
 
 		// No hace falta un mutex porque este diccionario se accede de forma
 		// secuencial
@@ -147,7 +152,7 @@ func (jq4 *joinerQuery4) Build(rabbitAddr string) {
 	// SessionID -> channel
 	sessionHandler           := make(map[string](chan packet.Packet))
 
-	colaSalidaQuery4  := colas.InstanceQueue("SalidaQuery3", rabbitAddr)
+	colaSalidaQuery4  := colas.InstanceQueue("SalidaQuery4", rabbitAddr)
 
 	colaStoresInput   := colas.InstanceQueue("FilteredStores4", rabbitAddr)
 	colaUsersInput    := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
@@ -162,13 +167,8 @@ func (jq4 *joinerQuery4) Build(rabbitAddr string) {
 	jq4.colaSalidaQuery4 = colaSalidaQuery4
 }
 
-func (jq4 *joinerQuery4) send(pkt packet.Packet) {
-	// SessionID -> channel
-	jq4.colaSalidaQuery4.Send(pkt.Serialize())
-}
-
 func (jq4 *joinerQuery4) Process() {
-	slog.Info("Arranca procesamiento del joiner 3")
+	slog.Info("Arranca procesamiento del joiner 4")
 	storeListener            := make(chan packet.Packet)
 	userListener             := make(chan packet.Packet)
 	aggregatorGlobalListener := make(chan packet.Packet)
@@ -270,7 +270,7 @@ func (jq4 *joinerQuery4) Process() {
 // // Recibe year_half_created_at, store_id, tpv
 // // joinea con stores.csv cargado en memoria con store_id, store_name
 // // y me devuelve year_half_created_at, store_name, tpv
-func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string]string, joinedResult *strings.Builder) {
+func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string]string, userMap map[string]string, joinedResult *strings.Builder) {
 	input := inputTransaction.String()
 
 	// Liberamos el buffer de input
@@ -283,10 +283,13 @@ func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string
 		if len(cols) < 3 {
 			panic("No hay 3 columnas como se esperaba")
 		}
-		semester, storeID, tpv := cols[0], cols[1], cols[2]
-		storeName := storeMap[storeID]
+		// transactionID, storeID, userID
+		_, storeID, userID := cols[0], cols[1], cols[2]
+		storeName    := storeMap[storeID]
+		userBirthday := userMap[userID]
 
-		fmt.Fprintf(joinedResult, "%s,%s,%s\n", semester, storeName, tpv)
+		// Necesito algo del estilo: storeName, birthday
+		fmt.Fprintf(joinedResult, "%s,%s\n", storeName, userBirthday)
 	}
 }
 
@@ -335,7 +338,7 @@ func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string
 // 	var output string
 // 	switch function_name {
 // 	case "query3":
-// 		output = c.joinerFunctionQuery3(input)
+// 		output = c.joinerFunctionQuery4(input)
 // 	case "query2quantity":
 // 		output = c.joinerFunctionQuery2Quantity(input)
 // 	case "query2subtotal":
@@ -356,7 +359,7 @@ func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string
 // 	rabbitAddr := os.Args[1]
 
 // 	switch joinFunction {
-// 	case "Query3":
+// 	case "Query4":
 // 		colaEntradaStores, err := middleware.CreateQueue("FilteredStores", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 // 		if err != nil {
 // 			panic(fmt.Errorf("CreateQueue(COLA DE ENTRADA): %w", err))
@@ -406,9 +409,9 @@ func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string
 // 			fmt.Printf("PAQUETES SALIDA %v\n", paquetesSalida)
 // 			for _, pkt := range paquetesSalida {
 // 				slog.Info("[Joiner Q3] Mando packet joineado a siguiente cola")
-// 				colaSalida, err := middleware.CreateQueue("SalidaQuery3", middleware.ChannelOptionsDefault())
+// 				colaSalida, err := middleware.CreateQueue("SalidaQuery4", middleware.ChannelOptionsDefault())
 // 				if err != nil {
-// 					panic(fmt.Errorf("CreateQueue(SalidaQuery3): %w", err))
+// 					panic(fmt.Errorf("CreateQueue(SalidaQuery4): %w", err))
 // 				}
 // 				_ = colaSalida.Send(pkt.Serialize())
 // 			}

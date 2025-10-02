@@ -138,11 +138,6 @@ func (jq3 *joinerQuery3) Build(rabbitAddr string) {
 	jq3.colaSalidaQuery3 = colaSalidaQuery3
 }
 
-func (jq3 *joinerQuery3) send(pkt packet.Packet) {
-	// SessionID -> channel
-	jq3.colaSalidaQuery3.Send(pkt.Serialize())
-}
-
 func (jq3 *joinerQuery3) Process() {
 	slog.Info("Arranca procesamiento del joiner 3")
 	storeListener            := make(chan packet.Packet)
