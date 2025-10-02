@@ -10,6 +10,7 @@ import (
 	"os"
 )
 
+// TODO: MATCHEAR CON "counterN"
 func main() {
 	counterFunction := os.Args[2]
 	if len(counterFunction) == 0 {
