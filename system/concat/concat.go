@@ -6,8 +6,7 @@ import (
 	"log/slog"
 	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
-	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/network"
+	"malasian_coffe/utils/colas"
 	"os"
 )
 
@@ -17,19 +16,17 @@ import (
 func main() {
 	rabbit_addr := os.Args[1]
 	print("Rabbit address: ", rabbit_addr, "\n")
-	colaEntrada, err := middleware.CreateQueue("FilteredTransactions1", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilteredTransactions1): %w", err))
-	}
+	colaEntrada := colas.InstanceQueue("FilteredTransactions1", rabbit_addr)
+	// colaEntrada, err := middleware.CreateQueue("FilteredTransactions1", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
+	// if err != nil {
+	// 	panic(fmt.Errorf("CreateQueue(FilteredTransactions1): %w", err))
+	// }
 	msgQueue, consumeError := colaEntrada.StartConsuming()
 	if consumeError != 0 {
 		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
 	}
 
-	colaSalida, err := middleware.CreateQueue("SalidaQuery1", middleware.ChannelOptionsDefault())
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(FilterMapper1YearAndAmount): %w", err))
-	}
+	colaSalida := colas.InstanceQueue("SalidaQuery1", rabbit_addr)
 
 	worker := concat.Concat{}
 	var result []packet.Packet
