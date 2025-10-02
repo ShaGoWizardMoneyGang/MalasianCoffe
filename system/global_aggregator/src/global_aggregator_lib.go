@@ -68,10 +68,37 @@ func (g *aggregator2bGlobal) flushAndBuild() string {
 		return ""
 	}
 
-	var b strings.Builder
+	monthlyMax := make(map[string]struct {
+		itemID   string
+		subtotal float64
+	})
+
 	for k, value := range g.acc {
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearMonth, k.itemID, value)
+		yearMonth := k.yearMonth
+
+		if current, exists := monthlyMax[yearMonth]; !exists || value > current.subtotal {
+			monthlyMax[yearMonth] = struct {
+				itemID   string
+				subtotal float64
+			}{
+				itemID:   k.itemID,
+				subtotal: value,
+			}
+		}
 	}
+
+	var b strings.Builder
+	months := make([]string, 0, len(monthlyMax))
+	for month := range monthlyMax {
+		months = append(months, month)
+	}
+	sort.Strings(months)
+
+	for _, month := range months {
+		maxItem := monthlyMax[month]
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", month, maxItem.itemID, maxItem.subtotal)
+	}
+
 	g.acc = make(map[keyQuery2b]float64)
 	return b.String()
 }
@@ -139,13 +166,13 @@ func (g *aggregator2aGlobal) ingestBatch(input string) {
 		itemID := cols[1]
 		quantityStr := cols[2]
 
-		amount, err := strconv.ParseFloat(quantityStr, 64)
+		quantity, err := strconv.ParseFloat(quantityStr, 64)
 		if err != nil {
 			panic("quantity con formato inválido")
 		}
 
 		k := keyQuery2a{yearMonth: yearMonth, itemID: itemID}
-		g.acc[k] += amount
+		g.acc[k] += quantity
 	}
 }
 
@@ -153,13 +180,40 @@ func (g *aggregator2aGlobal) flushAndBuild() string {
 	if len(g.acc) == 0 {
 		return ""
 	}
+	monthlyMax := make(map[string]struct {
+		itemID   string
+		quantity float64
+	})
 
-	var b strings.Builder
 	for k, value := range g.acc {
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearMonth, k.itemID, value)
+		yearMonth := k.yearMonth
+		if current, exists := monthlyMax[yearMonth]; !exists || value > current.quantity {
+			monthlyMax[yearMonth] = struct {
+				itemID   string
+				quantity float64
+			}{
+				itemID:   k.itemID,
+				quantity: value,
+			}
+		}
 	}
+	var b strings.Builder
+
+	months := make([]string, 0, len(monthlyMax))
+	for month := range monthlyMax {
+		months = append(months, month)
+	}
+	sort.Strings(months)
+
+	for _, month := range months {
+		maxItem := monthlyMax[month]
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", month, maxItem.itemID, maxItem.quantity)
+	}
+
 	g.acc = make(map[keyQuery2a]float64)
-	return b.String()
+
+	result := b.String()
+	return result
 }
 
 func (g *aggregator2aGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage {
@@ -255,8 +309,8 @@ func (g *aggregator3Global) flushAndBuild() string {
 	var b strings.Builder
 	for k, val := range g.acc {
 		yearHalf := k.yearHalf
-		storeID  := k.storeID
-		value    := val
+		storeID := k.storeID
+		value := val
 
 		fmt.Fprintf(&b, "%s,%s,%.2f\n", yearHalf, storeID, value)
 	}
@@ -288,6 +342,7 @@ func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage 
 		},
 	}
 }
+
 // ============================ AggregatorQuery3 ===============================
 
 type GlobalAggregator interface {
