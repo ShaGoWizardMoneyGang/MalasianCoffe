@@ -1,9 +1,9 @@
 services:
-  sender3: #no escala
-    container_name: sender3
+  sender2a: #no escala
+    container_name: sender2a
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/sender rabbitmq:5672 Query3
+    entrypoint: ./bin/sender rabbitmq:5672 Query2a
     volumes:
       - ../../bin/sender:/app/bin/sender
     networks:

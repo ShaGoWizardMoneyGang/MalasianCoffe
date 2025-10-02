@@ -1,9 +1,9 @@
 services:
-  global_aggregator3: #no escala
-    container_name: global_aggregator3
+  global_aggregator2a: #no escala
+    container_name: global_aggregator2a
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/global_aggregator rabbitmq:5672 query3Global
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 query2aGlobal
     volumes:
       - ../../bin/global_aggregator:/app/bin/global_aggregator
     networks:
