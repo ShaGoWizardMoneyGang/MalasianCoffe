@@ -25,40 +25,17 @@ type joinerQuery3 struct {
 	colaSalidaQuery3  *middleware.MessageMiddlewareQueue
 }
 
-// Devuelve true cuando quedan recibio todos los paquetes, sino false
-func addStoreToMap(storePkt packet.Packet, storeMap map[string]string) bool {
-	stores := storePkt.GetPayload()
-	lines := strings.Split(stores, "\n")
-	lines = lines[:len(lines)-1]
-	for _, line := range lines {
-		// store_id , store_name
-		cols := strings.Split(line, ",")
-		store_id, store_name := cols[0], cols[1]
-		storeMap[store_id] = store_name
-	}
 
-	// TODO: verificar paquetes fuera de orden. En teoria se deberia poder
-	// aislar en esta funcion o packet receiver en el directorio de packets
-	// Ver: https://github.com/ShaGoWizardMoneyGang/MalasianCoffe/issues/46
-	if storePkt.IsEOF() {
-		// Me llegaron todos
-		return true
-	} else {
-		return false
-	}
-}
-
-func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
+func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
 	// store_id -> store_name
-	stores              := make(map[string]string)
+	storeID2Name        := make(map[string]string)
 	all_stores_received := false
 
-	all_transactions_received := false
+
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
 	// stores. Deberian ser pocos (si es que existen)
 	var transactions strings.Builder
-
-	// Resultado final
+	all_transactions_received := false
 	var joinedTransactions strings.Builder
 
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
@@ -76,7 +53,7 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 		}
 
 		if dataset_name == "stores" {
-			all_stores_received =  addStoreToMap(pkt, stores)
+			all_stores_received =  addStoreToMap(pkt, storeID2Name)
 		} else if dataset_name == "transactions" {
 
 			// Nos guardamos los que llegaron
@@ -89,7 +66,7 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 			if all_stores_received == true {
 				slog.Info("Joineo")
 				// WARNING: transactions queda vacio despues de esta funcion
-				joinerFunctionQuery3(&transactions, stores, &joinedTransactions)
+				joinerFunctionQuery3(&transactions, storeID2Name, &joinedTransactions)
 			}
 
 			all_transactions_received = pkt.IsEOF()
