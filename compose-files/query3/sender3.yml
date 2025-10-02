@@ -1,5 +1,5 @@
 services:
-  sender1: #no escala
+  sender3: #no escala
     container_name: sender3
     image: ubuntu:24.04
     working_dir: /app
@@ -10,4 +10,3 @@ services:
       - testing_net
     depends_on:
       - server
-      - concat

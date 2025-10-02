@@ -1,0 +1,14 @@
+name: query2b
+include:
+  - ../common/commons.yml
+  - ../common/filter-transaction-items.yml
+  - ../common/filter-menu-items.yml
+  - ./counter2b.yml
+  - ./global-aggregator2b.yml
+  - ./joiner2b.yml
+  - ./sender2b.yml
+  - ../common/client.yml
+
+networks:
+  testing_net:
+    driver: bridge
