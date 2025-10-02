@@ -62,22 +62,21 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 				panic("Joiner failed to add payload to transaction buffer")
 			}
 
-			// No joineamos hasta tener todos las stores
-			if all_stores_received == true {
-				slog.Info("Joineo")
-				// WARNING: transactions queda vacio despues de esta funcion
-				joinerFunctionQuery3(&transactions, storeID2Name, &joinedTransactions)
-			}
-
 			all_transactions_received = pkt.IsEOF()
 
 		} else {
 			panic(fmt.Errorf("JoinerQuery3 received packet from dataset that was not expecting: %s", dataset_name))
 		}
 
-		if all_stores_received && all_transactions_received {
-			last_packet = pkt
-			break
+		if all_stores_received {
+			slog.Info("Joineo")
+			// WARNING: transactions queda vacio despues de esta funcion
+			joinerFunctionQuery3(&transactions, storeID2Name, &joinedTransactions)
+
+			if all_transactions_received {
+				last_packet = pkt
+				break
+			}
 		}
 	}
 
