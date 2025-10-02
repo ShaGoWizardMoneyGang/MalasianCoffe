@@ -2,17 +2,191 @@ package global_aggregator
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+
 	// "malasian_coffe/system/queries/query4"
 	"malasian_coffe/utils/colas"
 )
 
 // ============================ AggregatorQuery3 ===============================
 // ============================ AggregatorQuery3 ===============================
+
+// AggregatorGLobal de la query2a ES LA SUBTOTAL
+type keyQuery2b struct {
+	yearMonth string
+	itemID    string
+}
+
+type aggregator2bGlobal struct {
+	colaEntrada *middleware.MessageMiddlewareQueue
+	colaSalida  *middleware.MessageMiddlewareQueue
+	acc         map[keyQuery2b]float64
+}
+
+func (g *aggregator2bGlobal) Build(rabbitAddr string) {
+	g.colaEntrada = colas.InstanceQueue("CountedItems2b", rabbitAddr)
+	// aca va GlobalAggregation2b
+	g.colaSalida = colas.InstanceQueue("GlobalAggregation2b", rabbitAddr)
+	g.acc = make(map[keyQuery2b]float64)
+}
+
+func (g *aggregator2bGlobal) GetInput() *middleware.MessageMiddlewareQueue {
+	return g.colaEntrada
+}
+
+func (g *aggregator2bGlobal) ingestBatch(input string) {
+	lines := strings.SplitSeq(input, "\n")
+	for line := range lines {
+		if line == "" {
+			continue
+		}
+		cols := strings.Split(line, ",")
+		if len(cols) != 3 {
+			panic("Se esperaban 3 columnas")
+		}
+		yearMonth := cols[0]
+		itemID := cols[1]
+		subtotalStr := cols[2]
+
+		subtotal, err := strconv.ParseFloat(subtotalStr, 64)
+		if err != nil {
+			panic("subtotal con formato inválido")
+		}
+
+		k := keyQuery2b{yearMonth: yearMonth, itemID: itemID}
+		g.acc[k] += subtotal
+	}
+}
+
+func (g *aggregator2bGlobal) flushAndBuild() string {
+	if len(g.acc) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	for k, value := range g.acc {
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearMonth, k.itemID, value)
+	}
+	g.acc = make(map[keyQuery2b]float64)
+	return b.String()
+}
+
+func (g *aggregator2bGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	input := pkt.GetPayload()
+
+	isEOF := pkt.IsEOF()
+
+	if !isEOF {
+		g.ingestBatch(input)
+		return nil
+	}
+
+	final := g.flushAndBuild()
+	if final == "" {
+		return nil
+	}
+
+	newPkts := packet.ChangePayload(pkt, []string{final})
+	return []packet.OutBoundMessage{
+		{
+			Packet:     newPkts[0],
+			ColaSalida: g.colaSalida,
+		},
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// AggregatorGLobal de la query2a ES LA QUANTITY
+type keyQuery2a struct {
+	yearMonth string
+	itemID    string
+}
+
+type aggregator2aGlobal struct {
+	colaEntrada *middleware.MessageMiddlewareQueue
+	colaSalida  *middleware.MessageMiddlewareQueue
+	acc         map[keyQuery2a]float64
+}
+
+func (g *aggregator2aGlobal) Build(rabbitAddr string) {
+	g.colaEntrada = colas.InstanceQueue("CountedItems2a", rabbitAddr)
+	// aca va GlobalAggregation2a
+	g.colaSalida = colas.InstanceQueue("GlobalAggregation2a", rabbitAddr)
+	g.acc = make(map[keyQuery2a]float64)
+}
+
+func (g *aggregator2aGlobal) GetInput() *middleware.MessageMiddlewareQueue {
+	return g.colaEntrada
+}
+
+func (g *aggregator2aGlobal) ingestBatch(input string) {
+	lines := strings.SplitSeq(input, "\n")
+	for line := range lines {
+		if line == "" {
+			continue
+		}
+		cols := strings.Split(line, ",")
+		if len(cols) != 3 {
+			panic("Se esperaban 3 columnas")
+		}
+		yearMonth := cols[0]
+		itemID := cols[1]
+		quantityStr := cols[2]
+
+		amount, err := strconv.ParseFloat(quantityStr, 64)
+		if err != nil {
+			panic("quantity con formato inválido")
+		}
+
+		k := keyQuery2a{yearMonth: yearMonth, itemID: itemID}
+		g.acc[k] += amount
+	}
+}
+
+func (g *aggregator2aGlobal) flushAndBuild() string {
+	if len(g.acc) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	for k, value := range g.acc {
+		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearMonth, k.itemID, value)
+	}
+	g.acc = make(map[keyQuery2a]float64)
+	return b.String()
+}
+
+func (g *aggregator2aGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	input := pkt.GetPayload()
+
+	isEOF := pkt.IsEOF()
+
+	if !isEOF {
+		g.ingestBatch(input)
+		return nil
+	}
+
+	final := g.flushAndBuild()
+	if final == "" {
+		return nil
+	}
+
+	newPkts := packet.ChangePayload(pkt, []string{final})
+	return []packet.OutBoundMessage{
+		{
+			Packet:     newPkts[0],
+			ColaSalida: g.colaSalida,
+		},
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type keyQuery3 struct {
 	yearHalf string // "YYYY-H1" o "YYYY-H2"
@@ -66,7 +240,18 @@ func (g *aggregator3Global) flushAndBuild() string {
 		return ""
 	}
 
+	keys := make([]keyQuery3, 0, len(g.acc))
+	for k := range g.acc {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].yearHalf == keys[j].yearHalf {
+			return keys[i].storeID < keys[j].storeID
+		}
+		return keys[i].yearHalf < keys[j].yearHalf
+	})
 
+	// // NOTE: Usar despues de la entrega
 	var b strings.Builder
 	for k, val := range g.acc {
 		yearHalf := k.yearHalf
@@ -76,19 +261,6 @@ func (g *aggregator3Global) flushAndBuild() string {
 		fmt.Fprintf(&b, "%s,%s,%.2f\n", yearHalf, storeID, value)
 	}
 
-	// keys := make([]keyQuery3, 0, len(g.acc))
-	// for k := range g.acc {
-	// 	keys = append(keys, k)
-	// }
-	// QUESTION(fabri): Por que sorteamos?
-	// sort.Slice(keys, func(i, j int) bool {
-	// 	if keys[i].yearHalf == keys[j].yearHalf {
-	// 		return keys[i].storeID < keys[j].storeID
-	// 	}
-	// 	return keys[i].yearHalf < keys[j].yearHalf
-	// })
-
-	// Resetear
 	g.acc = make(map[keyQuery3]float64)
 	return b.String()
 }
@@ -125,15 +297,19 @@ type GlobalAggregator interface {
 }
 
 func GlobalAggregatorBuilder(name, rabbitAddr string) GlobalAggregator {
-	var worker GlobalAggregator
+	var globalAggregator GlobalAggregator
 	switch strings.ToLower(name) {
+	case "query2aglobal":
+		globalAggregator = &aggregator2aGlobal{}
+	case "query2bglobal":
+		globalAggregator = &aggregator2bGlobal{}
 	case "query3global":
-		worker = &aggregator3Global{}
+		globalAggregator = &aggregator3Global{}
 	case "query4global":
-		worker = &aggregator4Global{}
+		globalAggregator = &aggregator4Global{}
 	default:
 		panic(fmt.Sprintf("Unknown global aggregator '%s'", name))
 	}
-	worker.Build(rabbitAddr)
-	return worker
+	globalAggregator.Build(rabbitAddr)
+	return globalAggregator
 }

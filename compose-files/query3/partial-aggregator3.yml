@@ -1,0 +1,13 @@
+services:
+  partial_aggregator3:
+    container_name: partial_aggregator3
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/partial_aggregator rabbitmq:5672 query3
+    volumes:
+      - ../../bin/partial_aggregator:/app/bin/partial_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - filter_transactions

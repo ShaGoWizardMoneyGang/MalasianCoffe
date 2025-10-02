@@ -60,12 +60,20 @@ func filterFunctionQuery2a(input string) string {
 	lines := strings.Split(input, "\n")
 	final := ""
 	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
 		data := strings.Split(line, ",")
 		if len(data) < 6 {
-			panic("Invalid data format")
+			slog.Debug("Registro con menos de 6 columnas, dropeado", "line", line, "columns", len(data))
+			continue
 		}
 		layout := "2006-01-02 15:04:05" // Go's reference layout
-		t, _ := time.Parse(layout, data[5])
+		t, err := time.Parse(layout, data[5])
+		if err != nil {
+			slog.Debug("Error parsing timestamp, dropeado", "timestamp", data[5], "error", err)
+			continue
+		}
 		if t.Year() >= 2024 && t.Year() <= 2025 {
 			final += data[1] + "," + data[2] + "," + data[5] + "\n"
 		}
@@ -77,19 +85,26 @@ func filterFunctionQuery2b(input string) string {
 	lines := strings.Split(input, "\n")
 	final := ""
 	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
 		data := strings.Split(line, ",")
 		if len(data) < 6 {
-			panic("Invalid data format")
+			slog.Debug("Registro con menos de 6 columnas, dropeado", "line", line, "columns", len(data))
+			continue
 		}
 		layout := "2006-01-02 15:04:05" // Go's reference layout
-		t, _ := time.Parse(layout, data[5])
+		t, err := time.Parse(layout, data[5])
+		if err != nil {
+			slog.Debug("Error parsing timestamp, dropeado", "timestamp", data[5], "error", err)
+			continue
+		}
 		if t.Year() >= 2024 && t.Year() <= 2025 {
 			final += data[1] + "," + data[4] + "," + data[5] + "\n"
 		}
 	}
 	return final
 }
-
 func mapStoreIdAndName(input string) []string {
 	print("[FILTER STORES]:", input)
 	lines := strings.Split(input, "\n")
@@ -100,6 +115,29 @@ func mapStoreIdAndName(input string) []string {
 		}
 		data := strings.Split(line, ",")
 		if len(data) < 8 {
+			panic("Invalid data format")
+		}
+
+		if data[0] == "" ||
+			data[1] == "" {
+			slog.Debug("Registro con campos de interes vacios, dropeado")
+			continue
+		}
+		final += data[0] + "," + data[1] + "\n"
+	}
+	return []string{final, final}
+}
+
+func mapItemIdAndName(input string) []string {
+	print("[FILTER MENU ITEMS]:", input)
+	lines := strings.Split(input, "\n")
+	final := ""
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		data := strings.Split(line, ",")
+		if len(data) < 6 {
 			panic("Invalid data format")
 		}
 
@@ -355,6 +393,105 @@ func (ufm *userFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage
 }
 
 // =============================== UserFilter ==================================
+
+// =========================== MenuItemFilter ==============================
+
+type menuItemFilterMapper struct {
+	colaEntradaStore *middleware.MessageMiddlewareQueue
+
+	colaSalida2a *middleware.MessageMiddlewareQueue
+	colaSalida2b *middleware.MessageMiddlewareQueue
+}
+
+func (mifm *menuItemFilterMapper) Build(rabbitAddr string) {
+	colaEntradaStore := colas.InstanceQueue("DataMenuItems", rabbitAddr)
+
+	colaSalida2a := colas.InstanceQueue("FilteredMenuItems2a", rabbitAddr)
+	colaSalida2b := colas.InstanceQueue("FilteredMenuItems2b", rabbitAddr)
+
+	mifm.colaEntradaStore = colaEntradaStore
+
+	mifm.colaSalida2a = colaSalida2a
+	mifm.colaSalida2b = colaSalida2b
+
+}
+
+func (mifm *menuItemFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+	return mifm.colaEntradaStore
+}
+
+func (mifm *menuItemFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	input := pkt.GetPayload()
+
+	// Ambas payloads iguales
+	mapped_stores := mapItemIdAndName(input)
+	newPayload := packet.ChangePayload(pkt, mapped_stores)
+	outBoundMessage := []packet.OutBoundMessage{
+		{
+			Packet:     newPayload[0],
+			ColaSalida: mifm.colaSalida2a,
+		},
+		{
+			Packet:     newPayload[0],
+			ColaSalida: mifm.colaSalida2b,
+		},
+	}
+
+	return outBoundMessage
+}
+
+// =========================== MenuItemFilter ==============================
+
+// =========================== TransactionItemsFilter ==============================
+
+type transactionItemFilterMapper struct {
+	colaEntradaTransaction *middleware.MessageMiddlewareQueue
+
+	colaSalida2a *middleware.MessageMiddlewareQueue
+	colaSalida2b *middleware.MessageMiddlewareQueue
+}
+
+func (tifm *transactionItemFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
+	return tifm.colaEntradaTransaction
+
+}
+
+func (tifm *transactionItemFilterMapper) Build(rabbitAddr string) {
+	colaEntradaTransaction := colas.InstanceQueue("DataTransactionItems", rabbitAddr)
+
+	colaSalida2a := colas.InstanceQueue("FilteredTransactionItems2a", rabbitAddr)
+	colaSalida2b := colas.InstanceQueue("FilteredTransactionItems2b", rabbitAddr)
+
+	tifm.colaEntradaTransaction = colaEntradaTransaction
+
+	tifm.colaSalida2a = colaSalida2a
+	tifm.colaSalida2b = colaSalida2b
+}
+func (tifm *transactionItemFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	input := pkt.GetPayload()
+
+	payloadResults2a := filterFunctionQuery2a(input)
+	payloadResults2b := filterFunctionQuery2b(input)
+
+	newPayload2a := packet.ChangePayload(pkt, []string{payloadResults2a})
+	newPayload2b := packet.ChangePayload(pkt, []string{payloadResults2b})
+
+	outBoundMessage := []packet.OutBoundMessage{
+		{
+			Packet:     newPayload2a[0],
+			ColaSalida: tifm.colaSalida2a,
+		},
+		{
+			Packet:     newPayload2b[0],
+			ColaSalida: tifm.colaSalida2b,
+		},
+	}
+
+	return outBoundMessage
+}
+
+// =========================== TransactionItemsFilter ==============================
+
 type FilterMapper interface {
 	// Funcion que inicializa las cosas que el filter necesita
 	Build(rabbitAddr string)
@@ -375,6 +512,10 @@ func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {
 		filterMapper = &storeFilterMapper{}
 	case "users":
 		filterMapper = &userFilterMapper{}
+	case "menu_items":
+		filterMapper = &menuItemFilterMapper{}
+	case "transaction_items":
+		filterMapper = &transactionItemFilterMapper{}
 	default:
 		panic(fmt.Sprintf("Unknown 'dataset' %s", datasetName))
 	}

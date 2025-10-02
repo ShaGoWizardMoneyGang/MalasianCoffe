@@ -1,0 +1,12 @@
+services:
+  counter2a: #no escala
+    container_name: counter2a
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/counter rabbitmq:5672 counter2a
+    volumes:
+      - ../../bin/counter:/app/bin/counter
+    networks:
+      - testing_net
+    depends_on:
+      - server
