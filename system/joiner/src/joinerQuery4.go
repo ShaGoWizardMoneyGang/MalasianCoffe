@@ -286,6 +286,7 @@ func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string
 			panic("No hay 3 columnas como se esperaba")
 		}
 		// transactionID, storeID, userID
+		// TODO: EN ESTA PORONGA EL USER ID ES UN FLOAT
 		storeID, userID := cols[0], cols[1]
 		storeName    := storeMap[storeID]
 		userBirthday := userMap[userID]
