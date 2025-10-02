@@ -48,7 +48,7 @@ func addStoreToMap(storePkt packet.Packet, storeMap map[string]string) bool {
 	}
 }
 
-func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
+func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
 	// store_id -> store_name
 	stores              := make(map[string]string)
 	all_stores_received := false
@@ -128,7 +128,7 @@ func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 		// Joiner
 		slog.Info("Creo un hilo joiner")
 		assigned_channel := make(chan packet.Packet)
-		go joinQuery3(assigned_channel, jq3.colaSalidaQuery3)
+		go joinQuery4(assigned_channel, jq3.colaSalidaQuery3)
 
 		// No hace falta un mutex porque este diccionario se accede de forma
 		// secuencial
