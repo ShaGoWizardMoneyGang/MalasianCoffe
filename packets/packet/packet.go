@@ -1,8 +1,12 @@
 package packet
 
 import (
-	"malasian_coffe/system/middleware"
+	"fmt"
 	"strconv"
+	"strings"
+
+	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/dataset"
 )
 
 // Struct que asocia un paquete a enviar con la cola a la cual lo tiene que enviar
@@ -86,6 +90,47 @@ func ChangePayload(packet Packet, newpayload []string) []Packet {
 
 	return packets
 }
+
+// Devuelve packets que fueron el resultado de hacer un join
+// pkt es un paquete usado solo para extraer la metadata
+// datasets es el *NOMBRE* de los datasets joineados
+// newPayload es el contenido
+func ChangePayloadJoin(pkt Packet, datasets []string, newPayload []string) []Packet {
+	datasetsIDs := make([]string, len(datasets));
+	for i, dataset_name := range datasets {
+		datasetID, err := dataset.DatasetToID(dataset_name)
+		if err != nil {
+			panic(fmt.Errorf("%s unknown dataset", dataset_name))
+		}
+		datasetsIDs[i] = string(datasetID)
+	}
+
+	uuid := strings.Join(datasetsIDs, "-")
+	eof  := pkt.IsEOF()
+	packet_uuid := PacketUuid {
+		uuid: uuid,
+		eof: eof,
+	};
+
+	session_id := pkt.GetSessionID()
+	clientAddr := pkt.GetClientAddr()
+
+	header     := newHeader(session_id, packet_uuid, clientAddr)
+	packets := make([]Packet, len(newPayload))
+
+	for i, payload := range newPayload {
+		newheader := header
+		if len(packets) > 1 {
+			newheader = header.split(i)
+		}
+		packets[i] = Packet{
+			header:  newheader,
+			payload: payload,
+		}
+	}
+	return packets
+}
+
 
 func (p *Packet) GetPayload() string {
 	return p.payload
