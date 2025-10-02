@@ -17,31 +17,28 @@ DATADIR                ?=    ${current_dir}/dataset/
 OUTDIR                 ?=    ${current_dir}/out/
 GATEWAY_ADDR           ?=    "localhost:9090"
 CLIENT_LISTEN_ADDR     ?=    "localhost:9093"
-run-client:
-	cd client; go run client.go ${DATADIR} ${OUTDIR} ${GATEWAY_ADDR} ${CLIENT_LISTEN_ADDR}
-
-RABBIT_ADDR           ?=    "localhost:5672"
-SERVER_ADDR           ?=    "localhost:9092"
+RABBIT_ADDR            ?=    "localhost:5672"
+SERVER_ADDR            ?=    "localhost:9092"
 
 # El nombre de la funcion a ejecutar
 RUN_FUNCTION          ?=    ""
-run-gateway:
-	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${SERVER_ADDR} ${RUN_FUNCTION}
-
 run-server:
 	cd system; go run system.go ${SERVER_ADDR} ${RABBIT_ADDR}
+
+run-client:
+	cd client; go run client.go ${DATADIR} ${OUTDIR} ${GATEWAY_ADDR} ${CLIENT_LISTEN_ADDR}
+
+run-gateway:
+	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${SERVER_ADDR} ${RUN_FUNCTION}
 
 run-filter:
 	cd system/filter_mapper; go run filter_mapper.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
-run-partial-aggregator:
-	cd system/partial_aggregator; go run partial_aggregator.go ${RABBIT_ADDR} ${RUN_FUNCTION}
-
-run-global-aggregator:
-	cd system/global_aggregator; go run global_aggregator.go ${RABBIT_ADDR} ${RUN_FUNCTION}
-
 run-concat:
 	cd system/concat; go run concat.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
+run-sender:
+	cd system/sender; go run sender.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
 run-counter:
 	cd system/counter; go run counter.go ${RABBIT_ADDR} ${RUN_FUNCTION}
@@ -49,8 +46,12 @@ run-counter:
 run-joiner:
 	cd system/joiner; go run joiner.go ${RABBIT_ADDR} ${RUN_FUNCTION}
 
-run-sender:
-	cd system/sender; go run sender.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+run-partial-aggregator:
+	cd system/partial_aggregator; go run partial_aggregator.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
+run-global-aggregator:
+	cd system/global_aggregator; go run global_aggregator.go ${RABBIT_ADDR} ${RUN_FUNCTION}
+
 #============================== Build directives ===============================
 # Poner en order
 build: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator
