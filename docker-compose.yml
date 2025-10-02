@@ -1,19 +1,12 @@
 name: tp1
+include:
+  - docker-compose-rabbit.yml
+  - docker-compose-client.yml
+  - docker-compose-filter-transactions.yml
+  - docker-compose-partial-aggregator3.yml
+  
 services:
-  rabbitmq:
-    container_name: rabbitmq_test
-    image: rabbitmq:4.1.4-management
-    ports:
-      - "5673:5672"
-      - "15673:15672"
-    networks:
-      - testing_net
-    healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
-      interval: 5s
-      retries: 5
-
-  server:
+  server: #no escala
     container_name: server
     image: ubuntu:24.04
     working_dir: /app
@@ -26,7 +19,7 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  gateway:
+  gateway: #no escala
     container_name: gateway
     image: ubuntu:24.04
     working_dir: /app
@@ -38,25 +31,11 @@ services:
     depends_on:
       - server
 
-  client1:
-    container_name: client1
+  filter_stores: #no escala
+    container_name: filter_stores
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/client ../dataset/ ../out/ gateway:9090 client1:9093
-    volumes:
-      - ./bin/client:/app/bin/client
-      - ./dataset:/dataset
-    depends_on:
-      - gateway
-    networks:
-      - testing_net
-
-
-  filter_transactions:
-    container_name: filter_transactions
-    image: ubuntu:24.04
-    working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 transactions
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 stores
     volumes:
       - ./bin/filter_mapper:/app/bin/filter_mapper
     networks:
@@ -64,23 +43,11 @@ services:
     depends_on:
       - server
 
-  # filter_stores:
-  #   container_name: filter_stores
-  #   image: ubuntu:24.04
-  #   working_dir: /app
-  #   entrypoint: ./bin/filter_mapper rabbitmq:5672 stores
-  #   volumes:
-  #     - ./bin/filter_mapper:/app/bin/filter_mapper
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-
-  concat:
+  concat: #no escala
     container_name: concat
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/concat rabbitmq:5672 biribiri
+    entrypoint: ./bin/concat rabbitmq:5672
     volumes:
       - ./bin/concat:/app/bin/concat
     networks:
@@ -90,48 +57,21 @@ services:
       - rabbitmq
       - filter_transactions
 
-  # partial_aggregator3:
-  #   container_name: partial_aggregator3
-  #   image: ubuntu:24.04
-  #   working_dir: /app
-  #   entrypoint: ./bin/partial_aggregator rabbitmq:5672 query3
-  #   volumes:
-  #     - ./bin/partial_aggregator:/app/bin/partial_aggregator
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-  #     - filter_transactions
-
-  # global_aggregator3:
-  #   container_name: global_aggregator3
-  #   image: ubuntu:24.04
-  #   working_dir: /app
-  #   entrypoint: ./bin/global_aggregator rabbitmq:5672 query3Global
-  #   volumes:
-  #     - ./bin/global_aggregator:/app/bin/global_aggregator
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-  #     - concat
-  #     - partial_aggregator3
+  global_aggregator3: #no escala
+    container_name: global_aggregator3
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 query3Global
+    volumes:
+      - ./bin/global_aggregator:/app/bin/global_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - concat
+      - partial_aggregator3
   
-  # sender3:
-  #   container_name: sender3
-  #   image: ubuntu:24.04
-  #   working_dir: /app
-  #   entrypoint: ./bin/sender rabbitmq:5672 Query3
-  #   volumes:
-  #     - ./bin/sender:/app/bin/sender
-  #   networks:
-  #     - testing_net
-  #   depends_on:
-  #     - server
-  #     - global_aggregator3
-  #     - filter_stores
-
-  sender1:
+  sender1: #no escala
     container_name: sender1
     image: ubuntu:24.04
     working_dir: /app
@@ -144,7 +84,20 @@ services:
       - server
       - concat
 
-  
+  sender3: #no escala
+    container_name: sender3
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/sender rabbitmq:5672 Query3
+    volumes:
+      - ./bin/sender:/app/bin/sender
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - global_aggregator3
+      - filter_stores
+
 networks:
   testing_net:
     driver: bridge
