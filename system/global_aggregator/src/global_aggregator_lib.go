@@ -112,7 +112,7 @@ func (g *aggregator4Global) flushAndBuild() string {
 		}
 
 		for i := 0; i < size; i++ {
-			fmt.Fprintf(&b, "%s,%d\n", store, sortedSlice[i].user)
+			fmt.Fprintf(&b, "%s,%s\n", store, sortedSlice[i].user)
 		}
 	}
 	// QUESTION(fabri): Por que sorteamos?
@@ -141,14 +141,14 @@ type keyQuery3 struct {
 type aggregator3Global struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
-	acc         map[keyQuery3]float64
+	acc         map[keyQuery3]uint64
 }
 
 func (g *aggregator3Global) Build(rabbitAddr string) {
 	g.colaEntrada = colas.InstanceQueue("PartialAggregations3", rabbitAddr)
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 	//g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
-	g.acc = make(map[keyQuery3]float64)
+	g.acc = make(map[keyQuery3]uint64)
 }
 
 func (g *aggregator3Global) GetInput() *middleware.MessageMiddlewareQueue {
@@ -169,7 +169,7 @@ func (g *aggregator3Global) ingestBatch(input string) {
 		storeID := cols[1]
 		amountStr := cols[2]
 
-		amount, err := strconv.ParseFloat(amountStr, 64)
+		amount, err := strconv.ParseUint(amountStr, 10, 64)
 		if err != nil {
 			panic("tpv con formato inválido")
 		}
@@ -192,7 +192,9 @@ func (g *aggregator3Global) flushAndBuild() string {
 		storeID  := k.storeID
 		value    := val
 
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", yearHalf, storeID, value)
+		value_s := strconv.FormatUint(value, 10)
+
+		fmt.Fprintf(&b, "%s,%s,%s\n", yearHalf, storeID, value_s)
 	}
 
 	// keys := make([]keyQuery3, 0, len(g.acc))
@@ -208,7 +210,7 @@ func (g *aggregator3Global) flushAndBuild() string {
 	// })
 
 	// Resetear
-	g.acc = make(map[keyQuery3]float64)
+	g.acc = make(map[keyQuery3]uint64)
 	return b.String()
 }
 
