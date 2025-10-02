@@ -1,7 +1,7 @@
 name: tp1
 include:
   - docker-compose-rabbit.yml
-  - docker-compose-client.yml
+  - ./compose-files/docker-compose-client.yml
   - docker-compose-filter-transactions.yml
   - docker-compose-partial-aggregator3.yml
   
@@ -55,7 +55,7 @@ services:
     depends_on:
       - server
       - rabbitmq
-      - filter_transactions
+      # - filter_transactions
 
   global_aggregator3: #no escala
     container_name: global_aggregator3
@@ -69,7 +69,7 @@ services:
     depends_on:
       - server
       - concat
-      - partial_aggregator3
+      # - partial_aggregator3
   
   sender1: #no escala
     container_name: sender1

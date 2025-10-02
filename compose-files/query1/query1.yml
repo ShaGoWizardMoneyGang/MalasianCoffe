@@ -1,0 +1,11 @@
+name: query1
+include:
+  - ../common/commons.yml
+  - ../common/filter-transactions.yml 
+  - ./concat.yml
+  - ./sender1.yml
+  - ../common/client.yml
+
+networks:
+  testing_net:
+    driver: bridge
