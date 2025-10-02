@@ -21,7 +21,7 @@ func aggregator3BySemesterTPV(input string) string {
 		yearHalf string
 		storeID  string
 	}
-	acc := make(map[key]uint64)
+	acc := make(map[key]float64)
 
 	lines := strings.SplitSeq(input, "\n")
 	for line := range lines {
@@ -35,7 +35,7 @@ func aggregator3BySemesterTPV(input string) string {
 
 		storeID := cols[0]
 
-		amount, err := strconv.ParseUint(cols[1], 10, 64)
+		amount, err := strconv.ParseFloat(cols[1], 10)
 		if err != nil {
 			panic("final_amount con formato inválido")
 		}
@@ -69,7 +69,7 @@ func aggregator3BySemesterTPV(input string) string {
 
 	var b strings.Builder
 	for _, k := range keys {
-		value := strconv.FormatUint(acc[k], 10)
+		value := strconv.FormatFloat(acc[k], 'f', 0, 64)
 		fmt.Fprintf(&b, "%s,%s,%s\n", k.yearHalf, k.storeID, value)
 	}
 	return b.String()
