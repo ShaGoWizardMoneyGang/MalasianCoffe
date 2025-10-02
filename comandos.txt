@@ -38,7 +38,20 @@ make run-gateway
 make run-filter RUN_FUNCTION=transactions
 make run-filter RUN_FUNCTION=stores
 make run-partial-aggregator RUN_FUNCTION=query3
-make run-global-aggregator RUN_FUNCTION=query3Global
+make run-global-aggregator RUN_FUNCTION=query3global
 make run-joiner RUN_FUNCTION=Query3
 make run-sender RUN_FUNCTION=Query3
+make run-client
+
+QUERY 4
+
+make run-server
+make run-gateway
+make run-filter RUN_FUNCTION=transactions
+make run-filter RUN_FUNCTION=stores
+make run-filter RUN_FUNCTION=users
+make run-counter RUN_FUNCTION=counter4
+make run-global-aggregator RUN_FUNCTION=query4global
+make run-joiner RUN_FUNCTION=Query4
+make run-sender RUN_FUNCTION=Query4
 make run-client
