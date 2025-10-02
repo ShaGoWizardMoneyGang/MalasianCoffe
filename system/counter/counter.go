@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 
 	"malasian_coffe/packets/packet"
 	counter "malasian_coffe/system/counter/src"
@@ -21,11 +22,12 @@ make run-filter RUN_FUNCTION=transactions
 	rabbitAddr := os.Args[1]
 
 	worker := counter.CounterBuilder(counterFunction, rabbitAddr)
+	slog.Info("Counter builded")
 
 	colaEntrada := worker.GetInput()
 
 	msgQueue := colas.ConsumeInput(colaEntrada)
-
+	slog.Info("Leo de cola entrada", "queue", colaEntrada)
 	for message := range *msgQueue { //while true hasta que terminen los mensajes
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)

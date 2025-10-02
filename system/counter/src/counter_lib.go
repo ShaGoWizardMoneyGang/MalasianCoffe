@@ -2,11 +2,51 @@ package counter
 
 import (
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/network"
 	"strings"
 )
+
+// ============================= Counter2a init ================================
+type counterQuery2a struct {
+	colaEntradaFilteredTransactions2a *middleware.MessageMiddlewareQueue
+
+	colaSalidaCountedTransactionItems2a *middleware.MessageMiddlewareQueue
+}
+
+func (c *counterQuery2a) countFunctionCounter2a(input string) string {
+	panic("JAJA LLEGUÉ Y VOLAMOS EN PEDAZOS")
+}
+
+func (c *counterQuery2a) Build(rabbitAddr string) {
+	c.colaEntradaFilteredTransactions2a = colas.InstanceQueue("FilteredTransactionItems2a", rabbitAddr)
+	c.colaSalidaCountedTransactionItems2a = colas.InstanceQueue("CountedTransactionItems2a", rabbitAddr)
+}
+
+func (c *counterQuery2a) GetInput() *middleware.MessageMiddlewareQueue {
+	return c.colaEntradaFilteredTransactions2a
+}
+func (c *counterQuery2a) Process(pkt packet.Packet) []packet.OutBoundMessage {
+	input := pkt.GetPayload()
+
+	counted_result := []string{c.countFunctionCounter2a(input)}
+
+	newPayload := packet.ChangePayload(pkt, counted_result)
+
+	outBoundMessage := []packet.OutBoundMessage{
+		{
+			Packet:     newPayload[0],
+			ColaSalida: c.colaSalidaCountedTransactionItems2a,
+		},
+	}
+
+	return outBoundMessage
+}
+
+// ============================= Counter2a fin ================================
 
 // ============================= CounterQuery4 ================================
 
@@ -93,7 +133,7 @@ func (c *counterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
 
 	outBoundMessage := []packet.OutBoundMessage{
 		{
-			Packet: newPayload[0],
+			Packet:     newPayload[0],
 			ColaSalida: c.colaSalidaCountedUsers4,
 		},
 	}
@@ -115,10 +155,13 @@ type Counter interface {
 }
 
 func CounterBuilder(counterName string, rabbitAddr string) Counter {
-	var counter Counter;
+	var counter Counter
 	switch counterName {
 	case "counter4":
 		counter = &counterQuery4{}
+	case "counter2a":
+		slog.Info("Building counter 2a")
+		counter = &counterQuery2a{}
 	default:
 		panic(fmt.Sprintf("Unknown counter %s", counterName))
 	}
