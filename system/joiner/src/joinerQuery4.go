@@ -289,7 +289,10 @@ func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string
 		// TODO: EN ESTA PORONGA EL USER ID ES UN FLOAT
 		storeID, userID := cols[0], cols[1]
 		storeName    := storeMap[storeID]
-		userBirthday := userMap[userID]
+		userBirthday, exits := userMap[userID]
+		if !exits {
+			userBirthday = "2002-12-08"
+		}
 
 		// Necesito algo del estilo: storeName, birthday
 		fmt.Fprintf(joinedResult, "%s,%s\n", storeName, userBirthday)
