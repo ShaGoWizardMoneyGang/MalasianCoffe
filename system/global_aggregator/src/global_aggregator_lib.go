@@ -29,7 +29,7 @@ type aggregator3Global struct {
 
 func (g *aggregator3Global) Build(rabbitAddr string) {
 	g.colaEntrada = colas.InstanceQueue("PartialAggregations3", rabbitAddr)
-	g.colaSalida = colas.InstanceQueue("SalidaQuery3", rabbitAddr) //IMPORTANTE ACA CAMBIAR POR DE LA QUE LEE EL JOIN
+	g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 	//g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 	g.acc = make(map[key]float64)
 }

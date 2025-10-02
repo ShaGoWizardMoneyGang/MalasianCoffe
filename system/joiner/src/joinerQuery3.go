@@ -89,7 +89,7 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 			if all_stores_received == true {
 				slog.Info("Joineo")
 				// WARNING: transactions queda vacio despues de esta funcion
-				joinerFunctionQuery3(transactions, stores, joinedTransactions)
+				joinerFunctionQuery3(&transactions, stores, &joinedTransactions)
 			}
 
 			all_transactions_received = pkt.IsEOF()
@@ -249,7 +249,7 @@ func (jq3 *joinerQuery3) Process() {
 // // Recibe year_half_created_at, store_id, tpv
 // // joinea con stores.csv cargado en memoria con store_id, store_name
 // // y me devuelve year_half_created_at, store_name, tpv
-func joinerFunctionQuery3(inputTransaction strings.Builder, storeMap map[string]string, joinedResult strings.Builder) {
+func joinerFunctionQuery3(inputTransaction *strings.Builder, storeMap map[string]string, joinedResult *strings.Builder) {
 	input := inputTransaction.String()
 
 	// Liberamos el buffer de input
@@ -265,7 +265,7 @@ func joinerFunctionQuery3(inputTransaction strings.Builder, storeMap map[string]
 		semester, storeID, tpv := cols[0], cols[1], cols[2]
 		storeName := storeMap[storeID]
 
-		fmt.Fprintf(&joinedResult, "%s,%s,%s\n", semester, storeName, tpv)
+		fmt.Fprintf(joinedResult, "%s,%s,%s\n", semester, storeName, tpv)
 	}
 }
 
