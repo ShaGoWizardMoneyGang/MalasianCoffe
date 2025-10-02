@@ -5,7 +5,7 @@ services:
     working_dir: /app
     entrypoint: ./bin/filter_mapper rabbitmq:5672 transactions
     volumes:
-      - ./bin/filter_mapper:/app/bin/filter_mapper
+      - ../../bin/filter_mapper:/app/bin/filter_mapper
     networks:
       - testing_net
     depends_on:

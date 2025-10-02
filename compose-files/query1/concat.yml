@@ -1,0 +1,13 @@
+services:
+  concat: #no escala
+    container_name: concat
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/concat rabbitmq:5672
+    volumes:
+      - ../../bin/concat:/app/bin/concat
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - rabbitmq
