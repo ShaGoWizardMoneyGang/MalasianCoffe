@@ -1,0 +1,12 @@
+services:
+  filter_stores: #no escala
+    container_name: filter_stores
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 stores
+    volumes:
+      - ../../bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+      - testing_net
+    depends_on:
+      - server
