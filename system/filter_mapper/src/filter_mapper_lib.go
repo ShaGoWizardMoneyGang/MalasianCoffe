@@ -216,9 +216,9 @@ func filterFunctionQuery4UsersBirthdates(input string) string {
 }
 
 func filterTransactions(input string) []string {
-	final_query1 := filterFunctionQuery1(input)
 
 	lines := strings.Split(input, "\n")
+	final_query1 := ""
 	final_query3 := ""
 	final_query4 := ""
 	for _, line := range lines {
@@ -245,10 +245,14 @@ func filterTransactions(input string) []string {
 		amount = math.Round(amount*10) / 10
 		layout := "2006-01-02 15:04:05" // Go's reference layout
 		t, _ := time.Parse(layout, data[8])
+
 		if yearCondition(data) {
 			final_query4 += data[0] + "," + data[1] + "," + data[4] + "\n" //mapeo query 4
 			if t.Hour() >= 6 && t.Hour() <= 23 {
 				final_query3 += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n" //mapeo query 3
+				if amount >= 75.0 {
+					final_query1 += data[0] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "\n"
+				}
 			}
 		}
 	}
