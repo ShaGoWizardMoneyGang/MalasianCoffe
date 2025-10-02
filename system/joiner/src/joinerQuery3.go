@@ -25,12 +25,10 @@ type joinerQuery3 struct {
 	colaSalidaQuery3 *middleware.MessageMiddlewareQueue
 }
 
-
 func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
 	// store_id -> store_name
-	storeID2Name        := make(map[string]string)
+	storeID2Name := make(map[string]string)
 	all_stores_received := false
-
 
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
 	// stores. Deberian ser pocos (si es que existen)
@@ -53,7 +51,7 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 		}
 
 		if dataset_name == "stores" {
-			all_stores_received =  addStoreToMap(pkt, storeID2Name)
+			all_stores_received = addStoreToMap(pkt, storeID2Name)
 		} else if dataset_name == "transactions" {
 
 			// Nos guardamos los que llegaron
@@ -103,7 +101,7 @@ func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
 		// Joiner
 		slog.Info("Creo un hilo joiner")
 		assigned_channel := make(chan packet.Packet)
-		go joinQuery4(assigned_channel, jq3.colaSalidaQuery3)
+		go joinQuery3(assigned_channel, jq3.colaSalidaQuery3)
 
 		// No hace falta un mutex porque este diccionario se accede de forma
 		// secuencial
