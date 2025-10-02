@@ -67,6 +67,7 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 
 	for {
 		pkt :=  <- inputChannel
+		fmt.Printf("Recibi %v\n")
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -116,6 +117,7 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 }
 
 func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
+	slog.Info("Envio packete a la session")
 	sessionID := pkt.GetSessionID()
 	channel, exists := jq3.sessions[sessionID]
 
