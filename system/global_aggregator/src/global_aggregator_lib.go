@@ -8,7 +8,7 @@ import (
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
-	"malasian_coffe/system/queries/query4"
+	// "malasian_coffe/system/queries/query4"
 	"malasian_coffe/utils/colas"
 )
 
@@ -35,8 +35,8 @@ func (g *aggregator4Global) Process(pkt packet.Packet) []packet.OutBoundMessage 
 
 	isEOF := pkt.IsEOF()
 
+	g.ingestBatch(input)
 	if !isEOF {
-		g.ingestBatch(input)
 		return nil
 	}
 
@@ -72,9 +72,12 @@ func (g *aggregator4Global) ingestBatch(input string) {
 			panic("tpv con formato inválido")
 		}
 
-		// k := query4.Key{Store: store_id, User: user_id}
+		_, exists := g.acc[store_id]
+		if !exists {
+			g.acc[store_id] = make(map[string]uint64)
+		}
+		// user[user_id] += amount
 		g.acc[store_id][user_id] += amount
-		// g.acc[k] += amount
 	}
 }
 

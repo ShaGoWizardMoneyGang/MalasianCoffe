@@ -282,11 +282,11 @@ func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string
 	lines = lines[:len(lines)-1]
 	for _, r := range lines {
 		cols := strings.Split(r, ",")
-		if len(cols) < 3 {
+		if len(cols) < 2 {
 			panic("No hay 3 columnas como se esperaba")
 		}
 		// transactionID, storeID, userID
-		_, storeID, userID := cols[0], cols[1], cols[2]
+		storeID, userID := cols[0], cols[1]
 		storeName    := storeMap[storeID]
 		userBirthday := userMap[userID]
 
