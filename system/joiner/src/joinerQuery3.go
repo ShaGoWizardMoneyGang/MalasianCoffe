@@ -77,7 +77,6 @@ func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 
 func (jq3 *joinerQuery3) Build(rabbitAddr string) {
 	jq3.inputChannel      = make(chan packet.Packet)
-
 	jq3.outputChannel     = make(chan packet.Packet)
 
 	jq3.colaStoresInput   = colas.InstanceQueue("FilteredStores3", rabbitAddr)
@@ -87,6 +86,7 @@ func (jq3 *joinerQuery3) Build(rabbitAddr string) {
 
 	jq3.sessionHandler    = sessionhandler.NewSessionHandler(joinQuery3, jq3.outputChannel)
 }
+
 
 func (jq3 *joinerQuery3) Process() {
 	slog.Info("Arranca procesamiento del joiner 3")
