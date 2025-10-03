@@ -1,7 +1,7 @@
 name: query4
 include:
   - ../common/commons.yml
-  - ../common/filter-transaction-items.yml
+  - ../common/filter-transactions.yml
   - ../common/filter-stores.yml
   - ./filter-users.yml
   - ./counter4.yml
