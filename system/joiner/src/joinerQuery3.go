@@ -41,7 +41,6 @@ func joinQuery3(inputChannel chan packet.Packet, outputChannel chan<- packet.Pac
 
 	for {
 		pkt := <-inputChannel
-		fmt.Printf("Recibi %v\n", pkt)
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -49,10 +48,10 @@ func joinQuery3(inputChannel chan packet.Packet, outputChannel chan<- packet.Pac
 			panic(err)
 		}
 
-		if dataset_name == "stores" {
+		switch dataset_name {
+		case "stores":
 			all_stores_received = addStoreToMap(pkt, storeID2Name)
-		} else if dataset_name == "transactions" {
-
+		case "transactions":
 			// Nos guardamos los que llegaron
 			_, err := transactions.WriteString(pkt.GetPayload())
 			if err != nil {
@@ -60,8 +59,7 @@ func joinQuery3(inputChannel chan packet.Packet, outputChannel chan<- packet.Pac
 			}
 
 			all_transactions_received = pkt.IsEOF()
-
-		} else {
+		default:
 			panic(fmt.Errorf("JoinerQuery3 received packet from dataset that was not expecting: %s", dataset_name))
 		}
 
