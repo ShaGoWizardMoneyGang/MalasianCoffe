@@ -90,22 +90,33 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 				panic("Joiner failed to add payload to transaction buffer")
 			}
 
-			// No joineamos hasta tener todos las stores
-			if all_stores_received == true && all_users_received == true {
-				slog.Info("Joineo")
-				// WARNING: transactions queda vacio despues de esta funcion
-				joinerFunctionQuery4(&transactions, storeID2Name, userID2Birthday, &joinedTransactions)
-			}
-
 			all_transactions_received = pkt.IsEOF()
 
 		} else {
 			panic(fmt.Errorf("JoinerQuery4 received packet from dataset that was not expecting: %s", dataset_name))
 		}
 
-		if all_stores_received && all_users_received && all_transactions_received {
-			last_packet = pkt
-			break
+		// Casos posibles:
+		// 1:
+		//   Recibi todos los transactions antes que stores y users.
+		//   Apenas reciba los stores y users que me faltan, hago el join y
+		//   termina el loop al toque.
+		// 2:
+		//   Recibi todas las stores y users antes que transactions.
+		//   Voy a ir recibiendo transacciones de a poquito y las voy a ir
+		//   anadiendo en el join.  Cuando llegue la ultima, esto va a cortar,
+		//   y el join va a tener el resultado final en joined transactions.
+
+		// No joineamos hasta tener todos las stores
+		if all_stores_received == true && all_users_received == true {
+			slog.Info("Comienza proceso de join")
+			// WARNING: transactions queda vacio despues de esta funcion
+			joinerFunctionQuery4(&transactions, storeID2Name, userID2Birthday, &joinedTransactions)
+
+			if all_transactions_received {
+				last_packet = pkt
+				break
+			}
 		}
 	}
 

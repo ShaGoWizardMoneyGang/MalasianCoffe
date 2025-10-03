@@ -61,21 +61,20 @@ func joinQuery2b(inputChannel chan packet.Packet, outputQueue *middleware.Messag
 			}
 
 			// No joineamos hasta tener todos las stores
-			if all_items_received == true {
-				slog.Info("Joineo")
-				// WARNING: transactions queda vacio despues de esta funcion
-				joinerFunctionQuery2b(&transaction_items, items, &joinedTransactionItems)
-			}
-
 			all_transaction_items_received = pkt.IsEOF()
 
 		} else {
 			panic(fmt.Errorf("JoinerQuery2a received packet from dataset that was not expecting: %s", dataset_name))
 		}
 
-		if all_items_received && all_transaction_items_received {
-			last_packet = pkt
-			break
+		if all_items_received {
+			// WARNING: transactions queda vacio despues de esta funcion
+			joinerFunctionQuery2b(&transaction_items, items, &joinedTransactionItems)
+
+			if all_transaction_items_received {
+				last_packet = pkt
+				break
+			}
 		}
 	}
 

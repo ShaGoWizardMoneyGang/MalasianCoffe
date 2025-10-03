@@ -69,7 +69,10 @@ func aggregator3BySemesterTPV(input string) string {
 
 	var b strings.Builder
 	for _, k := range keys {
+		// NOTA FABRI: Esto me tiraba conflicto, dejo ambos.
+		// value := strconv.FormatFloat(acc[k], 'f', 0, 64)
 		value := strconv.FormatFloat(acc[k], 'f', 1, 64)
+
 		fmt.Fprintf(&b, "%s,%s,%s\n", k.yearHalf, k.storeID, value)
 	}
 	return b.String()

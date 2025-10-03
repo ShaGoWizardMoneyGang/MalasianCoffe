@@ -1,0 +1,57 @@
+QUERY 1
+
+make run-server
+make run-gateway
+make run-filter RUN_FUNCTION=transactions
+make run-concat
+make run-sender RUN_FUNCTION=Query1
+make run-client
+
+QUERY 2a
+
+make run-server
+make run-gateway
+make run-filter RUN_FUNCTION=transaction_items
+make run-filter RUN_FUNCTION=menu_items
+make run-counter RUN_FUNCTION=counter2a
+make run-global-aggregator RUN_FUNCTION=query2aglobal
+make run-joiner RUN_FUNCTION=Query2a
+make run-sender RUN_FUNCTION=Query2a
+make run-client
+
+QUERY 2b
+
+make run-server
+make run-gateway
+make run-filter RUN_FUNCTION=transaction_items
+make run-filter RUN_FUNCTION=menu_items
+make run-counter RUN_FUNCTION=counter2b
+make run-global-aggregator RUN_FUNCTION=query2bglobal
+make run-joiner RUN_FUNCTION=Query2b
+make run-sender RUN_FUNCTION=Query2b
+make run-client
+
+QUERY 3
+
+make run-server
+make run-gateway
+make run-filter RUN_FUNCTION=transactions
+make run-filter RUN_FUNCTION=stores
+make run-partial-aggregator RUN_FUNCTION=query3
+make run-global-aggregator RUN_FUNCTION=query3global
+make run-joiner RUN_FUNCTION=Query3
+make run-sender RUN_FUNCTION=Query3
+make run-client
+
+QUERY 4
+
+make run-server
+make run-gateway
+make run-filter RUN_FUNCTION=transactions
+make run-filter RUN_FUNCTION=stores
+make run-filter RUN_FUNCTION=users
+make run-counter RUN_FUNCTION=counter4
+make run-global-aggregator RUN_FUNCTION=query4global
+make run-joiner RUN_FUNCTION=Query4
+make run-sender RUN_FUNCTION=Query4
+make run-client
