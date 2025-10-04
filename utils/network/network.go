@@ -93,7 +93,7 @@ func read(conn net.Conn, size int) ([]byte, error) {
 	var received = 0
 	var err error
 	for offset := 0; offset < size; offset += received {
-		received, err = conn.Read(buffer[received:])
+		received, err = conn.Read(buffer[offset:])
 		if err != nil {
 			break
 		}
