@@ -6,7 +6,6 @@ import (
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -105,31 +104,6 @@ func transactionFilterQuery1(year_condition bool, hour_condition bool, amount_co
 }
 
 
-func filterFunctionQuery1(input string) string {
-	lines := strings.Split(input, "\n")
-
-	final := ""
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		data := strings.Split(line, ",")
-		if len(data) < 9 {
-			panic("Invalid data format")
-		}
-		amount, _ := strconv.ParseFloat(data[7], 64)
-		amount = math.Round(amount*10) / 10
-
-		layout := "2006-01-02 15:04:05" // Go's reference layout
-		t, _ := time.Parse(layout, data[8])
-
-		if yearCondition(data) && amount >= 75.0 && t.Hour() >= 6 && t.Hour() <= 23 {
-			final += data[0] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "\n"
-		}
-	}
-	return final
-}
-
 func filterFunctionQuery2a(input string) string {
 	lines := strings.Split(input, "\n")
 	final := ""
@@ -223,28 +197,6 @@ func mapItemIdAndName(input string) []string {
 		final += data[0] + "," + data[1] + "\n"
 	}
 	return []string{final, final}
-}
-
-func filterFunctionQuery3Transactions(input string) string {
-	lines := strings.Split(input, "\n")
-	final := ""
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		data := strings.Split(line, ",")
-		if len(data) < 9 {
-			panic("Invalid data format")
-		}
-		layout := "2006-01-02 15:04:05" // Go's reference layout
-		t, _ := time.Parse(layout, data[8])
-		amount, _ := strconv.ParseFloat(data[7], 64)
-		amount = math.Round(amount*10) / 10
-		if yearCondition(data) && t.Hour() >= 6 && t.Hour() <= 23 {
-			final += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n"
-		}
-	}
-	return final
 }
 
 func filterFunctionQuery4Transactions(input string) string {
