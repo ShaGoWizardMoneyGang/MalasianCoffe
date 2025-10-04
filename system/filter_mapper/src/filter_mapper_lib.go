@@ -11,14 +11,7 @@ import (
 	"time"
 )
 
-// TODO: Delete
-func yearCondition(data []string) bool {
-	layout := "2006-01-02 15:04:05" // Go's reference layout
-	t, _ := time.Parse(layout, data[8])
-	return t.Year() >= 2024 && t.Year() <= 2025
-}
-
-func yearConditionNew(time_s string) (bool, error) {
+func yearCondition(time_s string) (bool, error) {
 	if time_s == "" {
 		return false, nil
 	}
@@ -199,24 +192,6 @@ func mapItemIdAndName(input string) []string {
 	return []string{final, final}
 }
 
-func filterFunctionQuery4Transactions(input string) string {
-	lines := strings.Split(input, "\n")
-	final := ""
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		data := strings.Split(line, ",")
-		if len(data) < 9 {
-			panic("Invalid data format")
-		}
-		if yearCondition(data) {
-			final += data[0] + "," + data[1] + "," + data[4] + "\n"
-		}
-	}
-	return final
-}
-
 func filterFunctionQuery4UsersBirthdates(input string) string {
 	lines := strings.Split(input, "\n")
 	final := ""
@@ -261,7 +236,7 @@ func filterTransactions(input string) []string {
 		amount_s := data[7]
 		time_s := data[8]
 
-		year_condition, err := yearConditionNew(time_s)
+		year_condition, err := yearCondition(time_s)
 		if err != nil {
 			panic(fmt.Errorf("Failed to parse year %w", err))
 		}
