@@ -23,7 +23,7 @@ func yearConditionNew(time_s string) (bool, error) {
 		return false, nil
 	}
 
-	layout    := "2006-01-02 15:04:05" // Go's reference layout
+	layout := "2006-01-02 15:04:05" // Go's reference layout
 	time_t, err := time.Parse(layout, time_s)
 	if err != nil {
 		return false, nil
@@ -36,7 +36,7 @@ func hourCondition(time_s string) (bool, error) {
 		return false, nil
 	}
 
-	layout       := "2006-01-02 15:04:05" // Go's reference layout
+	layout := "2006-01-02 15:04:05" // Go's reference layout
 	time_t, err := time.Parse(layout, time_s)
 	if err != nil {
 		return false, nil
@@ -46,17 +46,17 @@ func hourCondition(time_s string) (bool, error) {
 }
 
 func amountCondition(amount_s string) (bool, error) {
-	amount_f, err  := strconv.ParseFloat(amount_s, 64)
+	amount_f, err := strconv.ParseFloat(amount_s, 64)
 	if err != nil {
 		return false, nil
 	}
-	return  amount_f >= 75.0, nil
+	return amount_f >= 75.0, nil
 }
 
 func transactionFilterQuery4(year_condition bool, transaction_id string, store_id string, user_id string, buffer *strings.Builder) {
 	if transaction_id == "" ||
-		store_id     == "" ||
-		user_id      == ""  {
+		store_id == "" ||
+		user_id == "" {
 		return
 	}
 
@@ -65,17 +65,18 @@ func transactionFilterQuery4(year_condition bool, transaction_id string, store_i
 	}
 
 	// NOTE: Descartamos el .0 anadido que tienen por algun motivo
-	store_id_int   := store_id[:len(store_id)-2]
+	fmt.Println(user_id)
+	user_id_int := user_id[:len(user_id)-2]
 
-	new_line := transaction_id + "," + store_id + "," + store_id_int + "\n"
+	new_line := transaction_id + "," + store_id + "," + user_id_int + "\n"
 
 	buffer.WriteString(new_line)
 }
 
 func transactionFilterQuery3(year_condition bool, hour_condition bool, store_id string, amount_s string, time_s string, buffer *strings.Builder) {
-	if store_id       == "" ||
-		amount_s     == "" ||
-		time_s       == ""  {
+	if store_id == "" ||
+		amount_s == "" ||
+		time_s == "" {
 		return
 	}
 
@@ -90,7 +91,7 @@ func transactionFilterQuery3(year_condition bool, hour_condition bool, store_id 
 
 func transactionFilterQuery1(year_condition bool, hour_condition bool, amount_condition bool, transaction_id string, amount_s string, buffer *strings.Builder) {
 	if transaction_id == "" ||
-		amount_s     == "" {
+		amount_s == "" {
 		return
 	}
 
@@ -102,7 +103,6 @@ func transactionFilterQuery1(year_condition bool, hour_condition bool, amount_co
 
 	buffer.WriteString(new_line)
 }
-
 
 func filterFunctionQuery2a(input string) string {
 	lines := strings.Split(input, "\n")
@@ -256,16 +256,16 @@ func filterTransactions(input string) []string {
 		}
 
 		transaction_id := data[0]
-		store_id       := data[1]
-		user_id        := data[4]
-		amount_s       := data[7]
-		time_s         := data[8]
+		store_id := data[1]
+		user_id := data[4]
+		amount_s := data[7]
+		time_s := data[8]
 
-		year_condition, err   := yearConditionNew(time_s)
+		year_condition, err := yearConditionNew(time_s)
 		if err != nil {
 			panic(fmt.Errorf("Failed to parse year %w", err))
 		}
-		hour_condition, err   := hourCondition(time_s)
+		hour_condition, err := hourCondition(time_s)
 		if err != nil {
 			panic(fmt.Errorf("Failed to parse hour %w", err))
 		}
