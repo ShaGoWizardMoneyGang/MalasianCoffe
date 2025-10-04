@@ -12,28 +12,98 @@ import (
 	"time"
 )
 
-type filterMapperOptions func(string) string
-
-func filterByYearCommon(input string) string {
-	input_lines := strings.Split(input, "\n")
-	final := ""
-	for _, line := range input_lines {
-		data := strings.Split(line, ",")
-		if len(data) < 9 {
-			panic("Invalid data format")
-		}
-		if yearCondition(data) {
-			final += line + "\n"
-		}
-	}
-	return final
-}
-
+// TODO: Delete
 func yearCondition(data []string) bool {
 	layout := "2006-01-02 15:04:05" // Go's reference layout
 	t, _ := time.Parse(layout, data[8])
 	return t.Year() >= 2024 && t.Year() <= 2025
 }
+
+func yearConditionNew(time_s string) (bool, error) {
+	if time_s == "" {
+		return false, nil
+	}
+
+	layout    := "2006-01-02 15:04:05" // Go's reference layout
+	time_t, err := time.Parse(layout, time_s)
+	if err != nil {
+		return false, nil
+	}
+	return time_t.Year() >= 2024 && time_t.Year() <= 2025, nil
+}
+
+func hourCondition(time_s string) (bool, error) {
+	if time_s == "" {
+		return false, nil
+	}
+
+	layout       := "2006-01-02 15:04:05" // Go's reference layout
+	time_t, err := time.Parse(layout, time_s)
+	if err != nil {
+		return false, nil
+	}
+
+	return time_t.Hour() >= 6 && time_t.Hour() <= 23, nil
+}
+
+func amountCondition(amount_s string) (bool, error) {
+	amount_f, err  := strconv.ParseFloat(amount_s, 64)
+	if err != nil {
+		return false, nil
+	}
+	return  amount_f >= 75.0, nil
+}
+
+func transactionFilterQuery4(year_condition bool, transaction_id string, store_id string, user_id string, buffer *strings.Builder) {
+	if transaction_id == "" ||
+		store_id     == "" ||
+		user_id      == ""  {
+		return
+	}
+
+	if !year_condition {
+		return
+	}
+
+	// NOTE: Descartamos el .0 anadido que tienen por algun motivo
+	store_id_int   := store_id[:len(store_id)-2]
+
+	new_line := transaction_id + "," + store_id + "," + store_id_int + "\n"
+
+	buffer.WriteString(new_line)
+}
+
+func transactionFilterQuery3(year_condition bool, hour_condition bool, store_id string, amount_s string, time_s string, buffer *strings.Builder) {
+	if store_id       == "" ||
+		amount_s     == "" ||
+		time_s       == ""  {
+		return
+	}
+
+	if !year_condition || !hour_condition {
+		return
+	}
+
+	new_line := store_id + "," + amount_s + "," + time_s + "\n"
+
+	buffer.WriteString(new_line)
+}
+
+func transactionFilterQuery1(year_condition bool, hour_condition bool, amount_condition bool, transaction_id string, amount_s string, buffer *strings.Builder) {
+	if transaction_id == "" ||
+		amount_s     == "" {
+		return
+	}
+
+	if !year_condition || !hour_condition || !amount_condition {
+		return
+	}
+
+	new_line := transaction_id + "," + amount_s + "\n"
+
+	buffer.WriteString(new_line)
+}
+
 
 func filterFunctionQuery1(input string) string {
 	lines := strings.Split(input, "\n")
@@ -218,47 +288,49 @@ func filterFunctionQuery4UsersBirthdates(input string) string {
 func filterTransactions(input string) []string {
 
 	lines := strings.Split(input, "\n")
-	final_query1 := ""
-	final_query3 := ""
-	final_query4 := ""
+
+	var final_query1 strings.Builder
+	var final_query3 strings.Builder
+	var final_query4 strings.Builder
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
+
 		data := strings.Split(line, ",")
 		if len(data) < 9 {
 			slog.Debug("Registro con menos de 9 columnas, dropeado")
 			continue
 		}
 
-		// TODO(fabri): Revisar como handlear el dropeo, tal vez tiene que ser mas quirurquico.
-		if data[0] == "" ||
-			data[1] == "" ||
-			data[4] == "" ||
-			data[7] == "" ||
-			data[8] == "" {
-			slog.Debug("Registro con campos de interes vacios, dropeado")
-			continue
-		}
+		transaction_id := data[0]
+		store_id       := data[1]
+		user_id        := data[4]
+		amount_s       := data[7]
+		time_s         := data[8]
 
-		amount, _ := strconv.ParseFloat(data[7], 64)
-		amount = math.Round(amount*10) / 10
-		layout := "2006-01-02 15:04:05" // Go's reference layout
-		t, _ := time.Parse(layout, data[8])
-
-		if yearCondition(data) {
-			id_float := data[4]
-			id_int   := id_float[:len(id_float)-2]
-			final_query4 += data[0] + "," + data[1] + "," + id_int + "\n" //mapeo query 4
-			if t.Hour() >= 6 && t.Hour() <= 23 {
-				final_query3 += data[1] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "," + data[8] + "\n" //mapeo query 3
-				if amount >= 75.0 {
-					final_query1 += data[0] + "," + strconv.FormatFloat(amount, 'f', 1, 64) + "\n"
-				}
-			}
+		year_condition, err   := yearConditionNew(time_s)
+		if err != nil {
+			panic(fmt.Errorf("Failed to parse year %w", err))
 		}
+		hour_condition, err   := hourCondition(time_s)
+		if err != nil {
+			panic(fmt.Errorf("Failed to parse hour %w", err))
+		}
+		amount_condition, err := amountCondition(amount_s)
+		if err != nil {
+			panic(fmt.Errorf("Failed to parse hour %w", err))
+		}
+		// Saco el punto de punto flotante del user id
+
+		transactionFilterQuery4(year_condition, transaction_id, store_id, user_id, &final_query4)
+
+		transactionFilterQuery3(year_condition, hour_condition, store_id, amount_s, time_s, &final_query3)
+
+		transactionFilterQuery1(year_condition, hour_condition, amount_condition, transaction_id, amount_s, &final_query1)
+
 	}
-	return []string{final_query1, final_query3, final_query4}
+	return []string{final_query1.String(), final_query3.String(), final_query4.String()}
 }
 
 // =========================== TransactionFilter ==============================
