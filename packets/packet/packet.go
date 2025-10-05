@@ -136,6 +136,10 @@ func (p *Packet) GetPayload() string {
 	return p.payload
 }
 
+func (p *Packet) GetUUID() string {
+	return p.header.packet_uuid.uuid
+}
+
 func (p *Packet) IsEOF() bool {
 	return p.header.packet_uuid.eof
 }
