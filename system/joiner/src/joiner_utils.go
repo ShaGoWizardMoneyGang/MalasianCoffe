@@ -27,3 +27,21 @@ func addStoreToMap(storePkt packet.Packet, storeMap map[string]string) bool {
 		return false
 	}
 }
+
+func createStoreMap(storeReceiver packet.PacketReceiver) map[string]string {
+	stores := storeReceiver.GetPayload()
+	lines := strings.Split(stores, "\n")
+	lines = lines[:len(lines)-1]
+
+	// Le damos un tamano inicial de lines porque deberia tener un tamano igual
+	// al de la cantidad de lineas. Ademas, ya pre-alocamos la memoria.
+	storeID2Name := make(map[string]string, len(lines))
+	for _, line := range lines {
+		// store_id , store_name
+		cols := strings.Split(line, ",")
+		store_id, store_name := cols[0], cols[1]
+		storeID2Name[store_id] = store_name
+	}
+
+	return storeID2Name
+}
