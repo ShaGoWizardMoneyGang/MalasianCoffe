@@ -105,7 +105,6 @@ func (pb *PacketBuilder) End() error {
 
 
 func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, error) {
-	slog.Info("New packet")
 	// Sanity checks
 
 	if pb.already_sent_eof && is_eof {
