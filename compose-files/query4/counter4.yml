@@ -3,7 +3,7 @@ services:
     container_name: counter4
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/counter rabbitmq:5672 counter4
+    entrypoint: ./bin/counter rabbitmq:5672 Query4
     volumes:
       - ../../bin/counter:/app/bin/counter
     networks:

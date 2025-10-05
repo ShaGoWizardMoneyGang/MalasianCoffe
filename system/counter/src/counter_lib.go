@@ -292,11 +292,11 @@ type Counter interface {
 func CounterBuilder(counterName string, rabbitAddr string) Counter {
 	var counter Counter
 	switch counterName {
-	case "counter4":
+	case "Query4":
 		counter = &CounterQuery4{}
-	case "counter2a":
+	case "Query2a":
 		counter = &CounterQuery2a{}
-	case "counter2b":
+	case "Query2b":
 		counter = &CounterQuery2b{}
 	default:
 		panic(fmt.Sprintf("Unknown counter %s", counterName))

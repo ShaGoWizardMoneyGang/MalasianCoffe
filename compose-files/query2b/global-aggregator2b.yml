@@ -3,7 +3,7 @@ services:
     container_name: global_aggregator2b
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/global_aggregator rabbitmq:5672 query2bGlobal
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query2b
     volumes:
       - ../../bin/global_aggregator:/app/bin/global_aggregator
     networks:
