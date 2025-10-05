@@ -20,24 +20,35 @@ type OutBoundMessage struct {
 // Donde:
 // - A: A es el identificador del archivo del cual se obtuvo este paquete
 // - El resto de los campos representan la particion del archivo, es decir cuantas particiones y subparticiones tuvo el archivo.
-type PacketUuid struct {
+type packetUuid struct {
 	uuid string
+
+	// End of group: Este paquete es el ultimo de su grupo/profundidad
+	eog bool
 
 	// End of file. Este paquete es el ultimo paquete del archivo correspondiente
 	eof bool
 }
 
 
-func (pu *PacketUuid) getDirID() string {
+func (pu *packetUuid) getDirID() string {
 	dir_id := string(pu.uuid[0])
 	return dir_id
+}
+
+func newPacketUuid(uuid string, eog bool, eof bool) packetUuid {
+	return packetUuid{
+		uuid: uuid,
+		eog: eog,
+		eof: eof,
+	}
 }
 
 type Header struct {
 	// ID de la session a la que este paquete corresponde
 	session_id string
 
-	packet_uuid PacketUuid
+	packet_uuid packetUuid
 
 	// TODO: esto potencialmente se puede guardar aparte en un nodo que guarde
 	// las IPS. No me gusta esa decision porque introducis comunicacion extra.
@@ -45,7 +56,7 @@ type Header struct {
 	client_ip_port string
 }
 
-func newHeader(session_id string, packet_uuid PacketUuid, client_ip_port string) Header {
+func newHeader(session_id string, packet_uuid packetUuid, client_ip_port string) Header {
 	return Header{
 		session_id:     session_id,
 		packet_uuid:    packet_uuid,
@@ -54,13 +65,12 @@ func newHeader(session_id string, packet_uuid PacketUuid, client_ip_port string)
 }
 func (h *Header) split(id int) Header {
 	new_uuid := h.packet_uuid.uuid + "." + strconv.Itoa(id)
+	// TODO: Change para que se haga el split de paquetes.
+	new_packetUUI := newPacketUuid(new_uuid, h.packet_uuid.eog, h.packet_uuid.eof)
 
 	new_header := Header{
 		session_id: h.session_id,
-		packet_uuid: PacketUuid{
-			uuid: new_uuid,
-			eof:  h.packet_uuid.eof,
-		},
+		packet_uuid: new_packetUUI,
 		client_ip_port: h.client_ip_port,
 	}
 
@@ -107,7 +117,7 @@ func ChangePayloadJoin(pkt Packet, datasets []string, newPayload []string) []Pac
 
 	uuid := strings.Join(datasetsIDs, "-")
 	eof  := pkt.IsEOF()
-	packet_uuid := PacketUuid {
+	packet_uuid := packetUuid {
 		uuid: uuid,
 		eof: eof,
 	};
