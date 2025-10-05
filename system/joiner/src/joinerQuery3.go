@@ -11,20 +11,26 @@ import (
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
+	"malasian_coffe/system/session_handler"
 )
 
 type joinerQuery3 struct {
-	// Tenemos una go routine por cada session
-	sessions map[string](chan packet.Packet)
+	inputChannel   chan packet.Packet
+
+	outputChannel   chan packet.Packet
+
 
 	colaStoresInput   *middleware.MessageMiddlewareQueue
 	colaAggTransInput *middleware.MessageMiddlewareQueue
 
-	// TODO(fabri): puede que no haga falta
 	colaSalidaQuery3 *middleware.MessageMiddlewareQueue
+
+	// Tenemos una go routine por cada session
+	sessionHandler sessionhandler.SessionHandler
+
 }
 
-func joinQuery3(inputChannel chan packet.Packet, outputChannel chan<- packet.Packet) {
+func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
 	// store_id -> store_name
 	storeID2Name := make(map[string]string)
 	all_stores_received := false
@@ -87,45 +93,17 @@ func joinQuery3(inputChannel chan packet.Packet, outputChannel chan<- packet.Pac
 	}
 }
 
-func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet, outputChannel chan<- packet.Packet) {
-	slog.Info("Envio packete a la session")
-	sessionID := pkt.GetSessionID()
-	channel, exists := jq3.sessions[sessionID]
-
-	// Nos creamos una rutina por cada session. Nosotros le enviamos los
-	// paquetes correspondientes a cada rutina
-	if !exists {
-		// Joiner
-		slog.Info("Creo un hilo joiner")
-		assigned_channel := make(chan packet.Packet)
-		go joinQuery3(assigned_channel, outputChannel)
-
-		// No hace falta un mutex porque este diccionario se accede de forma
-		// secuencial
-		jq3.sessions[sessionID] = assigned_channel
-
-		// Ahora que lo tenemos, sobre escribimos el valor basura que obtuvimos antes.
-		channel = assigned_channel
-	}
-
-	channel <- pkt
-}
-
 func (jq3 *joinerQuery3) Build(rabbitAddr string) {
-	slog.Info("Inicializo el Joiner 3")
-	sessionHandler := make(map[string](chan packet.Packet))
+	jq3.inputChannel      = make(chan packet.Packet)
 
-	colaSalidaQuery3 := colas.InstanceQueue("SalidaQuery3", rabbitAddr)
+	jq3.outputChannel     = make(chan packet.Packet)
 
-	colaStoresInput := colas.InstanceQueue("FilteredStores3", rabbitAddr)
-	colaAggTransInput := colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
+	jq3.colaStoresInput   = colas.InstanceQueue("FilteredStores3", rabbitAddr)
+	jq3.colaAggTransInput = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 
-	jq3.sessions = sessionHandler
+	jq3.colaSalidaQuery3  = colas.InstanceQueue("SalidaQuery3", rabbitAddr)
 
-	jq3.colaStoresInput = colaStoresInput
-	jq3.colaAggTransInput = colaAggTransInput
-
-	jq3.colaSalidaQuery3 = colaSalidaQuery3
+	jq3.sessionHandler    = sessionhandler.NewSessionHandler(joinQuery3, jq3.outputChannel)
 }
 
 func inputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- packet.Packet) {
@@ -148,20 +126,17 @@ func inputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- pa
 
 func (jq3 *joinerQuery3) Process() {
 	slog.Info("Arranca procesamiento del joiner 3")
-	inputChannel  := make(chan packet.Packet)
-
-	outputChannel := make(chan packet.Packet)
 
 	// Stores
-	go inputQueue(jq3.colaStoresInput, inputChannel)
+	go inputQueue(jq3.colaStoresInput, jq3.inputChannel)
 
-	go inputQueue(jq3.colaAggTransInput, inputChannel)
+	go inputQueue(jq3.colaAggTransInput, jq3.inputChannel)
 
 	for {
 		select {
-		case inputPacket := <-inputChannel:
-			jq3.passPacketToJoiner(inputPacket, outputChannel)
-		case packetJoineado := <-outputChannel:
+		case inputPacket := <-jq3.inputChannel:
+			jq3.sessionHandler.PassPacketToSession(inputPacket)
+		case packetJoineado := <-jq3.outputChannel:
 			jq3.colaSalidaQuery3.Send(packetJoineado.Serialize())
 		}
 	}

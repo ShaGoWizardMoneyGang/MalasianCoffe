@@ -1,7 +1,6 @@
 package joiner
 
 import (
-	"bytes"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -9,19 +8,24 @@ import (
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
 )
 
 type joinerQuery4 struct {
-	// Tenemos una go routine por cada session
-	sessions map[string] (chan packet.Packet)
+	inputChannel   chan packet.Packet
+
+	outputChannel   chan packet.Packet
 
 	colaStoresInput   *middleware.MessageMiddlewareQueue
 	colaUsersInput   *middleware.MessageMiddlewareQueue
 	colaAggTransInput *middleware.MessageMiddlewareQueue
 
 	colaSalidaQuery4  *middleware.MessageMiddlewareQueue
+
+	// Tenemos una go routine por cada session
+	sessionHandler sessionhandler.SessionHandler
 }
 
 
@@ -44,7 +48,7 @@ func createUserMap(userReceiver packet.PacketReceiver) map[string]string {
 	return storeID2Name
 }
 
-func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
+func joinQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
 	// store_id -> store_name
 	storeReceiver       := packet.NewPacketReceiver()
 	// storeID2Name        := make(map[string]string)
@@ -108,132 +112,63 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 	// Deberia ser 1 solo
 	for _, pkt := range pkt_joineado {
 		fmt.Printf("%+v\n", pkt)
-	   outputQueue.Send(pkt.Serialize())
+		outputChannel <- pkt
 	}
 }
 
-func (jq4 *joinerQuery4) passPacketToJoiner(pkt packet.Packet) {
-	slog.Info("Envio packete a la session")
-	sessionID := pkt.GetSessionID()
-	channel, exists := jq4.sessions[sessionID]
+// func (jq4 *joinerQuery4) passPacketToJoiner(pkt packet.Packet) {
+// 	slog.Info("Envio packete a la session")
+// 	sessionID := pkt.GetSessionID()
+// 	channel, exists := jq4.sessions[sessionID]
 
 
-	// Nos creamos una rutina por cada session. Nosotros le enviamos los
-	// paquetes correspondientes a cada rutina
-	if !exists {
-		// Joiner
-		slog.Info("Creo un hilo joiner")
-		assigned_channel := make(chan packet.Packet)
-		go joinQuery4(assigned_channel, jq4.colaSalidaQuery4)
+// 	// Nos creamos una rutina por cada session. Nosotros le enviamos los
+// 	// paquetes correspondientes a cada rutina
+// 	if !exists {
+// 		// Joiner
+// 		slog.Info("Creo un hilo joiner")
+// 		assigned_channel := make(chan packet.Packet)
+// 		go joinQuery4(assigned_channel, jq4.colaSalidaQuery4)
 
-		// No hace falta un mutex porque este diccionario se accede de forma
-		// secuencial
-		jq4.sessions[sessionID] = assigned_channel
+// 		// No hace falta un mutex porque este diccionario se accede de forma
+// 		// secuencial
+// 		jq4.sessions[sessionID] = assigned_channel
 
-		// Ahora que lo tenemos, sobre escribimos el valor basura que obtuvimos antes.
-		channel = assigned_channel
-	}
+// 		// Ahora que lo tenemos, sobre escribimos el valor basura que obtuvimos antes.
+// 		channel = assigned_channel
+// 	}
 
-	channel <- pkt
-}
+// 	channel <- pkt
+// }
 
 func (jq4 *joinerQuery4) Build(rabbitAddr string) {
-	slog.Info("Inicializo el Joiner 4")
-	// SessionID -> channel
-	sessionHandler           := make(map[string](chan packet.Packet))
+	jq4.inputChannel          = make(chan packet.Packet)
 
-	colaSalidaQuery4  := colas.InstanceQueue("SalidaQuery4", rabbitAddr)
+	jq4.outputChannel         = make(chan packet.Packet)
 
-	colaStoresInput   := colas.InstanceQueue("FilteredStores4", rabbitAddr)
-	colaUsersInput    := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
-	colaAggTransInput := colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
+	jq4.colaStoresInput       = colas.InstanceQueue("FilteredStores4", rabbitAddr)
+	jq4.colaUsersInput        = colas.InstanceQueue("FilteredUsers4", rabbitAddr)
+	jq4.colaAggTransInput     = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
 
-	jq4.sessions = sessionHandler
+	jq4.colaSalidaQuery4      = colas.InstanceQueue("SalidaQuery4", rabbitAddr)
 
-	jq4.colaStoresInput = colaStoresInput
-	jq4.colaUsersInput = colaUsersInput
-	jq4.colaAggTransInput = colaAggTransInput
+	jq4.sessionHandler        = sessionhandler.NewSessionHandler(joinQuery4, jq4.outputChannel)
 
-	jq4.colaSalidaQuery4 = colaSalidaQuery4
 }
 
 func (jq4 *joinerQuery4) Process() {
-	slog.Info("Arranca procesamiento del joiner 4")
-	storeListener            := make(chan packet.Packet)
-	userListener             := make(chan packet.Packet)
-	aggregatorGlobalListener := make(chan packet.Packet)
+	go inputQueue(jq4.colaStoresInput, jq4.inputChannel)
 
+	go inputQueue(jq4.colaUsersInput, jq4.inputChannel)
 
-	// Stores
-	go func() {
-		colasEntrada := jq4.colaStoresInput
-
-		messages := colas.ConsumeInput(colasEntrada)
-		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de stores")
-			packetReader := bytes.NewReader(message.Body)
-			pkt, _ := packet.DeserializePackage(packetReader)
-
-			err := message.Ack(false)
-			if err != nil {
-				panic(fmt.Errorf("Could not ack, %w", err))
-			}
-
-			storeListener <- pkt
-		}
-	}()
-
-	// Users
-	go func() {
-		colasEntrada := jq4.colaUsersInput
-
-		messages := colas.ConsumeInput(colasEntrada)
-		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de users")
-			packetReader := bytes.NewReader(message.Body)
-			pkt, _ := packet.DeserializePackage(packetReader)
-
-			err := message.Ack(false)
-			if err != nil {
-				panic(fmt.Errorf("Could not ack, %w", err))
-			}
-
-			userListener <- pkt
-		}
-	}()
-
-	// Aggregated Filtered Transactions
-	go func() {
-		// TODO: Maybe guardar en el struct
-		colasEntrada := jq4.colaAggTransInput
-
-		messages := colas.ConsumeInput(colasEntrada)
-
-		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de aggregated filtered transactions")
-
-			packetReader := bytes.NewReader(message.Body)
-			pkt, _ := packet.DeserializePackage(packetReader)
-			fmt.Printf("%+v\n", pkt)
-			fmt.Printf("TUKI")
-
-			err := message.Ack(false)
-			if err != nil {
-				panic(fmt.Errorf("Could not ack, %w", err))
-			}
-
-			aggregatorGlobalListener <- pkt
-		}
-	}()
+	go inputQueue(jq4.colaAggTransInput, jq4.inputChannel)
 
 	for {
 		select {
-		case storePacket := <-storeListener:
-			jq4.passPacketToJoiner(storePacket)
-		case aggregatedPacket := <-aggregatorGlobalListener:
-			jq4.passPacketToJoiner(aggregatedPacket)
-		case userPacket := <-userListener:
-			jq4.passPacketToJoiner(userPacket)
+		case inputPacket := <-jq4.inputChannel:
+			jq4.sessionHandler.PassPacketToSession(inputPacket)
+		case packetJoineado := <-jq4.outputChannel:
+			jq4.colaSalidaQuery4.Send(packetJoineado.Serialize())
 		}
 	}
 }
