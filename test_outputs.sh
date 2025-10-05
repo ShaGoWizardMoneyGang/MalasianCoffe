@@ -31,6 +31,18 @@ check_file() {
         return
     fi
 
+    # Verifico cantidad de lineas
+    expected_lines=$(wc -l < "$expected_file")
+    out_lines=$(wc -l < "$out_file")
+    
+    if [ "$expected_lines" -ne "$out_lines" ]; then
+        echo -e "${RED}[FAIL]${RESET} $2 - Cantidad de líneas diferente"
+        echo "  Esperado: $expected_lines líneas"
+        echo "  Obtenido: $out_lines líneas"
+        echo ""
+        return
+    fi
+
     # Archivos temporales para guardar los ordenados
     temp_expected=$(mktemp)
     temp_out=$(mktemp)
@@ -39,9 +51,9 @@ check_file() {
     sort "$out_file" > "$temp_out"
 
     if diff -q "$temp_expected" "$temp_out" > /dev/null; then
-        echo -e "${GREEN}[OK]${RESET} $2"
+        echo -e "${GREEN}[OK]${RESET} $2 ($expected_lines líneas)"
     else
-        echo -e "${RED}[FAIL]${RESET} $2"
+        echo -e "${RED}[FAIL]${RESET} $2 - Contenido diferente ($expected_lines líneas)"
         echo "Diferencias (5 primeras y 5 últimas líneas):"
 
         diff --side-by-side --suppress-common-lines "$temp_expected" "$temp_out" | head -n 5
