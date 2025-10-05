@@ -97,55 +97,76 @@ func transactionFilterQuery1(year_condition bool, hour_condition bool, amount_co
 	buffer.WriteString(new_line)
 }
 
-func filterFunctionQuery2a(input string) string {
-	lines := strings.Split(input, "\n")
-	final := ""
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		data := strings.Split(line, ",")
-		if len(data) < 6 {
-			slog.Debug("Registro con menos de 6 columnas, dropeado", "line", line, "columns", len(data))
-			continue
-		}
-		layout := "2006-01-02 15:04:05" // Go's reference layout
-		t, err := time.Parse(layout, data[5])
-		if err != nil {
-			slog.Debug("Error parsing timestamp, dropeado", "timestamp", data[5], "error", err)
-			continue
-		}
-		if t.Year() >= 2024 && t.Year() <= 2025 {
-			final += data[1] + "," + data[2] + "," + data[5] + "\n"
-		}
+func transactionFilterQuery2a(year_condition bool, transaction_id string, quantity string, created_at string, buffer *strings.Builder) {
+	if transaction_id == "" ||
+		quantity == "" ||
+		created_at == "" {
+		return
 	}
-	return final
+
+	if !year_condition {
+		return
+	}
+
+	new_line_2a := transaction_id + "," + quantity + "," + created_at + "\n"
+	buffer.WriteString(new_line_2a)
 }
 
-func filterFunctionQuery2b(input string) string {
+func transactionFilterQuery2b(year_condition bool, transaction_id string, subtotal string, created_at string, buffer *strings.Builder) {
+	if transaction_id == "" ||
+		subtotal == "" ||
+		created_at == "" {
+		return
+	}
+
+	if !year_condition {
+		return
+	}
+
+	new_line_2b := transaction_id + "," + subtotal + "," + created_at + "\n"
+	buffer.WriteString(new_line_2b)
+}
+
+// 0: transaction_id
+// 1: item_id
+// 2: quantity
+// 3: unitPrice
+// 4: subtotal
+// 5: created at
+func filterTransactionItems(input string) []string {
 	lines := strings.Split(input, "\n")
-	final := ""
+
+	var final_query2a strings.Builder
+	var final_query2b strings.Builder
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
+
 		data := strings.Split(line, ",")
 		if len(data) < 6 {
 			slog.Debug("Registro con menos de 6 columnas, dropeado", "line", line, "columns", len(data))
 			continue
 		}
-		layout := "2006-01-02 15:04:05" // Go's reference layout
-		t, err := time.Parse(layout, data[5])
+
+		transaction_id := data[1]
+		quantity       := data[2]
+		subtotal       := data[4]
+		created_at     := data[5]
+
+		year_condition, err := yearCondition(created_at)
 		if err != nil {
-			slog.Debug("Error parsing timestamp, dropeado", "timestamp", data[5], "error", err)
+			slog.Error("Failed to parse year %w, skipping register", err)
 			continue
 		}
-		if t.Year() >= 2024 && t.Year() <= 2025 {
-			final += data[1] + "," + data[4] + "," + data[5] + "\n"
-		}
+
+		transactionFilterQuery2a(year_condition, transaction_id, quantity, created_at, &final_query2a)
+
+		transactionFilterQuery2b(year_condition, transaction_id, subtotal, created_at, &final_query2b)
 	}
-	return final
+	return []string{final_query2a.String(), final_query2b.String()}
 }
+
 func mapStoreIdAndName(input string) []string {
 	print("[FILTER STORES]:", input)
 	lines := strings.Split(input, "\n")
@@ -238,15 +259,18 @@ func filterTransactions(input string) []string {
 
 		year_condition, err := yearCondition(time_s)
 		if err != nil {
-			panic(fmt.Errorf("Failed to parse year %w", err))
+			slog.Error("Failed to parse year %s, skipping register", err)
+			continue
 		}
 		hour_condition, err := hourCondition(time_s)
 		if err != nil {
-			panic(fmt.Errorf("Failed to parse hour %w", err))
+			slog.Error("Failed to parse hour %s, skipping register", err)
+			continue
 		}
 		amount_condition, err := amountCondition(amount_s)
 		if err != nil {
-			panic(fmt.Errorf("Failed to parse hour %w", err))
+			slog.Error("Failed to parse amount %w, skipping register", err)
+			continue
 		}
 		// Saco el punto de punto flotante del user id
 
@@ -479,19 +503,18 @@ func (tifm *transactionItemFilterMapper) Build(rabbitAddr string) {
 func (tifm *transactionItemFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
-	payloadResults2a := filterFunctionQuery2a(input)
-	payloadResults2b := filterFunctionQuery2b(input)
+	// Vienen en este orden: final_query2a, final_query2b
+	payloadResults := filterTransactionItems(input)
 
-	newPayload2a := packet.ChangePayload(pkt, []string{payloadResults2a})
-	newPayload2b := packet.ChangePayload(pkt, []string{payloadResults2b})
+	newPayload     := packet.ChangePayload(pkt, payloadResults)
 
 	outBoundMessage := []packet.OutBoundMessage{
 		{
-			Packet:     newPayload2a[0],
+			Packet:     newPayload[0],
 			ColaSalida: tifm.colaSalida2a,
 		},
 		{
-			Packet:     newPayload2b[0],
+			Packet:     newPayload[1],
 			ColaSalida: tifm.colaSalida2b,
 		},
 	}
