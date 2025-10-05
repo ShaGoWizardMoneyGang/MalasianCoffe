@@ -1,13 +1,12 @@
-package packetreceiver
+package packet
 
 import (
 	"log/slog"
-	"malasian_coffe/packets/packet"
 	"sort"
 )
 
 type PacketReceiver struct {
-	received_packages map[string]packet.Packet
+	received_packages map[string]Packet
 
 	// ordered_package []packet.Packet
 
@@ -18,7 +17,7 @@ type PacketReceiver struct {
 
 func NewPacketReceiver() PacketReceiver {
 	return PacketReceiver{
-		received_packages: make(map[string]packet.Packet),
+		received_packages: make(map[string]Packet),
 		receivedEOF: false,
 		latestUUID: "",
 	}
@@ -26,7 +25,7 @@ func NewPacketReceiver() PacketReceiver {
 
 // Devuelve un booleano que representa si el packete se recibio en su
 // totalidad o no
-func (pr *PacketReceiver) ReceivePacket(pkt packet.Packet) {
+func (pr *PacketReceiver) ReceivePacket(pkt Packet) {
 	uuid := pkt.GetUUID()
 
 	_, exits := pr.received_packages[uuid]
@@ -46,7 +45,7 @@ func (pr *PacketReceiver) GetPackets() bool {
 		return false
 	}
 
-	packets := make([]packet.Packet, len(pr.received_packages))
+	packets := make([]Packet, len(pr.received_packages))
 
 	i := 0
 	for _, packet := range pr.received_packages {
@@ -57,5 +56,6 @@ func (pr *PacketReceiver) GetPackets() bool {
 		return packets[i].GetSessionID() > packets[j].GetSessionID()
 	})
 
+	return false
 
 }
