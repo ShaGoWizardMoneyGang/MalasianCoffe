@@ -116,7 +116,7 @@ func (a *aggregator3Partial) Process(pkt packet.Packet) []packet.OutBoundMessage
 
 func PartialAggregatorBuilder(name string, rabbitAddr string) PartialAggregator {
 	switch strings.ToLower(name) {
-	case "Query3":
+	case "query3":
 		worker := &aggregator3Partial{}
 		worker.Build(rabbitAddr)
 		return worker

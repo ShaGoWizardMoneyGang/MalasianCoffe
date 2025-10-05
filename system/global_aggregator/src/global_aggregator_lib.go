@@ -357,13 +357,13 @@ type GlobalAggregator interface {
 func GlobalAggregatorBuilder(name, rabbitAddr string) GlobalAggregator {
 	var globalAggregator GlobalAggregator
 	switch strings.ToLower(name) {
-	case "Query2a":
+	case "query2a":
 		globalAggregator = &aggregator2aGlobal{}
-	case "Query2b":
+	case "query2b":
 		globalAggregator = &aggregator2bGlobal{}
-	case "Query3":
+	case "query3":
 		globalAggregator = &aggregator3Global{}
-	case "Query4":
+	case "query4":
 		globalAggregator = &aggregator4Global{}
 	default:
 		panic(fmt.Sprintf("Unknown global aggregator '%s'", name))
