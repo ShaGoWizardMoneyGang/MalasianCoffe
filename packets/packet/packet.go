@@ -53,7 +53,7 @@ func newHeader(session_id string, packet_uuid PacketUuid, client_ip_port string)
 	}
 }
 func (h *Header) split(id int) Header {
-	new_uuid := h.packet_uuid.uuid + strconv.Itoa(id)
+	new_uuid := h.packet_uuid.uuid + "." + strconv.Itoa(id)
 
 	new_header := Header{
 		session_id: h.session_id,
