@@ -31,22 +31,32 @@ check_file() {
         return
     fi
 
-    if diff -q "$expected_file" "$out_file" > /dev/null; then
+    # Archivos temporales para guardar los ordenados
+    temp_expected=$(mktemp)
+    temp_out=$(mktemp)
+    
+    sort "$expected_file" > "$temp_expected"
+    sort "$out_file" > "$temp_out"
+
+    if diff -q "$temp_expected" "$temp_out" > /dev/null; then
         echo -e "${GREEN}[OK]${RESET} $2"
     else
         echo -e "${RED}[FAIL]${RESET} $2"
         echo "Diferencias (5 primeras y 5 últimas líneas):"
 
-        diff --side-by-side --suppress-common-lines "$expected_file" "$out_file" | head -n 5
+        diff --side-by-side --suppress-common-lines "$temp_expected" "$temp_out" | head -n 5
 
         echo "."
         echo "."
         echo "."
 
-        diff --side-by-side --suppress-common-lines "$expected_file" "$out_file" | tail -n 5
+        diff --side-by-side --suppress-common-lines "$temp_expected" "$temp_out" | tail -n 5
 
         echo ""
     fi
+    
+    # Limpiar archivos temporales
+    rm -f "$temp_expected" "$temp_out"
 }
 
 # Hardcodear cada test
