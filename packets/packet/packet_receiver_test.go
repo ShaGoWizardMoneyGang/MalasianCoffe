@@ -1,14 +1,53 @@
 package packet
 
 import (
-	"math/rand"
 	"testing"
 )
 
-func TestPacketReceiver(t *testing.T) {
+func TestPacketReceiverInOrder(t *testing.T) {
 	s_id := "testing-session"
 	// El ultimo es 13, porque si no anda, mala suerte
-	packets := []Packet{
+	shuffled_packets := []Packet{
+		{
+			header: newHeader(s_id, newPacketUuid("0.0", false , false), "localhost:9091"),
+			payload: "00",
+		},
+		{
+			header: newHeader(s_id, newPacketUuid("0.4", false, true), "localhost:9091"),
+			payload: "04",
+		},
+		{
+			header: newHeader(s_id, newPacketUuid("0.1", false, false), "localhost:9091"),
+			payload: "01",
+		},
+		{
+			header: newHeader(s_id, newPacketUuid("0.3", false, false), "localhost:9091"),
+			payload: "03",
+		},
+		{
+			header: newHeader(s_id, newPacketUuid("0.2", false, false), "localhost:9091"),
+			payload: "02",
+		},
+	}
+
+	packet_receiver := NewPacketReceiver()
+	for _, packet := range shuffled_packets {
+		packet_receiver.ReceivePacket(packet)
+	}
+
+	_, is_ordered, err := packet_receiver.GetPackets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if is_ordered != true {
+		panic("Packet receiver failed to recognize that packets are ordered.")
+	}
+}
+
+func TestPacketReceiverNotInOrder(t *testing.T) {
+	s_id := "testing-session"
+	// El ultimo es 13, porque si no anda, mala suerte
+	shuffled_packets := []Packet{
 		{
 			header: newHeader(s_id, newPacketUuid("0.0", false , false), "localhost:9091"),
 			payload: "00",
@@ -18,100 +57,25 @@ func TestPacketReceiver(t *testing.T) {
 			payload: "01",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.2", false, false), "localhost:9091"),
-			payload: "02",
-		},
-		{
 			header: newHeader(s_id, newPacketUuid("0.3", false, false), "localhost:9091"),
 			payload: "03",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.4", false, false), "localhost:9091"),
-			payload: "04",
+			header: newHeader(s_id, newPacketUuid("0.2", false, false), "localhost:9091"),
+			payload: "02",
 		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.5", false, false), "localhost:9091"),
-			payload: "05",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.6", false, false), "localhost:9091"),
-			payload: "06",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.7", false, false), "localhost:9091"),
-			payload: "07",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.8.0", false, false), "localhost:9091"),
-			payload: "080",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.8.1", false, false), "localhost:9091"),
-			payload: "081",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.8.2", false, false), "localhost:9091"),
-			payload: "082",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.8.3", false, false), "localhost:9091"),
-			payload: "083",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.8.4", true, false), "localhost:9091"),
-			payload: "084",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.9", false, false), "localhost:9091"),
-			payload: "09",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.10", false, false), "localhost:9091"),
-			payload: "010",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.11.0", false, false), "localhost:9091"),
-			payload: "0110",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.11.1", false, false), "localhost:9091"),
-			payload: "0111",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.11.2", false, false), "localhost:9091"),
-			payload: "0112",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.11.3", false, false), "localhost:9091"),
-			payload: "0113",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.11.4", false, false), "localhost:9091"),
-			payload: "0114",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.11.5", true, false), "localhost:9091"),
-			payload: "0115",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.12", false, false), "localhost:9091"),
-			payload: "012",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.13", true, true), "localhost:9091"),
-			payload: "013",
-		},
-	}
-
-	shuffled_packets := make([]Packet, len(packets))
-	// Mezcla fisher yates
-	for i := range packets {
-		j := rand.Intn(i + 1)
-		shuffled_packets[i], shuffled_packets[j] = shuffled_packets[j], shuffled_packets[i]
 	}
 
 	packet_receiver := NewPacketReceiver()
 	for _, packet := range shuffled_packets {
 		packet_receiver.ReceivePacket(packet)
+	}
+
+	_, is_ordered, err := packet_receiver.GetPackets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if is_ordered != false {
+		panic("Packet receiver failed to recognize that packets are not ordered.")
 	}
 }
