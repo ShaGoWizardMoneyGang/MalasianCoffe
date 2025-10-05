@@ -1,102 +1,38 @@
 name: tp1
 include:
-  - docker-compose-rabbit.yml
-  - ./compose-files/docker-compose-client.yml
-  - docker-compose-filter-transactions.yml
-  - docker-compose-partial-aggregator3.yml
-  
-services:
-  server: #no escala
-    container_name: server
-    image: ubuntu:24.04
-    working_dir: /app
-    entrypoint: ./server_bin 0.0.0.0:9091 rabbitmq:5672
-    volumes:
-      - ./bin/server:/app/server_bin
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
+  - ./compose-files/common/commons.yml
+  - ./compose-files/common/filter-menu-items.yml
+  - ./compose-files/common/filter-stores.yml
+  - ./compose-files/common/filter-transaction-items.yml
+  - ./compose-files/common/filter-transactions.yml
+  # # query 1
+  - ./compose-files/query1/concat.yml
+  - ./compose-files/query1/sender1.yml
+  # # query 2a
+  - ./compose-files/query2a/counter2a.yml
+  - ./compose-files/query2a/global-aggregator2a.yml
+  - ./compose-files/query2a/joiner2a.yml
+  - ./compose-files/query2a/sender2a.yml
+  # # query 2b
+  - ./compose-files/query2b/counter2b.yml
+  - ./compose-files/query2b/global-aggregator2b.yml
+  - ./compose-files/query2b/joiner2b.yml
+  - ./compose-files/query2b/sender2b.yml
+  # # query3
+  - ./compose-files/query3/partial-aggregator3.yml
+  - ./compose-files/query3/global-aggregator3.yml
+  - ./compose-files/query3/joiner3.yml
+  - ./compose-files/query3/sender3.yml
 
-  gateway: #no escala
-    container_name: gateway
-    image: ubuntu:24.04
-    working_dir: /app
-    entrypoint: ./bin/gateway 0.0.0.0:9090 server:9091
-    volumes:
-      - ./bin/gateway:/app/bin/gateway
-    networks:
-      - testing_net
-    depends_on:
-      - server
+  # # query4
+  - ./compose-files/query4/filter-users.yml
+  - ./compose-files/query4/counter4.yml
+  - ./compose-files/query4/global-aggregator4.yml
+  - ./compose-files/query4/joiner4.yml
+  - ./compose-files/query4/sender4.yml
 
-  filter_stores: #no escala
-    container_name: filter_stores
-    image: ubuntu:24.04
-    working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 stores
-    volumes:
-      - ./bin/filter_mapper:/app/bin/filter_mapper
-    networks:
-      - testing_net
-    depends_on:
-      - server
-
-  concat: #no escala
-    container_name: concat
-    image: ubuntu:24.04
-    working_dir: /app
-    entrypoint: ./bin/concat rabbitmq:5672
-    volumes:
-      - ./bin/concat:/app/bin/concat
-    networks:
-      - testing_net
-    depends_on:
-      - server
-      - rabbitmq
-      # - filter_transactions
-
-  global_aggregator3: #no escala
-    container_name: global_aggregator3
-    image: ubuntu:24.04
-    working_dir: /app
-    entrypoint: ./bin/global_aggregator rabbitmq:5672 query3Global
-    volumes:
-      - ./bin/global_aggregator:/app/bin/global_aggregator
-    networks:
-      - testing_net
-    depends_on:
-      - server
-      - concat
-      # - partial_aggregator3
-  
-  sender1: #no escala
-    container_name: sender1
-    image: ubuntu:24.04
-    working_dir: /app
-    entrypoint: ./bin/sender rabbitmq:5672 Query1
-    volumes:
-      - ./bin/sender:/app/bin/sender
-    networks:
-      - testing_net
-    depends_on:
-      - server
-      - concat
-
-  sender3: #no escala
-    container_name: sender3
-    image: ubuntu:24.04
-    working_dir: /app
-    entrypoint: ./bin/sender rabbitmq:5672 Query3
-    volumes:
-      - ./bin/sender:/app/bin/sender
-    networks:
-      - testing_net
-    depends_on:
-      - server
-      - global_aggregator3
-      - filter_stores
+  # cliente
+  - ./compose-files/common/client.yml
 
 networks:
   testing_net:

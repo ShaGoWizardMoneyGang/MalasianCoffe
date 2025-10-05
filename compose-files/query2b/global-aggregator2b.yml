@@ -1,0 +1,12 @@
+services:
+  global_aggregator2b: #no escala
+    container_name: global_aggregator2b
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 query2bGlobal
+    volumes:
+      - ../../bin/global_aggregator:/app/bin/global_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
