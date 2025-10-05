@@ -165,3 +165,14 @@ func (p *Packet) GetClientAddr() string {
 func (p *Packet) GetDirID() string {
 	return p.header.packet_uuid.getDirID()
 }
+
+func (p *Packet) GetSequenceNumber() (int, error) {
+	uuid       := p.header.packet_uuid.uuid;
+	uuid_split := strings.Split(uuid, ".") 
+	sequence_n, err := strconv.ParseInt(uuid_split[1], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(sequence_n), nil
+}
