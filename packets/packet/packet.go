@@ -23,9 +23,6 @@ type OutBoundMessage struct {
 type packetUuid struct {
 	uuid string
 
-	// End of group: Este paquete es el ultimo de su grupo/profundidad
-	eog bool
-
 	// End of file. Este paquete es el ultimo paquete del archivo correspondiente
 	eof bool
 }
@@ -36,10 +33,9 @@ func (pu *packetUuid) getDirID() string {
 	return dir_id
 }
 
-func newPacketUuid(uuid string, eog bool, eof bool) packetUuid {
+func newPacketUuid(uuid string, eof bool) packetUuid {
 	return packetUuid{
 		uuid: uuid,
-		eog: eog,
 		eof: eof,
 	}
 }
@@ -65,12 +61,13 @@ func newHeader(session_id string, packet_uuid packetUuid, client_ip_port string)
 }
 func (h *Header) split(id int) Header {
 	new_uuid := h.packet_uuid.uuid + "." + strconv.Itoa(id)
-	// TODO: Change para que se haga el split de paquetes.
-	new_packetUUI := newPacketUuid(new_uuid, h.packet_uuid.eog, h.packet_uuid.eof)
 
 	new_header := Header{
 		session_id: h.session_id,
-		packet_uuid: new_packetUUI,
+		packet_uuid: packetUuid{
+			uuid: new_uuid,
+			eof:  h.packet_uuid.eof,
+		},
 		client_ip_port: h.client_ip_port,
 	}
 

@@ -9,23 +9,23 @@ func TestPacketReceiverInOrder(t *testing.T) {
 	// El ultimo es 13, porque si no anda, mala suerte
 	shuffled_packets := []Packet{
 		{
-			header: newHeader(s_id, newPacketUuid("0.0", false , false), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.0", false), "localhost:9091"),
 			payload: "00",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.4", false, true), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.4", true), "localhost:9091"),
 			payload: "04",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.1", false, false), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.1", false), "localhost:9091"),
 			payload: "01",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.3", false, false), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.3", false), "localhost:9091"),
 			payload: "03",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.2", false, false), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.2", false), "localhost:9091"),
 			payload: "02",
 		},
 	}
@@ -49,19 +49,19 @@ func TestPacketReceiverNotInOrder(t *testing.T) {
 	// El ultimo es 13, porque si no anda, mala suerte
 	shuffled_packets := []Packet{
 		{
-			header: newHeader(s_id, newPacketUuid("0.0", false , false), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.0", false), "localhost:9091"),
 			payload: "00",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.1", false, false), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.1", false), "localhost:9091"),
 			payload: "01",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.3", false, false), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.3", false), "localhost:9091"),
 			payload: "03",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.2", false, false), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.2", false), "localhost:9091"),
 			payload: "02",
 		},
 	}
