@@ -10,20 +10,14 @@ import (
 
 func (pu *packetUuid) serialize() ([]byte) {
 	uuid_b := protocol.SerializeString(pu.uuid)
-	eof_g := protocol.SerializeBool(pu.eog)
 	eof_b := protocol.SerializeBool(pu.eof)
 
-	packet_b := append(uuid_b, eof_g...)
-	packet_b = append(packet_b, eof_b...)
+	packet_b := append(uuid_b, eof_b...)
 	return packet_b
 }
 
 func deserializePacketUuid(reader *bytes.Reader) (packetUuid, error) {
 	uuid, error := protocol.DeserializeString(reader)
-	if error != nil {
-		return packetUuid{}, error
-	}
-	eog, error := protocol.DeserializeBool(reader)
 	if error != nil {
 		return packetUuid{}, error
 	}
@@ -34,7 +28,6 @@ func deserializePacketUuid(reader *bytes.Reader) (packetUuid, error) {
 
 	return packetUuid{
 		uuid: uuid,
-		eog: eog,
 		eof: eof,
 	}, nil
 }

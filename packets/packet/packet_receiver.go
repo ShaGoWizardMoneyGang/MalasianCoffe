@@ -85,5 +85,4 @@ func (pr *PacketReceiver) GetPackets() ([]Packet, bool, error) {
 	}
 
 	return packets, ordered, nil
-
 }
