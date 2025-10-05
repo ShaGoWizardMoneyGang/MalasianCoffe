@@ -163,13 +163,15 @@ func (p *Packet) GetDirID() string {
 	return p.header.packet_uuid.getDirID()
 }
 
-func (p *Packet) GetSequenceNumber() (int, error) {
+func (p *Packet) GetSequenceNumber() int {
 	uuid       := p.header.packet_uuid.uuid;
-	uuid_split := strings.Split(uuid, ".") 
+	uuid_split := strings.Split(uuid, ".")
 	sequence_n, err := strconv.ParseInt(uuid_split[1], 10, 64)
 	if err != nil {
-		return 0, err
+		// Esto no deberia pasar porque nosotros construimos los headers con
+		// valores bien conocidos. No son valores arbitrarios.
+		panic(fmt.Errorf("Failed to get sequence number, %w", err))
 	}
 
-	return int(sequence_n), nil
+	return int(sequence_n)
 }

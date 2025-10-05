@@ -1,12 +1,12 @@
 package packet
 
 import (
+	"fmt"
 	"testing"
 )
 
 func TestPacketReceiverInOrder(t *testing.T) {
 	s_id := "testing-session"
-	// El ultimo es 13, porque si no anda, mala suerte
 	shuffled_packets := []Packet{
 		{
 			header: newHeader(s_id, newPacketUuid("0.0", false), "localhost:9091"),
@@ -35,29 +35,31 @@ func TestPacketReceiverInOrder(t *testing.T) {
 		packet_receiver.ReceivePacket(packet)
 	}
 
-	_, is_ordered, err := packet_receiver.GetPackets()
-	if err != nil {
-		t.Fatal(err)
-	}
+	is_ordered := packet_receiver.ReceivedAll()
 	if is_ordered != true {
 		panic("Packet receiver failed to recognize that packets are ordered.")
+	}
+
+	expected_payload := "0001020304"
+	accum_payload  := packet_receiver.GetPayload()
+	if accum_payload != expected_payload {
+		panic(fmt.Errorf(`No se obtuvo el payload esperado:
+Esperaba %s
+Obtuve %s
+`, expected_payload, accum_payload))
 	}
 }
 
 func TestPacketReceiverNotInOrder(t *testing.T) {
 	s_id := "testing-session"
-	// El ultimo es 13, porque si no anda, mala suerte
+	// Le falta el paquete 0.1
 	shuffled_packets := []Packet{
 		{
 			header: newHeader(s_id, newPacketUuid("0.0", false), "localhost:9091"),
 			payload: "00",
 		},
 		{
-			header: newHeader(s_id, newPacketUuid("0.1", false), "localhost:9091"),
-			payload: "01",
-		},
-		{
-			header: newHeader(s_id, newPacketUuid("0.3", false), "localhost:9091"),
+			header: newHeader(s_id, newPacketUuid("0.3", true), "localhost:9091"),
 			payload: "03",
 		},
 		{
@@ -71,10 +73,7 @@ func TestPacketReceiverNotInOrder(t *testing.T) {
 		packet_receiver.ReceivePacket(packet)
 	}
 
-	_, is_ordered, err := packet_receiver.GetPackets()
-	if err != nil {
-		t.Fatal(err)
-	}
+	is_ordered := packet_receiver.ReceivedAll()
 	if is_ordered != false {
 		panic("Packet receiver failed to recognize that packets are not ordered.")
 	}
