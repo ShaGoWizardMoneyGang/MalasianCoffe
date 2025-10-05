@@ -6,8 +6,8 @@ import (
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/network"
 	"malasian_coffe/system/queries/query4"
+	"malasian_coffe/utils/network"
 	"strconv"
 	"time"
 )
@@ -23,7 +23,43 @@ func toYearMonth(dateStr string) string {
 // funcion comun entre los count de la query2
 // Recibe item_id, subtotal, created_at o  item_id, quantity, created_at
 // Devuelve year_month_created_at, item_id, sellings_qty o profit_sum
-func countFunctionQuery2(input string) string {
+func countFunctionQuery2a(input string) string {
+	rows := strings.Split(input, "\n")
+	rows = rows[:len(rows)-1] // El split me genera 1 linea de mas vacia por el ultimo /n, la ignoro
+
+	type key struct {
+		yearMonth string
+		itemID    string
+	}
+	counts := map[key]int64{}
+
+	for _, r := range rows {
+		cols := strings.Split(r, ",")
+		if len(cols) < 3 {
+			panic("Invalid data format")
+		}
+
+		itemID := cols[0]
+		acumulatorValue, err := strconv.ParseInt(cols[1], 10, 64)
+		if err != nil {
+			panic(fmt.Sprintf("Error parsing accumulator value '%s': %s", cols[1], err))
+		}
+		date := cols[2]
+		key := key{yearMonth: toYearMonth(date), itemID: itemID}
+		counts[key] += acumulatorValue
+	}
+
+	var b strings.Builder
+	for k, val := range counts {
+		fmt.Fprintf(&b, "%s,%s,%d\n", k.yearMonth, k.itemID, val)
+	}
+	return b.String()
+}
+
+// funcion comun entre los count de la query2
+// Recibe item_id, subtotal, created_at o  item_id, quantity, created_at
+// Devuelve year_month_created_at, item_id, sellings_qty o profit_sum
+func countFunctionQuery2b(input string) string {
 	rows := strings.Split(input, "\n")
 	rows = rows[:len(rows)-1] // El split me genera 1 linea de mas vacia por el ultimo /n, la ignoro
 
@@ -88,7 +124,7 @@ func (c *CounterQuery2b) GetInput() *middleware.MessageMiddlewareQueue {
 func (c *CounterQuery2b) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
-	counted_result := []string{countFunctionQuery2(input)}
+	counted_result := []string{countFunctionQuery2b(input)}
 
 	newPayload := packet.ChangePayload(pkt, counted_result)
 
@@ -136,7 +172,7 @@ func (c *CounterQuery2a) GetInput() *middleware.MessageMiddlewareQueue {
 func (c *CounterQuery2a) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	input := pkt.GetPayload()
 
-	counted_result := []string{countFunctionQuery2(input)}
+	counted_result := []string{countFunctionQuery2a(input)}
 
 	newPayload := packet.ChangePayload(pkt, counted_result)
 
@@ -232,7 +268,7 @@ func (c *CounterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
 	newPayload := packet.ChangePayload(pkt, counted_result)
 	outBoundMessage := []packet.OutBoundMessage{
 		{
-			Packet: newPayload[0],
+			Packet:     newPayload[0],
 			ColaSalida: c.colaSalidaPartialCountedUsers4,
 		},
 	}
