@@ -11,6 +11,7 @@ func TestPacketSerialization(t *testing.T) {
 	packet_uuid := packetUuid {
 		"0.0",
 		false,
+		false,
 	};
 
 	header      := newHeader("session-id", packet_uuid, "localhost:9091")
