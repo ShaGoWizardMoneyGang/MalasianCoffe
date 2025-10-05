@@ -167,7 +167,7 @@ func filterTransactionItems(input string) []string {
 	return []string{final_query2a.String(), final_query2b.String()}
 }
 
-func mapStoreIdAndName(input string) []string {
+func filterStores(input string) []string {
 	print("[FILTER STORES]:", input)
 	lines := strings.Split(input, "\n")
 	final := ""
@@ -190,7 +190,7 @@ func mapStoreIdAndName(input string) []string {
 	return []string{final, final}
 }
 
-func mapItemIdAndName(input string) []string {
+func filterMenus(input string) []string {
 	print("[FILTER MENU ITEMS]:", input)
 	lines := strings.Split(input, "\n")
 	final := ""
@@ -213,7 +213,7 @@ func mapItemIdAndName(input string) []string {
 	return []string{final, final}
 }
 
-func filterFunctionQuery4UsersBirthdates(input string) string {
+func filterUsers(input string) string {
 	lines := strings.Split(input, "\n")
 	final := ""
 	for _, line := range lines {
@@ -369,7 +369,7 @@ func (sfm *storeFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessag
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
-	mapped_stores := mapStoreIdAndName(input)
+	mapped_stores := filterStores(input)
 	newPayload := packet.ChangePayload(pkt, mapped_stores)
 	outBoundMessage := []packet.OutBoundMessage{
 		{
@@ -412,7 +412,7 @@ func (ufm *userFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
-	filtered_users := []string{filterFunctionQuery4UsersBirthdates(input)}
+	filtered_users := []string{filterUsers(input)}
 
 	newPayload := packet.ChangePayload(pkt, filtered_users)
 	outBoundMessage := []packet.OutBoundMessage{
@@ -457,7 +457,7 @@ func (mifm *menuItemFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMe
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
-	mapped_stores := mapItemIdAndName(input)
+	mapped_stores := filterMenus(input)
 	newPayload := packet.ChangePayload(pkt, mapped_stores)
 	outBoundMessage := []packet.OutBoundMessage{
 		{
