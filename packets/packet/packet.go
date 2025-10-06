@@ -2,6 +2,7 @@ package packet
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -60,7 +61,8 @@ func newHeader(session_id string, packet_uuid packetUuid, client_ip_port string)
 	}
 }
 func (h *Header) split(id int) Header {
-	new_uuid := h.packet_uuid.uuid + "." + strconv.Itoa(id)
+	dir_id   := h.packet_uuid.getDirID()
+	new_uuid := dir_id + "." + strconv.Itoa(id)
 
 	new_header := Header{
 		session_id: h.session_id,
@@ -80,6 +82,55 @@ type Packet struct {
 	payload string
 }
 
+const (
+	// Max batch size es 8192 simplemente porque es el valor default de BUFSIZ en glibc:
+	// https://sourceware.org/git/?p=glibc.git;a=blob;f=libio/stdio.h;h=e0e70945fab175fafcb0c8bbae96ad7eebe3df5a;hb=HEAD#l100
+	// Ademas, en el tp0 el maximo era 8000, el cual es parecido en tamano
+	MAX_BATCH_SIZE int = 8192
+)
+
+// Dado un paquete y un payload nuevo, te devulve todos los paquetes, subdivididos con ese payload nuevo
+func NewPayloads(packet Packet, newpayload string) []Packet {
+	return newPayloads(packet, newpayload, MAX_BATCH_SIZE)
+}
+
+func newPayloads(packet Packet, newpayload string, size int) []Packet {
+	packet_amount_p := float64(len(newpayload)) / float64(size)
+	packet_amount   := int(math.Ceil(packet_amount_p))
+
+	packets := make([]Packet, packet_amount)
+
+
+	is_eof := packet.IsEOF()
+	// Si packet_amount = 3 -> 0, 1, 2
+	// Si packet_amount = 2 -> 0, 1
+	// Si packet_amount = 1 -> 0
+	for batch := range packet_amount {
+		begin     := batch * size
+		end       := min(begin + size, len(newpayload))
+		content   := newpayload[begin:end]
+		uuid      := packet.GetUUID()
+
+		var packetUuid packetUuid
+		if is_eof && batch == len(packets) - 1 {
+			packetUuid = newPacketUuid(uuid, true)
+		} else {
+			packetUuid = newPacketUuid(uuid, false)
+		}
+		header := newHeader(packet.header.session_id, packetUuid, packet.header.client_ip_port)
+		split_h := header.split(batch)
+
+		packets[batch] = Packet {
+			header: split_h,
+			payload: content,
+		}
+	}
+
+
+	return packets
+}
+
+// TODO: marcar como deprecada
 // Mismo header, distinto payload
 func ChangePayload(packet Packet, newpayload []string) []Packet {
 	packets := make([]Packet, len(newpayload))

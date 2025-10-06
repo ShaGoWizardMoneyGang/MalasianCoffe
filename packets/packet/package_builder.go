@@ -12,12 +12,6 @@ import (
 	"malasian_coffe/utils/dataset"
 )
 
-const (
-	// Max batch size es 8192 simplemente porque es el valor default de BUFSIZ en glibc:
-	// https://sourceware.org/git/?p=glibc.git;a=blob;f=libio/stdio.h;h=e0e70945fab175fafcb0c8bbae96ad7eebe3df5a;hb=HEAD#l100
-	// Ademas, en el tp0 el maximo era 8000, el cual es parecido en tamano
-	MAX_BATCH_SIZE int = 8192
-)
 
 // Struct usado para crear varios packets de un mismo directorio
 type PacketBuilder struct {
