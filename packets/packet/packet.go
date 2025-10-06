@@ -2,6 +2,7 @@ package packet
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -78,6 +79,49 @@ type Packet struct {
 	header Header
 
 	payload string
+}
+
+const (
+	// Max batch size es 8192 simplemente porque es el valor default de BUFSIZ en glibc:
+	// https://sourceware.org/git/?p=glibc.git;a=blob;f=libio/stdio.h;h=e0e70945fab175fafcb0c8bbae96ad7eebe3df5a;hb=HEAD#l100
+	// Ademas, en el tp0 el maximo era 8000, el cual es parecido en tamano
+	MAX_BATCH_SIZE int = 8192
+)
+
+// Dado un paquete y un payload nuevo, te devulve todos los paquetes, subdivididos con ese payload nuevo
+func NewPayloads(packet Packet, newpayload string) []Packet {
+	packet_amount_p := float64(len(newpayload) / MAX_BATCH_SIZE)
+	packet_amount   := int(math.Ceil(packet_amount_p))
+
+	packets := make([]Packet, packet_amount)
+
+
+	is_eof := packet.IsEOF()
+	// Si packet_amount = 3 -> 0, 1, 2
+	// Si packet_amount = 2 -> 0, 1
+	// Si packet_amount = 1 -> 0
+	for batch := range packet_amount {
+		begin     := batch * MAX_BATCH_SIZE
+		end       := begin + MAX_BATCH_SIZE
+		content   := newpayload[begin:end]
+		uuid      := packet.GetUUID()
+
+		var packetUuid packetUuid
+		if batch == len(packets) - 1 && is_eof {
+			packetUuid = newPacketUuid(uuid, true)
+		} else {
+			packetUuid = newPacketUuid(uuid, false)
+		}
+		header := newHeader(packet.header.session_id, packetUuid, packet.header.client_ip_port)
+
+		packets[batch] = Packet {
+			header: header,
+			payload: content,
+		}
+	}
+
+
+	return packets
 }
 
 // Mismo header, distinto payload
