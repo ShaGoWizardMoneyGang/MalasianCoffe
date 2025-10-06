@@ -8,6 +8,7 @@ import (
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+
 	// "malasian_coffe/system/queries/query4"
 	"malasian_coffe/utils/colas"
 )
@@ -16,7 +17,7 @@ type aggregator4Global struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
 	// acc         map[query4.Key]uint64
-	acc         map[string]map[string]uint64
+	acc map[string]map[string]uint64
 }
 
 func (g *aggregator4Global) Build(rabbitAddr string) {
@@ -114,14 +115,6 @@ func (g *aggregator4Global) flushAndBuild() string {
 			fmt.Fprintf(&b, "%s,%s\n", store, sortedSlice[i].user)
 		}
 	}
-	// QUESTION(fabri): Por que sorteamos?
-	// sort.Slice(keys, func(i, j int) bool {
-	// 	if keys[i].yearHalf == keys[j].yearHalf {
-	// 		return keys[i].storeID < keys[j].storeID
-	// 	}
-	// 	return keys[i].yearHalf < keys[j].yearHalf
-	// })
-
 	g.acc = make(map[string]map[string]uint64)
 	return b.String()
 }

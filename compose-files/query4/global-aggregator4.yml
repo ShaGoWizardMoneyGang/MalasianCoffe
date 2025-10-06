@@ -3,7 +3,7 @@ services:
     container_name: global_aggregator4
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/global_aggregator rabbitmq:5672 query4Global
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query4
     volumes:
       - ../../bin/global_aggregator:/app/bin/global_aggregator
     networks:

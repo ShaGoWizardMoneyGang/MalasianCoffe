@@ -3,7 +3,7 @@ services:
     container_name: counter2a
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/counter rabbitmq:5672 counter2a
+    entrypoint: ./bin/counter rabbitmq:5672 Query2a
     volumes:
       - ../../bin/counter:/app/bin/counter
     networks:

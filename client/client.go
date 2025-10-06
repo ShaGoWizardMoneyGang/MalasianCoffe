@@ -168,6 +168,15 @@ func (ra *received_answers) addAnswer(pkt packetanswer.PacketAnswer) {
 	fmt.Printf("Recibi paquete respuesta de la %s: \n", pkt.GetQuery())
 }
 
+func (ra *received_answers) allReceived() bool {
+	for _, answer := range ra.received {
+		if !answer.received {
+			return false
+		}
+	}
+	return true
+}
+
 func (ra *received_answers) display() {
 	// Taken from: https://stackoverflow.com/a/22892171/13683575
 	fmt.Print("\033[H\033[2J")
@@ -212,6 +221,11 @@ func waitForAnswers(listen_addr string, out_dir string) error {
 
 		write_to_file(packet_answer, out_dir)
 		received_answers.addAnswer(packet_answer)
+
+		if received_answers.allReceived() {
+			received_answers.display()
+			os.Exit(0)
+		}
 	}
 }
 
