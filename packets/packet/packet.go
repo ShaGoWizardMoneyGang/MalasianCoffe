@@ -90,7 +90,11 @@ const (
 
 // Dado un paquete y un payload nuevo, te devulve todos los paquetes, subdivididos con ese payload nuevo
 func NewPayloads(packet Packet, newpayload string) []Packet {
-	packet_amount_p := float64(len(newpayload) / MAX_BATCH_SIZE)
+	return newPayloads(packet, newpayload, MAX_BATCH_SIZE)
+}
+
+func newPayloads(packet Packet, newpayload string, size int) []Packet {
+	packet_amount_p := float64(len(newpayload)) / float64(size)
 	packet_amount   := int(math.Ceil(packet_amount_p))
 
 	packets := make([]Packet, packet_amount)
@@ -101,8 +105,9 @@ func NewPayloads(packet Packet, newpayload string) []Packet {
 	// Si packet_amount = 2 -> 0, 1
 	// Si packet_amount = 1 -> 0
 	for batch := range packet_amount {
-		begin     := batch * MAX_BATCH_SIZE
-		end       := begin + MAX_BATCH_SIZE
+		begin     := batch * size
+		end       := min(begin + size, len(newpayload))
+		fmt.Printf("Begin: %d, End: %d \n", begin, end)
 		content   := newpayload[begin:end]
 		uuid      := packet.GetUUID()
 
