@@ -25,41 +25,42 @@ type joinerQuery4 struct {
 }
 
 
-func addUserToMap(storePkt packet.Packet, storeMap map[string]string) bool {
-	stores := storePkt.GetPayload()
-	lines := strings.Split(stores, "\n")
-	lines = lines[:len(lines)-1]
+func createUserMap(userReceiver packet.PacketReceiver) map[string]string {
+	storePkt := userReceiver.GetPayload()
+	lines    := strings.Split(storePkt, "\n")
+	lines     = lines[:len(lines)-1]
+
+	// Le damos un tamano inicial de lines porque deberia tener un tamano igual
+	// al de la cantidad de lineas. Ademas, ya pre-alocamos la memoria.
+	storeID2Name        := make(map[string]string, len(lines))
+
 	for _, line := range lines {
 		// store_id , store_name
 		cols := strings.Split(line, ",")
 		store_id, store_name := cols[0], cols[1]
-		storeMap[store_id] = store_name
+		storeID2Name[store_id] = store_name
 	}
 
-	// TODO: verificar paquetes fuera de orden. En teoria se deberia poder
-	// aislar en esta funcion o packet receiver en el directorio de packets
-	// Ver: https://github.com/ShaGoWizardMoneyGang/MalasianCoffe/issues/46
-	if storePkt.IsEOF() {
-		// Me llegaron todos
-		return true
-	} else {
-		return false
-	}
+	return storeID2Name
 }
 
 func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
 	// store_id -> store_name
-	storeID2Name        := make(map[string]string)
-	all_stores_received := false
+	storeReceiver       := packet.NewPacketReceiver()
+	// storeID2Name        := make(map[string]string)
+	// all_stores_received := false
 
 	// store_id -> store_name
-	userID2Birthday     := make(map[string]string)
-	all_users_received  := false
+	userReceiver        := packet.NewPacketReceiver()
+	// userID2Birthday     := make(map[string]string)
+	// all_users_received  := false
 
-	all_transactions_received := false
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
 	// stores. Deberian ser pocos (si es que existen)
-	var transactions strings.Builder
+	// var transactions strings.Builder
+	// all_transactions_received := false
+
+	transactionReceiver := packet.NewPacketReceiver()
 
 	// Resultado final
 	var joinedTransactions strings.Builder
@@ -70,7 +71,6 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 
 	for {
 		pkt :=  <- inputChannel
-		// println(pkt.GetPayload())
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -79,44 +79,23 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 		}
 
 		if dataset_name == "stores" {
-			all_stores_received = addStoreToMap(pkt, storeID2Name)
+			storeReceiver.ReceivePacket(pkt)
 		} else if dataset_name == "users" {
-			all_users_received = addUserToMap(pkt, userID2Birthday)
+			userReceiver.ReceivePacket(pkt)
 		} else if dataset_name == "transactions" {
-
-			// Nos guardamos los que llegaron
-			_, err := transactions.WriteString(pkt.GetPayload())
-			if err != nil {
-				panic("Joiner failed to add payload to transaction buffer")
-			}
-
-			all_transactions_received = pkt.IsEOF()
+			transactionReceiver.ReceivePacket(pkt)
 
 		} else {
 			panic(fmt.Errorf("JoinerQuery4 received packet from dataset that was not expecting: %s", dataset_name))
 		}
 
-		// Casos posibles:
-		// 1:
-		//   Recibi todos los transactions antes que stores y users.
-		//   Apenas reciba los stores y users que me faltan, hago el join y
-		//   termina el loop al toque.
-		// 2:
-		//   Recibi todas las stores y users antes que transactions.
-		//   Voy a ir recibiendo transacciones de a poquito y las voy a ir
-		//   anadiendo en el join.  Cuando llegue la ultima, esto va a cortar,
-		//   y el join va a tener el resultado final en joined transactions.
-
-		// No joineamos hasta tener todos las stores
-		if all_stores_received == true && all_users_received == true {
+		// No joineamos hasta tenerlo todo.
+		if storeReceiver.ReceivedAll() && userReceiver.ReceivedAll() && transactionReceiver.ReceivedAll() {
 			slog.Info("Comienza proceso de join")
-			// WARNING: transactions queda vacio despues de esta funcion
-			joinerFunctionQuery4(&transactions, storeID2Name, userID2Birthday, &joinedTransactions)
+			joinerFunctionQuery4New(storeReceiver, userReceiver, transactionReceiver, &joinedTransactions)
 
-			if all_transactions_received {
-				last_packet = pkt
-				break
-			}
+			last_packet = pkt
+			break
 		}
 	}
 
@@ -307,6 +286,33 @@ func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string
 
 		// Necesito algo del estilo: storeName, birthday
 		fmt.Fprintf(joinedResult, "%s,%s\n", storeName, userBirthday)
+	}
+}
+
+func joinerFunctionQuery4New(storeReceiver packet.PacketReceiver, userReceiver packet.PacketReceiver, transactionReceiver packet.PacketReceiver, joinedTransactions *strings.Builder) {
+	userMap     := createUserMap(userReceiver)
+	storeMap    := createStoreMap(storeReceiver)
+
+
+	transactions := transactionReceiver.GetPayload()
+	lines := strings.Split(transactions, "\n")
+	lines = lines[:len(lines)-1]
+	for _, r := range lines {
+		cols := strings.Split(r, ",")
+		if len(cols) < 2 {
+			panic("No hay 3 columnas como se esperaba")
+		}
+		// transactionID, storeID, userID
+		// TODO: EN ESTA PORONGA EL USER ID ES UN FLOAT
+		storeID, userID := cols[0], cols[1]
+		storeName    := storeMap[storeID]
+		userBirthday, exits := userMap[userID]
+		if !exits {
+			userBirthday = "2002-12-08"
+		}
+
+		// Necesito algo del estilo: storeName, birthday
+		fmt.Fprintf(joinedTransactions, "%s,%s\n", storeName, userBirthday)
 	}
 }
 

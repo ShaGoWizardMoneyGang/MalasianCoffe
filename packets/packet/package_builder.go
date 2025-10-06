@@ -6,7 +6,6 @@ import (
 	"net"
 	"strings"
 
-	"log/slog"
 	"strconv"
 
 	"malasian_coffe/utils/network"
@@ -105,7 +104,6 @@ func (pb *PacketBuilder) End() error {
 
 
 func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, error) {
-	slog.Info("New packet")
 	// Sanity checks
 
 	if pb.already_sent_eof && is_eof {
@@ -120,7 +118,7 @@ func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, erro
 	packet_id := strconv.FormatUint(dir_id, 10) + "." + strconv.FormatUint(uint64(pb.currentSequenceNumber), 10)
 	pb.currentSequenceNumber += 1
 
-	packet_uuid := PacketUuid{
+	packet_uuid := packetUuid{
 		uuid: packet_id,
 		eof:  is_eof,
 	}

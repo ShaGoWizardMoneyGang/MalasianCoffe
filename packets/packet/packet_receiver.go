@@ -1,0 +1,121 @@
+package packet
+
+import (
+	"fmt"
+	"log/slog"
+	"slices"
+	"strings"
+)
+
+type PacketReceiver struct {
+	// received_packages map[string]Packet
+	ordered_package []Packet
+
+	// Determina si el buffer interno recibio todos los paquetes que esperaba.
+	allReceived bool
+
+	// Para saber si llego el EOF
+	receivedEOF bool
+
+
+	buffer strings.Builder
+}
+
+func NewPacketReceiver() PacketReceiver {
+	return PacketReceiver{
+		ordered_package: []Packet{},
+		receivedEOF: false,
+		allReceived: false,
+	}
+}
+
+// Devuelve un booleano que representa si se recivieron todos los paquetes
+// esperados o no.
+func (pr *PacketReceiver) ReceivePacket(pkt Packet) bool {
+	// Apenas llega un nuevo paquete, el buffer queda invalido. Reseteamos.
+	pr.buffer.Reset()
+
+	n, exits := slices.BinarySearchFunc(pr.ordered_package, pkt,
+		func(i, j Packet) int {
+			sn_i := i.GetSequenceNumber()
+			sn_j := j.GetSequenceNumber()
+			return sn_i - sn_j})
+
+	if exits {
+		slog.Debug(fmt.Sprintf("Duplicate packet received. UUID: %s", pkt.GetUUID()))
+		pkt_existente := pr.ordered_package[n]
+		if pkt_existente.GetPayload() != pkt.GetPayload() {
+			slog.Warn(fmt.Sprintf(`ATENCION: Los dos paquetes tienen distinto payload.
+Existente:
+%s
+Nuevo:
+%s
+`, pkt_existente.GetPayload(), pkt.GetPayload()))
+		}
+	} else {
+		pr.ordered_package = slices.Insert(pr.ordered_package, n, pkt)
+	}
+
+	// Solamente actualizamos esto si no recibimos el EOF hasta ahora.
+	if !pr.receivedEOF {
+		pr.receivedEOF = pkt.IsEOF()
+	}
+
+	// Early check, si no llego el EOF, entonces es imposible que este
+	// completo.  Entonces ni nos calentamos en construir el buffer porque ya
+	// sabemos que va a estar mal.
+	// NOTE: No poner este if adentro del de arriba, tenemos que chequear dos
+	// veces este valor: Una para saber si lo tenemos que actualizar y otra
+	// para saber si ya lo recibimos.
+	if !pr.receivedEOF {
+		return false
+	}
+
+	allReceived := true
+	for i, pkt := range pr.ordered_package {
+		pr.buffer.WriteString(pkt.GetPayload())
+
+		// Llegue al ultimo packet, tiene que ser el EOF si o si.
+		if i == len(pr.ordered_package) - 1 {
+			allReceived = pkt.IsEOF()
+			break
+		}
+
+		nxt_pkt         := pr.ordered_package[i + 1]
+		nxt_pkt_sn      := nxt_pkt.GetSequenceNumber()
+
+		pkt_sn          := pkt.GetSequenceNumber()
+
+		if pkt_sn + 1 != nxt_pkt_sn {
+			allReceived = false
+			break
+		}
+	}
+
+	pr.allReceived = allReceived
+
+	// Para no usar memoria al cohete, si no esta todo recibido, tambien
+	// reseteamos.
+	if pr.allReceived == false {
+		pr.buffer.Reset()
+	}
+
+	return pr.allReceived
+}
+
+func (pr *PacketReceiver) ReceivedAll() bool {
+	return pr.allReceived
+}
+
+// Devuelve el packet acumulado.
+func (pr *PacketReceiver) GetPayload() string {
+	if pr.allReceived != true {
+		// NOTE: No borrar este panic. Es importante que si en algun momento
+		// se rompe la invariante, que el programa explote para poder debugear
+		// mejor.
+		// Un error no lo solucionaria porque esos son ignorables.
+		panic("Invariante del Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
+	}
+	return pr.buffer.String()
+}
+

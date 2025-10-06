@@ -8,7 +8,7 @@ import (
 
 // =============================== PacketUUID ==================================
 
-func (pu *PacketUuid) serialize() ([]byte) {
+func (pu *packetUuid) serialize() ([]byte) {
 	uuid_b := protocol.SerializeString(pu.uuid)
 	eof_b := protocol.SerializeBool(pu.eof)
 
@@ -16,17 +16,17 @@ func (pu *PacketUuid) serialize() ([]byte) {
 	return packet_b
 }
 
-func deserializePacketUuid(reader *bytes.Reader) (PacketUuid, error) {
+func deserializePacketUuid(reader *bytes.Reader) (packetUuid, error) {
 	uuid, error := protocol.DeserializeString(reader)
 	if error != nil {
-		return PacketUuid{}, error
+		return packetUuid{}, error
 	}
 	eof, error := protocol.DeserializeBool(reader)
 	if error != nil {
-		return PacketUuid{}, error
+		return packetUuid{}, error
 	}
 
-	return PacketUuid{
+	return packetUuid{
 		uuid: uuid,
 		eof: eof,
 	}, nil
