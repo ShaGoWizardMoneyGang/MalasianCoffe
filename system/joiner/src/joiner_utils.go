@@ -45,3 +45,19 @@ func createStoreMap(storeReceiver packet.PacketReceiver) map[string]string {
 
 	return storeID2Name
 }
+
+func createMenuItemMap(menuItemReceiver packet.PacketReceiver) map[string]string {
+	menuItemPkt := menuItemReceiver.GetPayload()
+	lines := strings.Split(menuItemPkt, "\n")
+	lines = lines[:len(lines)-1]
+	itemID2Name := make(map[string]string, len(lines))
+
+	for _, line := range lines {
+		// item_id, item_name
+		cols := strings.Split(line, ",")
+		item_id, item_name := cols[0], cols[1]
+		itemID2Name[item_id] = item_name
+	}
+
+	return itemID2Name
+}
