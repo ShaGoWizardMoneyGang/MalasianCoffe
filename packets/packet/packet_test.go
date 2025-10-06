@@ -36,7 +36,7 @@ func TestPacketSerialization(t *testing.T) {
 }
 
 func TestNewPayloadSplit(t *testing.T) {
-	packet_uuid := newPacketUuid("0.0", false)
+	packet_uuid := newPacketUuid("0.0", true)
 	header      := newHeader("session-id", packet_uuid, "localhost:9091")
 	payloads    := []string{"12345", "12345", "123"}
 	var payloadEnsemble string
@@ -60,5 +60,17 @@ func TestNewPayloadSplit(t *testing.T) {
 Got %s
 Expected %s`,i ,packet.GetPayload(), payloads[i]))
 		}
+
+		fmt.Printf("%v\n", packet)
+		if i == len(packets) - 1 {
+			if !packets[i].IsEOF() {
+				panic(fmt.Sprintf("Packet is not marked as EOF even though it should %v", packet))
+			}
+		} else {
+			if packets[i].IsEOF() {
+				panic(fmt.Sprintf("Packet is marked as EOF even though it shouldn't %v", packet))
+			}
+		}
 	}
 }
+

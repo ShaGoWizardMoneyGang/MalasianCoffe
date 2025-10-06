@@ -61,7 +61,8 @@ func newHeader(session_id string, packet_uuid packetUuid, client_ip_port string)
 	}
 }
 func (h *Header) split(id int) Header {
-	new_uuid := h.packet_uuid.uuid + "." + strconv.Itoa(id)
+	dir_id   := h.packet_uuid.getDirID()
+	new_uuid := dir_id + "." + strconv.Itoa(id)
 
 	new_header := Header{
 		session_id: h.session_id,
@@ -118,9 +119,10 @@ func newPayloads(packet Packet, newpayload string, size int) []Packet {
 			packetUuid = newPacketUuid(uuid, false)
 		}
 		header := newHeader(packet.header.session_id, packetUuid, packet.header.client_ip_port)
+		split_h := header.split(batch)
 
 		packets[batch] = Packet {
-			header: header,
+			header: split_h,
 			payload: content,
 		}
 	}
