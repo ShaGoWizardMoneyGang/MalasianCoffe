@@ -103,6 +103,14 @@ lint:
 	./.github/scripts/check_go_version.sh
 	./.github/scripts/check_invariantes.sh
 
+#=================================== Docker ====================================
+
+docker-all: build
+	docker compose -f docker-compose.yml up -d
+
+docker-down:
+	docker compose down
+
 #============================== Misc directives ===============================
 download-dataset:
 	curl -C - -L https://www.kaggle.com/api/v1/datasets/download/geraldooizx/g-coffee-shop-transaction-202307-to-202506 -o dataset/dataset.zip

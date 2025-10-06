@@ -31,8 +31,9 @@ include:
   - ./compose-files/query4/joiner4.yml
   - ./compose-files/query4/sender4.yml
 
-  # cliente
-  - ./compose-files/common/client.yml
+  # NOTA: Esto lo comento para que el usuario sea el cliente.
+  # # cliente
+  # - ./compose-files/common/client.yml
 
 networks:
   testing_net:
