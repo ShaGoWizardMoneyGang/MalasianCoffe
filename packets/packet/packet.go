@@ -108,12 +108,11 @@ func newPayloads(packet Packet, newpayload string, size int) []Packet {
 	for batch := range packet_amount {
 		begin     := batch * size
 		end       := min(begin + size, len(newpayload))
-		fmt.Printf("Begin: %d, End: %d \n", begin, end)
 		content   := newpayload[begin:end]
 		uuid      := packet.GetUUID()
 
 		var packetUuid packetUuid
-		if batch == len(packets) - 1 && is_eof {
+		if is_eof && batch == len(packets) - 1 {
 			packetUuid = newPacketUuid(uuid, true)
 		} else {
 			packetUuid = newPacketUuid(uuid, false)
@@ -131,6 +130,7 @@ func newPayloads(packet Packet, newpayload string, size int) []Packet {
 	return packets
 }
 
+// TODO: marcar como deprecada
 // Mismo header, distinto payload
 func ChangePayload(packet Packet, newpayload []string) []Packet {
 	packets := make([]Packet, len(newpayload))
