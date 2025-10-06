@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# Colores
 GREEN="\e[32m"
 RED="\e[31m"
 RESET="\e[0m"
 
-# Chequear argumento
 if [ $# -ne 1 ]; then
     echo "Uso: $0 FULL|RED"
     exit 1
@@ -43,7 +41,6 @@ check_file() {
         return
     fi
 
-    # Archivos temporales para guardar los ordenados
     temp_expected=$(mktemp)
     temp_out=$(mktemp)
     
@@ -67,13 +64,26 @@ check_file() {
         echo ""
     fi
     
-    # Limpiar archivos temporales
     rm -f "$temp_expected" "$temp_out"
 }
 
-# Hardcodear cada test
+check_query4() {
+    expected_file="$EXPECTED_DIR/$1"
+    out_file="$OUT_DIR/$2"
+
+    if [ ! -f "$out_file" ]; then
+        echo -e "${RED}[FAIL]${RESET} No existe $out_file"
+        return
+    fi
+        if go run test_output_query4/test_output_query4.go "$expected_file" "$out_file"; then
+        echo -e "${GREEN}[OK]${RESET} $2 - Todos los usuarios son correctos"
+    else
+        echo -e "${RED}[FAIL]${RESET} $2 - Hay usuarios inválidos"
+    fi
+}
+
 check_file "ExpectedQuery1.csv"  "Query1.csv"
 check_file "ExpectedQuery2a.csv" "Query2a.csv"
 check_file "ExpectedQuery2b.csv" "Query2b.csv"
 check_file "ExpectedQuery3.csv"  "Query3.csv"
-check_file "ExpectedQuery4.csv"  "Query4.csv"
+check_query4 "ExpectedQuery4.csv"  "Query4.csv"
