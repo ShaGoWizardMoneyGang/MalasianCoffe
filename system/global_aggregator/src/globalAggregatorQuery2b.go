@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// AggregatorGLobal de la query2a ES LA SUBTOTAL
+// AggregatorGLobal de la query2b ES LA SUBTOTAL
 type keyQuery2b struct {
 	yearMonth string
 	itemID    string
@@ -20,6 +20,8 @@ type aggregator2bGlobal struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
 	acc         map[keyQuery2b]float64
+
+	receiver packet.PacketReceiver
 }
 
 func (g *aggregator2bGlobal) Build(rabbitAddr string) {
@@ -27,6 +29,8 @@ func (g *aggregator2bGlobal) Build(rabbitAddr string) {
 	// aca va GlobalAggregation2b
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation2b", rabbitAddr)
 	g.acc = make(map[keyQuery2b]float64)
+
+	g.receiver = packet.NewPacketReceiver()
 }
 
 func (g *aggregator2bGlobal) GetInput() *middleware.MessageMiddlewareQueue {
@@ -34,8 +38,10 @@ func (g *aggregator2bGlobal) GetInput() *middleware.MessageMiddlewareQueue {
 }
 
 func (g *aggregator2bGlobal) ingestBatch(input string) {
-	lines := strings.SplitSeq(input, "\n")
-	for line := range lines {
+	lines := strings.Split(input, "\n")
+	lines = lines[:len(lines)-1]
+
+	for _, line := range lines {
 		if line == "" {
 			continue
 		}
@@ -49,7 +55,7 @@ func (g *aggregator2bGlobal) ingestBatch(input string) {
 
 		subtotal, err := strconv.ParseFloat(subtotalStr, 64)
 		if err != nil {
-			panic("subtotal con formato inválido")
+			panic("Subtotal con formato inválido")
 		}
 
 		k := keyQuery2b{yearMonth: yearMonth, itemID: itemID}
@@ -98,18 +104,24 @@ func (g *aggregator2bGlobal) flushAndBuild() string {
 }
 
 func (g *aggregator2bGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	input := pkt.GetPayload()
+	fmt.Println("Processing packet with PacketReceiver in Global Aggregator 2b")
 
-	isEOF := pkt.IsEOF()
-	g.ingestBatch(input)
-	if !isEOF {
+	g.receiver.ReceivePacket(pkt)
+
+	if !g.receiver.ReceivedAll() {
+		fmt.Println("Aún no se han recibido todos los paquetes")
 		return nil
 	}
+	consolidatedInput := g.receiver.GetPayload()
+
+	g.ingestBatch(consolidatedInput)
 
 	final := g.flushAndBuild()
 	if final == "" {
 		return nil
 	}
+
+	g.receiver = packet.NewPacketReceiver()
 
 	newPkts := packet.ChangePayload(pkt, []string{final})
 	return []packet.OutBoundMessage{
