@@ -34,7 +34,6 @@ func joinQuery2b(inputChannel chan packet.Packet, outputQueue *middleware.Messag
 
 	for {
 		pkt := <-inputChannel
-		fmt.Printf("Recibi %v\n", pkt)
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
