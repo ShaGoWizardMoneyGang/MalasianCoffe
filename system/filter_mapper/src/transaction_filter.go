@@ -86,17 +86,17 @@ func filterTransactions(input string) []string {
 
 		year_condition, err := yearCondition(time_s)
 		if err != nil {
-			slog.Error("Failed to parse year %s, skipping register", err)
+			slog.Error(fmt.Sprintf("Failed to parse year %s, skipping register", err))
 			continue
 		}
 		hour_condition, err := hourCondition(time_s)
 		if err != nil {
-			slog.Error("Failed to parse hour %s, skipping register", err)
+			slog.Error(fmt.Sprintf("Failed to parse hour %s, skipping register", err))
 			continue
 		}
 		amount_condition, err := amountCondition(amount_s)
 		if err != nil {
-			slog.Error("Failed to parse amount %w, skipping register", err)
+			slog.Error(fmt.Sprintf("Failed to parse amount %s, skipping register", err))
 			continue
 		}
 		// Saco el punto de punto flotante del user id
