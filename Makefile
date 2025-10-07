@@ -16,9 +16,10 @@ distro = $(shell cat /etc/os-release | grep -w NAME | sed 's/NAME=//g' )
 DATADIR                ?=    ${current_dir}/dataset/
 OUTDIR                 ?=    ${current_dir}/out/
 GATEWAY_ADDR           ?=    "localhost:9090"
-CLIENT_LISTEN_ADDR     ?=    "localhost:9093"
+CLIENT_LISTEN_ADDR     ?=    "0.0.0.0:9093"
 RABBIT_ADDR            ?=    "localhost:5672"
 SERVER_ADDR            ?=    "localhost:9092"
+SENDER_CONN_ADDR 	   ?=    "host.docker.internal:9093"
 
 # El nombre de la funcion a ejecutar
 RUN_FUNCTION          ?=    ""
@@ -26,7 +27,7 @@ run-server:
 	cd system; go run system.go ${SERVER_ADDR} ${RABBIT_ADDR}
 
 run-client:
-	cd client; go run client.go ${DATADIR} ${OUTDIR} ${GATEWAY_ADDR} ${CLIENT_LISTEN_ADDR}
+	cd client; go run client.go ${DATADIR} ${OUTDIR} ${GATEWAY_ADDR} ${CLIENT_LISTEN_ADDR} ${SENDER_CONN_ADDR}
 
 run-gateway:
 	cd gateway; go run gateway.go ${GATEWAY_ADDR} ${SERVER_ADDR} ${RUN_FUNCTION}

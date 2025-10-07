@@ -3,7 +3,7 @@ services:
     container_name: client1
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/client ./dataset/ ../out/ gateway:9090 client1:9093
+    entrypoint: ./bin/client ./dataset/ ../out/ gateway:9090 host.docker.internal:9093
     volumes:
       - ../../bin/client:/app/bin/client
       - ../../dataset:/app/dataset

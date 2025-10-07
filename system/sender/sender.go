@@ -41,6 +41,7 @@ func main() {
 		pkt, _ := packet.DeserializePackage(packetReader)
 
 		client_receiver := pkt.GetClientAddr()
+		// client_receiver := "host.docker.internal:9093"
 		print("Client receiver address: ", client_receiver, "\n")
 		conn, err := net.Dial("tcp", client_receiver)
 		if err != nil {

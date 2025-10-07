@@ -26,6 +26,7 @@ check_file() {
 
     if [ ! -f "$out_file" ]; then
         echo -e "${RED}[FAIL]${RESET} No existe $out_file"
+        ANY_FAIL=1
         return
     fi
 
@@ -38,6 +39,7 @@ check_file() {
         echo "  Esperado: $expected_lines líneas"
         echo "  Obtenido: $out_lines líneas"
         echo ""
+        ANY_FAIL=1
         return
     fi
 
@@ -62,6 +64,7 @@ check_file() {
         diff --side-by-side --suppress-common-lines "$temp_expected" "$temp_out" | tail -n 5
 
         echo ""
+        ANY_FAIL=1
     fi
     
     rm -f "$temp_expected" "$temp_out"
@@ -73,12 +76,14 @@ check_query4() {
 
     if [ ! -f "$out_file" ]; then
         echo -e "${RED}[FAIL]${RESET} No existe $out_file"
+        ANY_FAIL=1
         return
     fi
         if go run test_output_query4/test_output_query4.go "$expected_file" "$out_file"; then
         echo -e "${GREEN}[OK]${RESET} $2 - Todos los usuarios son correctos"
     else
         echo -e "${RED}[FAIL]${RESET} $2 - Hay usuarios inválidos"
+        ANY_FAIL=1
     fi
 }
 
@@ -87,3 +92,9 @@ check_file "ExpectedQuery2a.csv" "Query2a.csv"
 check_file "ExpectedQuery2b.csv" "Query2b.csv"
 check_file "ExpectedQuery3.csv"  "Query3.csv"
 check_query4 "ExpectedQuery4.csv"  "Query4.csv"
+
+# If any check failed, exit with -1
+if [ "${ANY_FAIL:-0}" -ne 0 ]; then
+    echo -e "${RED}Some tests failed.${RESET}"
+    exit -1
+fi
