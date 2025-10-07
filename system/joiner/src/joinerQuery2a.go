@@ -34,7 +34,6 @@ func joinQuery2a(inputChannel chan packet.Packet, outputQueue *middleware.Messag
 
 	for {
 		pkt := <-inputChannel
-		fmt.Printf("Recibi %v\n", pkt)
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -65,7 +64,6 @@ func joinQuery2a(inputChannel chan packet.Packet, outputQueue *middleware.Messag
 
 	slog.Info("Envio pkt joineado al sender")
 	for _, pkt := range pkt_joineado {
-		fmt.Printf("%+v\n", pkt)
 		outputQueue.Send(pkt.Serialize())
 	}
 }

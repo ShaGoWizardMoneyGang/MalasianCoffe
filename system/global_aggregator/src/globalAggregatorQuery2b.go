@@ -104,7 +104,6 @@ func (g *aggregator2bGlobal) flushAndBuild() string {
 }
 
 func (g *aggregator2bGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	fmt.Println("Processing packet with PacketReceiver in Global Aggregator 2b")
 
 	g.receiver.ReceivePacket(pkt)
 
