@@ -5,34 +5,28 @@ import (
 )
 
 type Concat struct {
-	// Guardo el resultado, recuerdo que voy a tener un nodo concat por query!!!
-	// el unico caso especial es la de la consulta 4 que devuelve 2 tablas
-	result string
+	receiver packet.PacketReceiver
 }
 
-func (c *Concat) concatFunctionQuery(input string) {
-	if len(input) > 0 && input[len(input)-1] != '\n' { //puedo tener un input vacio por si creo un packet nuevo
-		input += "\n"
+func NewConcat() *Concat {
+	return &Concat{
+		receiver: packet.NewPacketReceiver(),
 	}
-	c.result += input
-}
-
-func (c *Concat) end() {
-	c.result = ""
 }
 
 func (c *Concat) Process(pkt packet.Packet) []packet.Packet {
-	input := pkt.GetPayload()
-	c.concatFunctionQuery(input)
-	if !pkt.IsEOF() {
+	c.receiver.ReceivePacket(pkt)
+
+	if !c.receiver.ReceivedAll() {
 		return []packet.Packet{}
 	}
 
-	// Cuando llegamos aca, ya tenemos todo concatenado.
-	outputs := []string{c.result}
+	consolidatedInput := c.receiver.GetPayload()
+
+	outputs := []string{consolidatedInput}
 	newPacket := packet.ChangePayload(pkt, outputs)
 
-	c.end()
+	c.receiver = packet.NewPacketReceiver()
 
 	return newPacket
 }
