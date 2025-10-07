@@ -8,12 +8,6 @@ type Concat struct {
 	receiver packet.PacketReceiver
 }
 
-func NewConcat() *Concat {
-	return &Concat{
-		receiver: packet.NewPacketReceiver(),
-	}
-}
-
 func (c *Concat) Process(pkt packet.Packet) []packet.Packet {
 	c.receiver.ReceivePacket(pkt)
 
