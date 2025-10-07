@@ -13,15 +13,15 @@ import (
 // Recibe transaction_id, store_id, user_id
 // Devuelve user_id,store_id,cantidad por línea, ordenado por store_id y luego user_id para mantenerlo determinístico
 func (c *CounterQuery4) countFunctionQuery4(input string) string {
-	rows := strings.Split(input, "\n")
-	rows = rows[:len(rows)-1] // El split me genera 1 linea de mas vacia por el ultimo /n, la ignoro
+	lines := strings.Split(input, "\n")
+	lines = lines[:len(lines)-1] // Remover última línea vacía
 
 	// tengo un map donde voy contando las apariciones por store y user
 	counts := map[query4.Key]int{}
 
-	for _, r := range rows {
+	for _, line := range lines {
 
-		cols := strings.Split(r, ",") // este comportamiento podria modularizarlo para todos
+		cols := strings.Split(line, ",") // este comportamiento podria modularizarlo para todos
 		if len(cols) < 3 {
 			panic("Invalid data format")
 		}
@@ -41,12 +41,12 @@ func (c *CounterQuery4) countFunctionQuery4(input string) string {
 
 type CounterQuery4 struct {
 	colaEntradaFilteredTransactions4 *middleware.MessageMiddlewareQueue
+	colaSalidaPartialCountedUsers4   *middleware.MessageMiddlewareQueue
 
-	colaSalidaPartialCountedUsers4 *middleware.MessageMiddlewareQueue
+	receiver packet.PacketReceiver
 }
 
 func (c *CounterQuery4) Build(rabbitAddr string) {
-
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactions4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactions4", err))
@@ -58,8 +58,9 @@ func (c *CounterQuery4) Build(rabbitAddr string) {
 	}
 
 	c.colaEntradaFilteredTransactions4 = colaEntrada
-
 	c.colaSalidaPartialCountedUsers4 = colaSalida
+
+	c.receiver = packet.NewPacketReceiver()
 }
 
 func (c *CounterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
@@ -67,17 +68,25 @@ func (c *CounterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
 }
 
 func (c *CounterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	input := pkt.GetPayload()
+	c.receiver.ReceivePacket(pkt)
 
-	counted_result := []string{c.countFunctionQuery4(input)}
+	if !c.receiver.ReceivedAll() {
+		fmt.Println("Aún no se han recibido todos los paquetes")
+		return nil
+	}
+
+	consolidatedInput := c.receiver.GetPayload()
+
+	counted_result := []string{c.countFunctionQuery4(consolidatedInput)}
+
+	c.receiver = packet.NewPacketReceiver()
 
 	newPayload := packet.ChangePayload(pkt, counted_result)
-	outBoundMessage := []packet.OutBoundMessage{
+
+	return []packet.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
 			ColaSalida: c.colaSalidaPartialCountedUsers4,
 		},
 	}
-
-	return outBoundMessage
 }
