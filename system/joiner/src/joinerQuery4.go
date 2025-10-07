@@ -15,24 +15,23 @@ import (
 
 type joinerQuery4 struct {
 	// Tenemos una go routine por cada session
-	sessions map[string] (chan packet.Packet)
+	sessions map[string](chan packet.Packet)
 
 	colaStoresInput   *middleware.MessageMiddlewareQueue
-	colaUsersInput   *middleware.MessageMiddlewareQueue
+	colaUsersInput    *middleware.MessageMiddlewareQueue
 	colaAggTransInput *middleware.MessageMiddlewareQueue
 
-	colaSalidaQuery4  *middleware.MessageMiddlewareQueue
+	colaSalidaQuery4 *middleware.MessageMiddlewareQueue
 }
-
 
 func createUserMap(userReceiver packet.PacketReceiver) map[string]string {
 	storePkt := userReceiver.GetPayload()
-	lines    := strings.Split(storePkt, "\n")
-	lines     = lines[:len(lines)-1]
+	lines := strings.Split(storePkt, "\n")
+	lines = lines[:len(lines)-1]
 
 	// Le damos un tamano inicial de lines porque deberia tener un tamano igual
 	// al de la cantidad de lineas. Ademas, ya pre-alocamos la memoria.
-	storeID2Name        := make(map[string]string, len(lines))
+	storeID2Name := make(map[string]string, len(lines))
 
 	for _, line := range lines {
 		// store_id , store_name
@@ -46,12 +45,12 @@ func createUserMap(userReceiver packet.PacketReceiver) map[string]string {
 
 func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
 	// store_id -> store_name
-	storeReceiver       := packet.NewPacketReceiver()
+	storeReceiver := packet.NewPacketReceiver()
 	// storeID2Name        := make(map[string]string)
 	// all_stores_received := false
 
 	// store_id -> store_name
-	userReceiver        := packet.NewPacketReceiver()
+	userReceiver := packet.NewPacketReceiver()
 	// userID2Birthday     := make(map[string]string)
 	// all_users_received  := false
 
@@ -70,7 +69,7 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 	var last_packet packet.Packet
 
 	for {
-		pkt :=  <- inputChannel
+		pkt := <-inputChannel
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -92,7 +91,7 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 		// No joineamos hasta tenerlo todo.
 		if storeReceiver.ReceivedAll() && userReceiver.ReceivedAll() && transactionReceiver.ReceivedAll() {
 			slog.Info("Comienza proceso de join")
-			joinerFunctionQuery4New(storeReceiver, userReceiver, transactionReceiver, &joinedTransactions)
+			joinerFunctionQuery4(storeReceiver, userReceiver, transactionReceiver, &joinedTransactions)
 
 			last_packet = pkt
 			break
@@ -108,7 +107,7 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 	// Deberia ser 1 solo
 	for _, pkt := range pkt_joineado {
 		fmt.Printf("%+v\n", pkt)
-	   outputQueue.Send(pkt.Serialize())
+		outputQueue.Send(pkt.Serialize())
 	}
 }
 
@@ -116,7 +115,6 @@ func (jq4 *joinerQuery4) passPacketToJoiner(pkt packet.Packet) {
 	slog.Info("Envio packete a la session")
 	sessionID := pkt.GetSessionID()
 	channel, exists := jq4.sessions[sessionID]
-
 
 	// Nos creamos una rutina por cada session. Nosotros le enviamos los
 	// paquetes correspondientes a cada rutina
@@ -140,12 +138,12 @@ func (jq4 *joinerQuery4) passPacketToJoiner(pkt packet.Packet) {
 func (jq4 *joinerQuery4) Build(rabbitAddr string) {
 	slog.Info("Inicializo el Joiner 4")
 	// SessionID -> channel
-	sessionHandler           := make(map[string](chan packet.Packet))
+	sessionHandler := make(map[string](chan packet.Packet))
 
-	colaSalidaQuery4  := colas.InstanceQueue("SalidaQuery4", rabbitAddr)
+	colaSalidaQuery4 := colas.InstanceQueue("SalidaQuery4", rabbitAddr)
 
-	colaStoresInput   := colas.InstanceQueue("FilteredStores4", rabbitAddr)
-	colaUsersInput    := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
+	colaStoresInput := colas.InstanceQueue("FilteredStores4", rabbitAddr)
+	colaUsersInput := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
 	colaAggTransInput := colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
 
 	jq4.sessions = sessionHandler
@@ -159,10 +157,9 @@ func (jq4 *joinerQuery4) Build(rabbitAddr string) {
 
 func (jq4 *joinerQuery4) Process() {
 	slog.Info("Arranca procesamiento del joiner 4")
-	storeListener            := make(chan packet.Packet)
-	userListener             := make(chan packet.Packet)
+	storeListener := make(chan packet.Packet)
+	userListener := make(chan packet.Packet)
 	aggregatorGlobalListener := make(chan packet.Packet)
-
 
 	// Stores
 	go func() {
@@ -262,7 +259,7 @@ func (jq4 *joinerQuery4) Process() {
 // // Recibe year_half_created_at, store_id, tpv
 // // joinea con stores.csv cargado en memoria con store_id, store_name
 // // y me devuelve year_half_created_at, store_name, tpv
-func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string]string, userMap map[string]string, joinedResult *strings.Builder) {
+/*func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string]string, userMap map[string]string, joinedResult *strings.Builder) {
 	input := inputTransaction.String()
 
 	// Liberamos el buffer de input
@@ -287,12 +284,11 @@ func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string
 		// Necesito algo del estilo: storeName, birthday
 		fmt.Fprintf(joinedResult, "%s,%s\n", storeName, userBirthday)
 	}
-}
+}*/
 
-func joinerFunctionQuery4New(storeReceiver packet.PacketReceiver, userReceiver packet.PacketReceiver, transactionReceiver packet.PacketReceiver, joinedTransactions *strings.Builder) {
-	userMap     := createUserMap(userReceiver)
-	storeMap    := createStoreMap(storeReceiver)
-
+func joinerFunctionQuery4(storeReceiver packet.PacketReceiver, userReceiver packet.PacketReceiver, transactionReceiver packet.PacketReceiver, joinedTransactions *strings.Builder) {
+	userMap := createUserMap(userReceiver)
+	storeMap := createStoreMap(storeReceiver)
 
 	transactions := transactionReceiver.GetPayload()
 	lines := strings.Split(transactions, "\n")
@@ -305,7 +301,7 @@ func joinerFunctionQuery4New(storeReceiver packet.PacketReceiver, userReceiver p
 		// transactionID, storeID, userID
 		// TODO: EN ESTA PORONGA EL USER ID ES UN FLOAT
 		storeID, userID := cols[0], cols[1]
-		storeName    := storeMap[storeID]
+		storeName := storeMap[storeID]
 		userBirthday, exits := userMap[userID]
 		if !exits {
 			userBirthday = "2002-12-08"
