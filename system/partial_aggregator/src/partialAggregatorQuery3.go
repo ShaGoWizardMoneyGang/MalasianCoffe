@@ -6,7 +6,6 @@ import (
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -23,8 +22,10 @@ func aggregator3BySemesterTPV(input string) string {
 	}
 	acc := make(map[key]float64)
 
-	lines := strings.SplitSeq(input, "\n")
-	for line := range lines {
+	lines := strings.Split(input, "\n")
+	lines = lines[:len(lines)-1]
+
+	for _, line := range lines {
 		if line == "" {
 			continue
 		}
@@ -55,25 +56,13 @@ func aggregator3BySemesterTPV(input string) string {
 		acc[k] += amount
 	}
 
-	// ordeno por semestre y después por store_id
-	keys := make([]key, 0, len(acc))
-	for k := range acc {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].yearHalf == keys[j].yearHalf {
-			return keys[i].storeID < keys[j].storeID
-		}
-		return keys[i].yearHalf < keys[j].yearHalf
-	})
-
 	var b strings.Builder
-	for _, k := range keys {
+	for key, accum := range acc {
 		// NOTA FABRI: Esto me tiraba conflicto, dejo ambos.
 		// value := strconv.FormatFloat(acc[k], 'f', 0, 64)
-		value := strconv.FormatFloat(acc[k], 'f', 1, 64)
+		value := strconv.FormatFloat(accum, 'f', 1, 64)
 
-		fmt.Fprintf(&b, "%s,%s,%s\n", k.yearHalf, k.storeID, value)
+		fmt.Fprintf(&b, "%s,%s,%s\n", key.yearHalf, key.storeID, value)
 	}
 	return b.String()
 }
@@ -87,12 +76,16 @@ type PartialAggregator interface {
 type aggregator3Partial struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
+
+	receiver packet.PacketReceiver
 }
 
 func (a *aggregator3Partial) Build(rabbitAddr string) {
 	// mismas colas que las de antes
 	a.colaEntrada = colas.InstanceQueue("FilteredTransactions3", rabbitAddr)
 	a.colaSalida = colas.InstanceQueue("PartialAggregations3", rabbitAddr)
+
+	a.receiver = packet.NewPacketReceiver()
 }
 
 func (a *aggregator3Partial) GetInput() *middleware.MessageMiddlewareQueue {
@@ -100,10 +93,18 @@ func (a *aggregator3Partial) GetInput() *middleware.MessageMiddlewareQueue {
 }
 
 func (a *aggregator3Partial) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	input := pkt.GetPayload()
-	slog.Debug("Aggregator3Partial.Process: recibí payload")
+	a.receiver.ReceivePacket(pkt)
 
-	result := aggregator3BySemesterTPV(input)
+	if !a.receiver.ReceivedAll() {
+		slog.Debug("Aún no se han recibido todos los paquetes")
+		return nil
+	}
+
+	consolidatedInput := a.receiver.GetPayload()
+
+	result := aggregator3BySemesterTPV(consolidatedInput)
+
+	a.receiver = packet.NewPacketReceiver()
 
 	newPkts := packet.ChangePayload(pkt, []string{result})
 	return []packet.OutBoundMessage{
