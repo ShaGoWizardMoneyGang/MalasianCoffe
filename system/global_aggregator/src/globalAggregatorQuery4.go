@@ -16,34 +16,37 @@ import (
 type aggregator4Global struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
-	// acc         map[query4.Key]uint64
-	acc map[string]map[string]uint64
+	acc         map[string]map[string]uint64
+
+	receiver packet.PacketReceiver
 }
 
 func (g *aggregator4Global) Build(rabbitAddr string) {
 	g.colaEntrada = colas.InstanceQueue("PartialCountedUsers4", rabbitAddr)
-
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
-
-	// g.acc = make(map[query4.Key]uint64)
 	g.acc = make(map[string]map[string]uint64)
+
+	g.receiver = packet.NewPacketReceiver()
 }
 
 // user_id | store_id | #transactions
 func (g *aggregator4Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	input := pkt.GetPayload()
+	g.receiver.ReceivePacket(pkt)
 
-	isEOF := pkt.IsEOF()
-
-	g.ingestBatch(input)
-	if !isEOF {
+	if !g.receiver.ReceivedAll() {
 		return nil
 	}
+
+	consolidatedInput := g.receiver.GetPayload()
+
+	g.ingestBatch(consolidatedInput)
 
 	final := g.flushAndBuild()
 	if final == "" {
 		return nil
 	}
+
+	g.receiver = packet.NewPacketReceiver()
 
 	newPkts := packet.ChangePayload(pkt, []string{final})
 	return []packet.OutBoundMessage{
@@ -56,8 +59,10 @@ func (g *aggregator4Global) Process(pkt packet.Packet) []packet.OutBoundMessage 
 
 // user_id | store_id | #transactions
 func (g *aggregator4Global) ingestBatch(input string) {
-	lines := strings.SplitSeq(input, "\n")
-	for line := range lines {
+	lines := strings.Split(input, "\n")
+	lines = lines[:len(lines)-1]
+
+	for _, line := range lines {
 		if line == "" {
 			continue
 		}
@@ -76,7 +81,6 @@ func (g *aggregator4Global) ingestBatch(input string) {
 		if !exists {
 			g.acc[store_id] = make(map[string]uint64)
 		}
-		// user[user_id] += amount
 		g.acc[store_id][user_id] += amount
 	}
 }
@@ -115,6 +119,7 @@ func (g *aggregator4Global) flushAndBuild() string {
 			fmt.Fprintf(&b, "%s,%s\n", store, sortedSlice[i].user)
 		}
 	}
+
 	g.acc = make(map[string]map[string]uint64)
 	return b.String()
 }
