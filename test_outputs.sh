@@ -79,7 +79,7 @@ check_query4() {
         ANY_FAIL=1
         return
     fi
-        if go run test_output_query4/test_output_query4.go "$expected_file" "$out_file"; then
+        if ./bin/test_output_query_4 "$expected_file" "$out_file"; then
         echo -e "${GREEN}[OK]${RESET} $2 - Todos los usuarios son correctos"
     else
         echo -e "${RED}[FAIL]${RESET} $2 - Hay usuarios inválidos"

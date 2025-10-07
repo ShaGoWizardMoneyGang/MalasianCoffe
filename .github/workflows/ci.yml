@@ -94,5 +94,5 @@ jobs:
 
       - name: Run full local script
         run: |
-          chmod +x run_all_and_test.sh
-          bash run_all_and_test.sh
+          chmod +x run_all_and_test_ci.sh
+          bash run_all_and_test_ci.sh

@@ -3,11 +3,14 @@ services:
     container_name: client1
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/client ./dataset/ ../out/ gateway:9090 host.docker.internal:9093
+    entrypoint: sh -c "./bin/client ./dataset/ ./out/ gateway:9090 client1:9093 client1:9093 && bash test_outputs.sh RED" 
     volumes:
       - ../../bin/client:/app/bin/client
+      - ../../bin/test_output_query_4:/app/bin/test_output_query_4
       - ../../dataset:/app/dataset
-      - ../../out:/out
+      - ../../out:/app/out
+      - ../../test_outputs.sh:/app/test_outputs.sh
+      - ../../expected_outputs_red:/app/expected_outputs_red
     depends_on:
       - gateway
     networks:
