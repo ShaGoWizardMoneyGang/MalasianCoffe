@@ -14,8 +14,8 @@ import (
 // Recibe item_id, subtotal, created_at o  item_id, quantity, created_at
 // Devuelve year_month_created_at, item_id, sellings_qty o profit_sum
 func countFunctionQuery2b(input string) string {
-	rows := strings.Split(input, "\n")
-	rows = rows[:len(rows)-1] // El split me genera 1 linea de mas vacia por el ultimo /n, la ignoro
+	lines := strings.Split(input, "\n")
+	lines = lines[:len(lines)-1]
 
 	type key struct {
 		yearMonth string
@@ -23,8 +23,8 @@ func countFunctionQuery2b(input string) string {
 	}
 	counts := map[key]float64{}
 
-	for _, r := range rows {
-		cols := strings.Split(r, ",")
+	for _, line := range lines {
+		cols := strings.Split(line, ",")
 		if len(cols) < 3 {
 			panic("Invalid data format")
 		}
@@ -50,25 +50,26 @@ func countFunctionQuery2b(input string) string {
 
 type CounterQuery2b struct {
 	colaEntradaFilteredTransactionItems *middleware.MessageMiddlewareQueue
+	colaSalidaCountedSubtotal           *middleware.MessageMiddlewareQueue
 
-	colaSalidaCountedSubtotal *middleware.MessageMiddlewareQueue
+	receiver packet.PacketReceiver
 }
 
 func (c *CounterQuery2b) Build(rabbitAddr string) {
-
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactionItems2b", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactionItems2b", err))
 	}
-	//CountedItems2a
+	//CountedItems2b
 	colaSalida, err := middleware.CreateQueue("CountedItems2b", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "CountedItems2b", err))
 	}
 
 	c.colaEntradaFilteredTransactionItems = colaEntrada
-
 	c.colaSalidaCountedSubtotal = colaSalida
+
+	c.receiver = packet.NewPacketReceiver()
 }
 
 func (c *CounterQuery2b) GetInput() *middleware.MessageMiddlewareQueue {
@@ -76,18 +77,25 @@ func (c *CounterQuery2b) GetInput() *middleware.MessageMiddlewareQueue {
 }
 
 func (c *CounterQuery2b) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	input := pkt.GetPayload()
+	c.receiver.ReceivePacket(pkt)
 
-	counted_result := []string{countFunctionQuery2b(input)}
+	if !c.receiver.ReceivedAll() {
+		fmt.Println("Aún no se han recibido todos los paquetes")
+		return nil
+	}
+
+	consolidatedInput := c.receiver.GetPayload()
+
+	counted_result := []string{countFunctionQuery2b(consolidatedInput)}
+
+	c.receiver = packet.NewPacketReceiver()
 
 	newPayload := packet.ChangePayload(pkt, counted_result)
 
-	outBoundMessage := []packet.OutBoundMessage{
+	return []packet.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
 			ColaSalida: c.colaSalidaCountedSubtotal,
 		},
 	}
-
-	return outBoundMessage
 }
