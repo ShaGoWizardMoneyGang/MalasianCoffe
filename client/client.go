@@ -65,6 +65,7 @@ func main() {
 	out_dir := os.Args[2]
 	gateway_addr := os.Args[3]
 	listen_addr := os.Args[4]
+	sender_conn_addr := os.Args[5]
 
 	conn, err := net.Dial("tcp", gateway_addr)
 
@@ -90,7 +91,7 @@ func main() {
 			continue
 		}
 		subDirPath := dataset_directory + entry.Name()
-		err := createPackagesFrom(subDirPath, session_id, listen_addr, conn)
+		err := createPackagesFrom(subDirPath, session_id, sender_conn_addr, conn)
 		if err != nil {
 			panic(err)
 		}

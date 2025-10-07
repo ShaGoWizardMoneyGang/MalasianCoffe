@@ -102,7 +102,7 @@ func ChangePayloadJoin(pkt Packet, datasets []string, newPayload []string) []Pac
 		if err != nil {
 			panic(fmt.Errorf("%s unknown dataset", dataset_name))
 		}
-		datasetsIDs[i] = string(datasetID)
+		datasetsIDs[i] = strconv.FormatUint(datasetID, 10)
 	}
 
 	uuid := strings.Join(datasetsIDs, "-")

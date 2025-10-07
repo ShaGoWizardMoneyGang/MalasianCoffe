@@ -11,3 +11,6 @@ services:
     depends_on:
       - server
       - concat
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+

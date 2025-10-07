@@ -34,5 +34,7 @@ services:
       - ../../bin/gateway:/app/bin/gateway
     networks:
       - testing_net
+    ports:
+      - 9090:9090
     depends_on:
       - server

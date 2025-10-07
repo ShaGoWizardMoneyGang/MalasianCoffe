@@ -1,6 +1,7 @@
 package filter_mapper
 
 import (
+	"fmt"
 	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
@@ -67,7 +68,7 @@ func filterTransactionItems(input string) []string {
 
 		year_condition, err := yearCondition(created_at)
 		if err != nil {
-			slog.Error("Failed to parse year %w, skipping register", err)
+			slog.Error(fmt.Sprintf("Failed to parse year %s, skipping register", err))
 			continue
 		}
 
