@@ -52,7 +52,7 @@ func joinQuery2b(inputChannel chan packet.Packet, outputQueue *middleware.Messag
 
 		if menuItemReceiver.ReceivedAll() && transactionItemReceiver.ReceivedAll() {
 			slog.Info("Comienza proceso de join")
-			joinerFunctionQuery2bNew(menuItemReceiver, transactionItemReceiver, &joinedTransactionItems)
+			joinerFunctionQuery2b(menuItemReceiver, transactionItemReceiver, &joinedTransactionItems)
 
 			last_packet = pkt
 			break
@@ -159,7 +159,7 @@ func (jq2b *joinerQuery2b) Process() {
 	}
 }
 
-func joinerFunctionQuery2bNew(menuItemReceiver packet.PacketReceiver, transactionItemReceiver packet.PacketReceiver, joinedTransactionItems *strings.Builder) {
+func joinerFunctionQuery2b(menuItemReceiver packet.PacketReceiver, transactionItemReceiver packet.PacketReceiver, joinedTransactionItems *strings.Builder) {
 	menuItemMap := createMenuItemMap(menuItemReceiver)
 
 	transactionItems := transactionItemReceiver.GetPayload()
