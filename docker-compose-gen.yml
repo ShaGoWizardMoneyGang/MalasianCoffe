@@ -1,17 +1,6 @@
-def header():
-    return """name: tp1
+name: tp1
 services:
-"""
-
-def networks():
-    return """
-networks:
-  testing_net:
-    driver: bridge
-"""
-
-def commons():
-    return """  rabbitmq:
+  rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:4.1.4-management
     ports:
@@ -50,12 +39,9 @@ def commons():
       - 9090:9090
     depends_on:
       - server
-"""
 
-def filter_transactions_block(n):
-    return f"""
-  filter_transactions{n}:
-    container_name: filter_transactions{n}
+  filter_transactions1:
+    container_name: filter_transactions1
     image: ubuntu:24.04
     working_dir: /app
     entrypoint: ./bin/filter_mapper rabbitmq:5672 transactions
@@ -65,12 +51,9 @@ def filter_transactions_block(n):
       - testing_net
     depends_on:
       - server
-"""
 
-def filter_transaction_items_block(n):
-    return f"""
-  filter_transaction_items{n}:
-    container_name: filter_transaction_items{n}
+  filter_transaction_items1:
+    container_name: filter_transaction_items1
     image: ubuntu:24.04
     working_dir: /app
     entrypoint: ./bin/filter_mapper rabbitmq:5672 transaction_items
@@ -80,29 +63,19 @@ def filter_transaction_items_block(n):
         - testing_net
     depends_on:
         - server
-"""
 
-def read_config_file():
-    with open("compose.config", "r") as file:
-        lines = file.readlines()
-    configs = {}
-    for line in lines:
-        key, value = line.strip().split("=", 1)
-        configs[key] = int(value)
-    return configs
+  filter_transaction_items2:
+    container_name: filter_transaction_items2
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 transaction_items
+    volumes:
+        - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+        - testing_net
+    depends_on:
+        - server
 
-def main():
-    configs = read_config_file()
-    print(f"Configuration values: {configs}")
-
-    output_file = "docker-compose-gen.yml"        
-    with open(output_file, 'w') as file:
-        file.write(header())
-        file.write(commons())
-        file.writelines(filter_transactions_block(i) for i in range(1, configs.get("filter-transactions", 0) + 1))
-        file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
-
-        file.write(networks())    
-
-if __name__ == "__main__":
-    main()
+networks:
+  testing_net:
+    driver: bridge
