@@ -82,11 +82,47 @@ def filter_transaction_items_block(n):
         - server
 """
 
+def concat_block(n):
+    return f"""
+  concat:
+    container_name: concat
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/concat rabbitmq:5672
+    volumes:
+      - ./bin/concat:/app/bin/concat
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - rabbitmq
+"""
+
+def sender_block(n, query):
+    return f"""
+  sender{n}:
+    container_name: sender{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/sender rabbitmq:5672 Query{query}
+    volumes:
+      - ./bin/sender:/app/bin/sender
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - concat
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+"""
+
 def read_config_file():
     with open("compose.config", "r") as file:
         lines = file.readlines()
     configs = {}
     for line in lines:
+        if line.strip() == "" or line.startswith("#"):
+          continue
         key, value = line.strip().split("=", 1)
         configs[key] = int(value)
     return configs
@@ -101,8 +137,11 @@ def main():
         file.write(commons())
         file.writelines(filter_transactions_block(i) for i in range(1, configs.get("filter-transactions", 0) + 1))
         file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
+        file.writelines(concat_block(i) for i in range(1, configs.get("concat1", 0) + 1))
+        file.writelines(sender_block(i, 1) for i in range(1, configs.get("sender1", 0) + 1))
 
-        file.write(networks())    
+        
+        file.write(networks())
 
 if __name__ == "__main__":
     main()

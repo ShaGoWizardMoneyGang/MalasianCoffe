@@ -64,17 +64,33 @@ services:
     depends_on:
         - server
 
-  filter_transaction_items2:
-    container_name: filter_transaction_items2
+  concat:
+    container_name: concat
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 transaction_items
+    entrypoint: ./bin/concat rabbitmq:5672
     volumes:
-        - ./bin/filter_mapper:/app/bin/filter_mapper
+      - ./bin/concat:/app/bin/concat
     networks:
-        - testing_net
+      - testing_net
     depends_on:
-        - server
+      - server
+      - rabbitmq
+
+  sender1:
+    container_name: sender1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/sender rabbitmq:5672 Query1
+    volumes:
+      - ./bin/sender:/app/bin/sender
+    networks:
+      - testing_net
+    depends_on:
+      - server
+      - concat
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   testing_net:
