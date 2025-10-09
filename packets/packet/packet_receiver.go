@@ -2,7 +2,7 @@ package packet
 
 import (
 	"fmt"
-	"log/slog"
+	"malasian_coffe/bitacora"
 	"slices"
 	"strings"
 )
@@ -19,13 +19,19 @@ type PacketReceiver struct {
 
 
 	buffer strings.Builder
+
+	humanIdentifier string
 }
 
-func NewPacketReceiver() PacketReceiver {
+// HumanIdentifier es el nombre que identifica al packet receiver. Esto esta
+// pensando para los logs.  Esta pensando para que sea un nombre que nos ayude a
+// la hora de leer los prints del log.
+func NewPacketReceiver(humanIdentifier string) PacketReceiver {
 	return PacketReceiver{
 		ordered_package: []Packet{},
 		receivedEOF: false,
 		allReceived: false,
+		humanIdentifier: humanIdentifier,
 	}
 }
 
@@ -42,10 +48,10 @@ func (pr *PacketReceiver) ReceivePacket(pkt Packet) bool {
 			return sn_i - sn_j})
 
 	if exits {
-		slog.Debug(fmt.Sprintf("Duplicate packet received. UUID: %s", pkt.GetUUID()))
+		bitacora.Debug(fmt.Sprintf("Duplicate packet received. UUID: %s", pkt.GetUUID()))
 		pkt_existente := pr.ordered_package[n]
 		if pkt_existente.GetPayload() != pkt.GetPayload() {
-			slog.Warn(fmt.Sprintf(`ATENCION: Los dos paquetes tienen distinto payload.
+			bitacora.Info(fmt.Sprintf(`ATENCION: Los dos paquetes tienen distinto payload.
 Existente:
 %s
 Nuevo:
@@ -98,6 +104,8 @@ Nuevo:
 	// reseteamos.
 	if pr.allReceived == false {
 		pr.buffer.Reset()
+	} else {
+		bitacora.Info(fmt.Sprintf("El packet receiver %s, recibio todos los paquetes que esperaba", pr.humanIdentifier))
 	}
 
 	return pr.allReceived

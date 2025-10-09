@@ -44,13 +44,13 @@ func createUserMap(userReceiver packet.PacketReceiver) map[string]string {
 }
 
 func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
-	storeReceiver := packet.NewPacketReceiver()
+	storeReceiver := packet.NewPacketReceiver("Store")
 
-	userReceiver := packet.NewPacketReceiver()
+	userReceiver := packet.NewPacketReceiver("User")
 
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
 	// stores. Deberian ser pocos (si es que existen)
-	transactionReceiver := packet.NewPacketReceiver()
+	transactionReceiver := packet.NewPacketReceiver("Transactions")
 
 	// Resultado final
 	var joinedTransactions strings.Builder

@@ -30,7 +30,7 @@ func (g *aggregator2aGlobal) Build(rabbitAddr string) {
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation2a", rabbitAddr)
 	g.acc = make(map[keyQuery2a]int64)
 
-	g.receiver = packet.NewPacketReceiver()
+	g.receiver = packet.NewPacketReceiver("Agregador global")
 }
 
 func (g *aggregator2aGlobal) GetInput() *middleware.MessageMiddlewareQueue {
@@ -121,7 +121,7 @@ func (g *aggregator2aGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage
 		return nil
 	}
 
-	g.receiver = packet.NewPacketReceiver()
+	g.receiver = packet.NewPacketReceiver("Agregator 2a")
 
 	newPkts := packet.ChangePayload(pkt, []string{final})
 	return []packet.OutBoundMessage{

@@ -24,9 +24,9 @@ type joinerQuery3 struct {
 }
 
 func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
-	storeReceiver := packet.NewPacketReceiver()
+	storeReceiver := packet.NewPacketReceiver("Stores")
 
-	transactionReceiver := packet.NewPacketReceiver()
+	transactionReceiver := packet.NewPacketReceiver("Transactions")
 
 	var joinedTransactions strings.Builder
 

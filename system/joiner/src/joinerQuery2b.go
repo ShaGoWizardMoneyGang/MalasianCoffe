@@ -24,9 +24,9 @@ type joinerQuery2b struct {
 }
 
 func joinQuery2b(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
-	menuItemReceiver := packet.NewPacketReceiver()
+	menuItemReceiver := packet.NewPacketReceiver("Menu items")
 
-	transactionItemReceiver := packet.NewPacketReceiver()
+	transactionItemReceiver := packet.NewPacketReceiver("Transaction items")
 
 	var joinedTransactionItems strings.Builder
 

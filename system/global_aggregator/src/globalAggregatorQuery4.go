@@ -26,7 +26,7 @@ func (g *aggregator4Global) Build(rabbitAddr string) {
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
 	g.acc = make(map[string]map[string]uint64)
 
-	g.receiver = packet.NewPacketReceiver()
+	g.receiver = packet.NewPacketReceiver("Aggregator 4")
 }
 
 // user_id | store_id | #transactions
@@ -46,7 +46,7 @@ func (g *aggregator4Global) Process(pkt packet.Packet) []packet.OutBoundMessage 
 		return nil
 	}
 
-	g.receiver = packet.NewPacketReceiver()
+	g.receiver = packet.NewPacketReceiver("Aggregator 4")
 
 	newPkts := packet.ChangePayload(pkt, []string{final})
 	return []packet.OutBoundMessage{
