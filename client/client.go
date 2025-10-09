@@ -189,6 +189,24 @@ func (ra *received_answers) display() {
 	}
 }
 
+func receiveAnswer(conn net.Conn, out_dir string, finish_ch chan <- string) {
+	packet_answer_b, err := network.ReceiveFromNetwork(conn)
+	if err != nil {
+		panic(fmt.Errorf("Failed to receive packet from %s because of %s", conn.LocalAddr().String(), err))
+		}
+
+	packet_answer_reader := bytes.NewReader(packet_answer_b)
+	packet_answer, err := packetanswer.DeserializePackageAnswer(packet_answer_reader)
+	if err != nil {
+		panic(fmt.Errorf("Failed to deserialize packet because of %s", err))
+	}
+
+	write_to_file(packet_answer, out_dir)
+	queryName := packet_answer.GetQuery()
+
+	finish_ch <- queryName
+}
+
 func waitForAnswers(listen_addr string, out_dir string) error {
 	err := os.MkdirAll(out_dir, 0777)
 	if err != nil {
@@ -196,38 +214,36 @@ func waitForAnswers(listen_addr string, out_dir string) error {
 	}
 	received_answers := new_received_answers()
 
+	finish     := make(chan string)
+	new_connection := make(chan net.Conn)
+
 	list, err := net.Listen("tcp", listen_addr)
 	if err != nil {
 		panic(fmt.Errorf("Failed to create listener %w", err))
 	}
-	for {
-		received_answers.display()
-		// NOTE: Esto supone que la respuesta te llega en un solo Packet
+
+	go func() {
 		conn, err := list.Accept()
 		if err != nil {
-			return err
+			panic(err)
 		}
 
-		packet_answer_b, err := network.ReceiveFromNetwork(conn)
-		if err != nil {
-			return fmt.Errorf("Failed to receive packet from %s because of %s", conn.LocalAddr().String(), err)
-		}
+		new_connection <- conn
+	}()
 
-		packet_answer_reader := bytes.NewReader(packet_answer_b)
-		packet_answer, err := packetanswer.DeserializePackageAnswer(packet_answer_reader)
-		if err != nil {
-			return fmt.Errorf("Failed to deserialize packet because of %s", err)
-		}
-
-		write_to_file(packet_answer, out_dir)
-		queryName := packet_answer.GetQuery()
-		received_answers.addAnswer(queryName)
-
-		if received_answers.allReceived() {
-			received_answers.display()
-			os.Exit(0)
+	for {
+		select {
+		case conn := <-new_connection:
+			go receiveAnswer(conn, out_dir, finish)
+		case query_name := <-finish:
+			received_answers.addAnswer(query_name)
+			if received_answers.allReceived() {
+				received_answers.display()
+				os.Exit(0)
+			}
 		}
 	}
+
 }
 
 func write_to_file(pkt packetanswer.PacketAnswer, out_dir string) error {
