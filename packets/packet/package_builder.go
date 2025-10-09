@@ -88,6 +88,8 @@ func (pb *PacketBuilder) Send(register string) error {
 }
 
 func (pb *PacketBuilder) End() error {
+	defer pb.gatewayIP.Close()
+
 	packet, err := pb.createPacket(pb.payload_buffer.String(), true)
 
 	if err != nil {
@@ -102,6 +104,7 @@ func (pb *PacketBuilder) End() error {
 	pb.payload_buffer.Reset()
 
 	bitacora.Info(fmt.Sprintf("Envie %d paquetes, del dataset %s", pb.currentSequenceNumber, pb.directory_name))
+
 
 	return nil
 }
