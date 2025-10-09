@@ -10,6 +10,7 @@ import (
 
 	"net"
 
+	"malasian_coffe/bitacora"
 	"malasian_coffe/protocol"
 	"malasian_coffe/utils/network"
 	"malasian_coffe/utils/uuid"
@@ -53,6 +54,7 @@ func main() {
 }
 
 func handle_connection(conn net.Conn, system net.Conn) {
+	bitacora.Info("Proceso nueva conexion")
 	defer conn.Close()
 	session_id := uuid.GenerateUUID()
 	session_id_b := protocol.SerializeString(session_id)
@@ -69,5 +71,5 @@ func handle_connection(conn net.Conn, system net.Conn) {
 		}
 		network.SendToNetwork(system, packet)
 	}
-	fmt.Printf("Session %s ended - Finished Handling\n", session_id)
+	bitacora.Info(fmt.Sprintf("Session %s ended - Finished Handling\n", session_id))
 }
