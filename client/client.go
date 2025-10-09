@@ -146,9 +146,9 @@ func new_received_answers() received_answers {
 	return received_answers
 }
 
-func (ra *received_answers) addAnswer(pkt packetanswer.PacketAnswer) {
+func (ra *received_answers) addAnswer(queryName string) {
 	var index int
-	switch pkt.GetQuery() {
+	switch queryName {
 	case "Query1":
 		index = 0
 	case "Query2a":
@@ -160,13 +160,12 @@ func (ra *received_answers) addAnswer(pkt packetanswer.PacketAnswer) {
 	case "Query4":
 		index = 4
 	default:
-		panic(fmt.Sprintf("Unknown query: %s", pkt.GetQuery()))
+		panic(fmt.Sprintf("Unknown query: %s", queryName))
 	}
 
 	ra.received[index].received = true
 
-	// TODO: Escribir texto a archivo
-	fmt.Printf("Recibi paquete respuesta de la %s: \n", pkt.GetQuery())
+	fmt.Printf("Recibi paquete respuesta de la %s: \n", queryName)
 }
 
 func (ra *received_answers) allReceived() bool {
@@ -221,7 +220,8 @@ func waitForAnswers(listen_addr string, out_dir string) error {
 		}
 
 		write_to_file(packet_answer, out_dir)
-		received_answers.addAnswer(packet_answer)
+		queryName := packet_answer.GetQuery()
+		received_answers.addAnswer(queryName)
 
 		if received_answers.allReceived() {
 			received_answers.display()
