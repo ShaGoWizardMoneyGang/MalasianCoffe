@@ -78,7 +78,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	println(session_id)
+	fmt.Printf("Mi session ID es: %s\n", session_id)
 
 	entries, err := os.ReadDir(dataset_directory)
 	if err != nil {

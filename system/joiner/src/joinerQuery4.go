@@ -101,7 +101,6 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 }
 
 func (jq4 *joinerQuery4) passPacketToJoiner(pkt packet.Packet) {
-	bitacora.Info("Envio packete a la session")
 	sessionID := pkt.GetSessionID()
 	channel, exists := jq4.sessions[sessionID]
 
@@ -155,7 +154,6 @@ func (jq4 *joinerQuery4) Process() {
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
-			bitacora.Info("Recibi mensaje de cola de stores")
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
@@ -174,7 +172,6 @@ func (jq4 *joinerQuery4) Process() {
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
-			bitacora.Info("Recibi mensaje de cola de users")
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
@@ -195,7 +192,6 @@ func (jq4 *joinerQuery4) Process() {
 		messages := colas.ConsumeInput(colasEntrada)
 
 		for message := range *messages {
-			bitacora.Info("Recibi mensaje de cola de aggregated filtered transactions")
 
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)

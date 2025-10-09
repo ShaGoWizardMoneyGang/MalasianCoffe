@@ -115,7 +115,6 @@ func (jq2b *joinerQuery2b) Process() {
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de menu items")
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
@@ -134,7 +133,6 @@ func (jq2b *joinerQuery2b) Process() {
 		messages := colas.ConsumeInput(colasEntrada)
 
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de aggregated filtered transaction items")
 
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
