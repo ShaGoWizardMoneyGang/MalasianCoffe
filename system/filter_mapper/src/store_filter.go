@@ -9,7 +9,6 @@ import (
 )
 
 func filterStores(input string) []string {
-	print("[FILTER STORES]:", input)
 	lines := strings.Split(input, "\n")
 	final := ""
 	for _, line := range lines {
