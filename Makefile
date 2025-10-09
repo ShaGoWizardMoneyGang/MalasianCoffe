@@ -29,6 +29,7 @@ run-server: build-server
 
 run-client: build-client
 	${BINDIR}/client ${DATADIR} ${OUTDIR} ${GATEWAY_ADDR} ${CLIENT_LISTEN_ADDR} ${SENDER_CONN_ADDR}
+	@echo "Cliente finalizo, comparar resultados con 'make test-outputs-reduced'"
 
 run-gateway: build-gateway
 	${BINDIR}/gateway ${GATEWAY_ADDR} ${SERVER_ADDR} ${RUN_FUNCTION}
@@ -106,15 +107,26 @@ lint:
 	./.github/scripts/check_go_version.sh
 	./.github/scripts/check_invariantes.sh
 
+test-outputs-reduced:
+	bash scripts/test_outputs.sh RED
+
 #=================================== Docker ====================================
 
-docker-all: build
-	docker compose -f docker-compose.yml up -d
+docker-multi: build
+	python3 scripts/generar_compose.py
+	docker compose -f docker-compose-gen.yml up -d
+	@echo "Docker levantado, usar 'make client' para correr un cliente"
 
 docker-down:
-	docker compose down
+	docker compose -f docker-compose-gen.yml down -v --remove-orphans
+
+docker-ci:
+	docker compose -f docker-compose-ci.yml up -d
 
 #============================== Misc directives ===============================
+clean-out:
+	rm out/Query*.csv
+
 download-dataset:
 	curl -C - -L https://www.kaggle.com/api/v1/datasets/download/geraldooizx/g-coffee-shop-transaction-202307-to-202506 -o dataset/dataset.zip
 	unzip -n dataset/dataset.zip -d dataset/

@@ -6,7 +6,7 @@ make build
 make download-reduced-dataset
 
 # Levantar todos los servicios en detached mode
-docker compose -f docker-compose-ci.yml up -d
+make docker-ci
 
 # Seguir logs de client1 en tiempo real
 docker logs -f client1 &
@@ -19,4 +19,4 @@ docker wait client1
 kill $LOG_PID || true
 
 # Ejecutar tests
-bash test_outputs.sh RED
+make test-outputs-reduced
