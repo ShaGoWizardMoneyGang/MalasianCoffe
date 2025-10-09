@@ -2,7 +2,7 @@ package filter_mapper
 
 import (
 	"fmt"
-	"log/slog"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
@@ -21,7 +21,6 @@ func transactionFilterQuery4(year_condition bool, transaction_id string, store_i
 	}
 
 	// NOTE: Descartamos el .0 anadido que tienen por algun motivo
-	fmt.Println(user_id)
 	user_id_int := user_id[:len(user_id)-2]
 
 	new_line := transaction_id + "," + store_id + "," + user_id_int + "\n"
@@ -74,7 +73,7 @@ func filterTransactions(input string) []string {
 
 		data := strings.Split(line, ",")
 		if len(data) < 9 {
-			slog.Debug("Registro con menos de 9 columnas, dropeado")
+			bitacora.Debug("Registro con menos de 9 columnas, dropeado")
 			continue
 		}
 
@@ -86,17 +85,17 @@ func filterTransactions(input string) []string {
 
 		year_condition, err := yearCondition(time_s)
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to parse year %s, skipping register", err))
+			bitacora.Error(fmt.Sprintf("Failed to parse year %s, skipping register", err))
 			continue
 		}
 		hour_condition, err := hourCondition(time_s)
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to parse hour %s, skipping register", err))
+			bitacora.Error(fmt.Sprintf("Failed to parse hour %s, skipping register", err))
 			continue
 		}
 		amount_condition, err := amountCondition(amount_s)
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to parse amount %s, skipping register", err))
+			bitacora.Error(fmt.Sprintf("Failed to parse amount %s, skipping register", err))
 			continue
 		}
 		// Saco el punto de punto flotante del user id

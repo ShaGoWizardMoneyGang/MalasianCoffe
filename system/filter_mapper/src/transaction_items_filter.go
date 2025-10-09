@@ -2,7 +2,7 @@ package filter_mapper
 
 import (
 	"fmt"
-	"log/slog"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
@@ -57,7 +57,7 @@ func filterTransactionItems(input string) []string {
 
 		data := strings.Split(line, ",")
 		if len(data) < 6 {
-			slog.Debug("Registro con menos de 6 columnas, dropeado", "line", line, "columns", len(data))
+			bitacora.Debug(fmt.Sprintf("Registro con menos de 6 columnas"))
 			continue
 		}
 
@@ -68,7 +68,7 @@ func filterTransactionItems(input string) []string {
 
 		year_condition, err := yearCondition(created_at)
 		if err != nil {
-			slog.Error(fmt.Sprintf("Failed to parse year %s, skipping register", err))
+			bitacora.Error(fmt.Sprintf("Failed to parse year %s, skipping register", err))
 			continue
 		}
 
