@@ -2,7 +2,6 @@ package global_aggregator
 
 import (
 	"fmt"
-	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
@@ -30,7 +29,7 @@ func (g *aggregator3Global) Build(rabbitAddr string) {
 	//g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 	g.acc = make(map[keyQuery3]float64)
 
-	g.receiver = packet.NewPacketReceiver()
+	g.receiver = packet.NewPacketReceiver("Aggregator 3")
 }
 
 func (g *aggregator3Global) GetInput() *middleware.MessageMiddlewareQueue {
@@ -95,12 +94,9 @@ func (g *aggregator3Global) flushAndBuild() string {
 }
 
 func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	slog.Info("Processing packet in Global Aggregator 3")
-
 	g.receiver.ReceivePacket(pkt)
 
 	if !g.receiver.ReceivedAll() {
-		slog.Info("Aún no se han recibido todos los paquetes")
 		return nil
 	}
 
@@ -113,7 +109,7 @@ func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage 
 		return nil
 	}
 
-	g.receiver = packet.NewPacketReceiver()
+	g.receiver = packet.NewPacketReceiver("Aggregator 3")
 
 	newPkts := packet.ChangePayload(pkt, []string{final})
 	return []packet.OutBoundMessage{

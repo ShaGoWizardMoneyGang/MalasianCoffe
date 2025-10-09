@@ -24,9 +24,9 @@ type joinerQuery3 struct {
 }
 
 func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
-	storeReceiver := packet.NewPacketReceiver()
+	storeReceiver := packet.NewPacketReceiver("Stores")
 
-	transactionReceiver := packet.NewPacketReceiver()
+	transactionReceiver := packet.NewPacketReceiver("Transactions")
 
 	var joinedTransactions strings.Builder
 
@@ -34,7 +34,6 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 
 	for {
 		pkt := <-inputChannel
-		fmt.Printf("Recibi %v\n", pkt)
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -65,7 +64,6 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 
 	slog.Info("Envio pkt joineado al sender")
 	for _, pkt := range pkt_joineado {
-		fmt.Printf("%+v\n", pkt)
 		outputQueue.Send(pkt.Serialize())
 	}
 }
@@ -115,7 +113,6 @@ func (jq3 *joinerQuery3) Process() {
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de stores")
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
@@ -134,8 +131,6 @@ func (jq3 *joinerQuery3) Process() {
 		messages := colas.ConsumeInput(colasEntrada)
 
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de aggregated filtered transactions")
-
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 

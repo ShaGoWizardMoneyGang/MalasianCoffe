@@ -2,6 +2,7 @@ package global_aggregator
 
 import (
 	"fmt"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
@@ -30,7 +31,7 @@ func (g *aggregator2bGlobal) Build(rabbitAddr string) {
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation2b", rabbitAddr)
 	g.acc = make(map[keyQuery2b]float64)
 
-	g.receiver = packet.NewPacketReceiver()
+	g.receiver = packet.NewPacketReceiver("Aggregator 2b")
 }
 
 func (g *aggregator2bGlobal) GetInput() *middleware.MessageMiddlewareQueue {
@@ -47,7 +48,8 @@ func (g *aggregator2bGlobal) ingestBatch(input string) {
 		}
 		cols := strings.Split(line, ",")
 		if len(cols) != 3 {
-			panic("Se esperaban 3 columnas")
+			bitacora.Debug("Se esperaban 3 columnas")
+			continue
 		}
 		yearMonth := cols[0]
 		itemID := cols[1]
@@ -55,7 +57,7 @@ func (g *aggregator2bGlobal) ingestBatch(input string) {
 
 		subtotal, err := strconv.ParseFloat(subtotalStr, 64)
 		if err != nil {
-			panic("Subtotal con formato inválido")
+			bitacora.Error("Subtotal con formato inválido")
 		}
 
 		k := keyQuery2b{yearMonth: yearMonth, itemID: itemID}
@@ -108,7 +110,6 @@ func (g *aggregator2bGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage
 	g.receiver.ReceivePacket(pkt)
 
 	if !g.receiver.ReceivedAll() {
-		fmt.Println("Aún no se han recibido todos los paquetes")
 		return nil
 	}
 	consolidatedInput := g.receiver.GetPayload()
@@ -120,7 +121,7 @@ func (g *aggregator2bGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage
 		return nil
 	}
 
-	g.receiver = packet.NewPacketReceiver()
+	g.receiver = packet.NewPacketReceiver("Aggretor 2b")
 
 	newPkts := packet.ChangePayload(pkt, []string{final})
 	return []packet.OutBoundMessage{

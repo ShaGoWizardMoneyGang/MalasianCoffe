@@ -1,6 +1,8 @@
 package joiner
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Joiner interface {
 	// Funcion que inicializa las cosas que el filter necesita

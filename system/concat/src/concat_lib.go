@@ -20,7 +20,7 @@ func (c *Concat) Process(pkt packet.Packet) []packet.Packet {
 	outputs := []string{consolidatedInput}
 	newPacket := packet.ChangePayload(pkt, outputs)
 
-	c.receiver = packet.NewPacketReceiver()
+	c.receiver = packet.NewPacketReceiver("concater")
 
 	return newPacket
 }

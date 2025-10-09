@@ -24,9 +24,9 @@ type joinerQuery2a struct {
 }
 
 func joinQuery2a(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
-	menuItemReceiver := packet.NewPacketReceiver()
+	menuItemReceiver := packet.NewPacketReceiver("Menu items")
 
-	transactionItemReceiver := packet.NewPacketReceiver()
+	transactionItemReceiver := packet.NewPacketReceiver("Transaction items")
 
 	var joinedTransactionItems strings.Builder
 
@@ -114,7 +114,6 @@ func (jq2a *joinerQuery2a) Process() {
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de menu items")
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
@@ -133,8 +132,6 @@ func (jq2a *joinerQuery2a) Process() {
 		messages := colas.ConsumeInput(colasEntrada)
 
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de aggregated filtered transaction items")
-
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
