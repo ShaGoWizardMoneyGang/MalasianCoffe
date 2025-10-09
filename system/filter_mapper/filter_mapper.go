@@ -48,7 +48,7 @@ make run-filter RUN_FUNCTION=transactions
 
 		err := message.Ack(false)
 		if err != nil {
-			bitacora.Error(fmt.Sprintf("Could not ack, %w", err))
+			bitacora.Error(fmt.Errorf("Could not ack, %w", err).Error())
 		}
 	}
 }
