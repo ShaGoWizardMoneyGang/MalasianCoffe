@@ -2,14 +2,16 @@ package packet
 
 import (
 	"errors"
+	"fmt"
 
 	"net"
 	"strings"
 
 	"strconv"
 
-	"malasian_coffe/utils/network"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/utils/dataset"
+	"malasian_coffe/utils/network"
 )
 
 const (
@@ -98,6 +100,8 @@ func (pb *PacketBuilder) End() error {
 	}
 
 	pb.payload_buffer.Reset()
+
+	bitacora.Info(fmt.Sprintf("Envie %d paquetes, del dataset %s", pb.currentSequenceNumber, pb.directory_name))
 
 	return nil
 }

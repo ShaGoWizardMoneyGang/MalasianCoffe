@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"log/slog"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	aggregator "malasian_coffe/system/global_aggregator/src"
 	"malasian_coffe/system/middleware"
@@ -26,20 +26,20 @@ func main() {
 	aggName := os.Args[2]
 
 	worker := aggregator.GlobalAggregatorBuilder(aggName, rabbitAddr)
-	slog.Info("Starting global aggregator", "name", aggName)
+	bitacora.Info(fmt.Sprintf("Starting global aggregator name %s", aggName))
+
 	colaEntrada := worker.GetInput()
+
 	msgQueue := consumeInput(colaEntrada)
-	slog.Info("Queue to consume", "queue", colaEntrada)
+
 	for message := range *msgQueue {
-		slog.Info("Received message", "queue", msgQueue)
 		reader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(reader)
 
 		outMsgs := worker.Process(pkt)
 
 		for _, out := range outMsgs {
-			slog.Info("Sending packet to joiner")
-			fmt.Printf("%v", pkt)
+			bitacora.Info(fmt.Sprintf("Sending packet, with UUID %s, to joiner", pkt.GetUUID()))
 			_ = out.ColaSalida.Send(out.Packet.Serialize())
 		}
 

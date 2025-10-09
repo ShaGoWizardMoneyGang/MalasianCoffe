@@ -2,7 +2,6 @@ package global_aggregator
 
 import (
 	"fmt"
-	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
@@ -95,12 +94,9 @@ func (g *aggregator3Global) flushAndBuild() string {
 }
 
 func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	slog.Info("Processing packet in Global Aggregator 3")
-
 	g.receiver.ReceivePacket(pkt)
 
 	if !g.receiver.ReceivedAll() {
-		slog.Info("Aún no se han recibido todos los paquetes")
 		return nil
 	}
 

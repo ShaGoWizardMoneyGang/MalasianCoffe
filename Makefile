@@ -27,7 +27,7 @@ RUN_FUNCTION           ?=    ""
 run-server: build-server
 	${BINDIR}/server ${SERVER_ADDR} ${RABBIT_ADDR}
 
-run-client: build-client
+run-client: build-client clean-out
 	${BINDIR}/client ${DATADIR} ${OUTDIR} ${GATEWAY_ADDR} ${CLIENT_LISTEN_ADDR} ${SENDER_CONN_ADDR}
 	@echo "Cliente finalizo, comparar resultados con 'make test-outputs-reduced'"
 
@@ -120,12 +120,15 @@ docker-multi: build
 docker-down:
 	docker compose -f docker-compose-gen.yml down -v --remove-orphans
 
+docker-logs:
+	docker compose -f docker-compose-gen.yml logs
+
 docker-ci:
 	docker compose -f docker-compose-ci.yml up -d
 
 #============================== Misc directives ===============================
 clean-out:
-	rm out/Query*.csv
+	rm -f out/Query*.csv
 
 download-dataset:
 	curl -C - -L https://www.kaggle.com/api/v1/datasets/download/geraldooizx/g-coffee-shop-transaction-202307-to-202506 -o dataset/dataset.zip
