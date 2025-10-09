@@ -82,10 +82,55 @@ def filter_transaction_items_block(n):
         - server
 """
 
+def filter_users_block(n):
+    return f"""
+  filter_users{n}:
+    container_name: filter_users{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 users
+    volumes:
+      - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
+
+def filter_stores_block(n):
+    return f"""
+  filter_stores{n}:
+    container_name: filter_stores{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 stores
+    volumes:
+      - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
+
+def filter_menu_items_block(n):
+    return f"""
+  filter_menu_items{n}:
+    container_name: filter_menu_items{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 menu_items
+    volumes:
+      - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
+
 def concat_block(n):
     return f"""
-  concat:
-    container_name: concat
+  concat_{n}:
+    container_name: concat_{n}
     image: ubuntu:24.04
     working_dir: /app
     entrypoint: ./bin/concat rabbitmq:5672
@@ -100,8 +145,8 @@ def concat_block(n):
 
 def sender_block(n, query):
     return f"""
-  sender{n}:
-    container_name: sender{n}
+  sender{query}_{n}:
+    container_name: sender{query}_{n}
     image: ubuntu:24.04
     working_dir: /app
     entrypoint: ./bin/sender rabbitmq:5672 Query{query}
@@ -111,9 +156,68 @@ def sender_block(n, query):
       - testing_net
     depends_on:
       - server
-      - concat
     extra_hosts:
       - "host.docker.internal:host-gateway"
+"""
+
+def counter_block(n, query):
+    return f"""
+  counter{query}_{n}:
+    container_name: counter{query}_{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/counter rabbitmq:5672 Query{query}
+    volumes:
+      - ./bin/counter:/app/bin/counter
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
+
+def global_aggregator_block(n, query):
+    return f"""
+  global_aggregator{query}_{n}:
+    container_name: global_aggregator{query}_{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query{query}
+    volumes:
+      - ./bin/global_aggregator:/app/bin/global_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
+
+def joiner_block(n, query):
+    return f"""
+  joiner{query}_{n}:
+    container_name: joiner{query}_{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/joiner rabbitmq:5672 Query{query}
+    volumes:
+      - ./bin/joiner:/app/bin/joiner
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
+
+def partial_aggregator_block(n, query):
+    return f"""
+  partial_aggregator{query}_{n}:
+    container_name: partial_aggregator{query}_{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/partial_aggregator rabbitmq:5672 Query{query}
+    volumes:
+      - ./bin/partial_aggregator:/app/bin/partial_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
 """
 
 def read_config_file():
@@ -137,10 +241,37 @@ def main():
         file.write(commons())
         file.writelines(filter_transactions_block(i) for i in range(1, configs.get("filter-transactions", 0) + 1))
         file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
-        file.writelines(concat_block(i) for i in range(1, configs.get("concat1", 0) + 1))
-        file.writelines(sender_block(i, 1) for i in range(1, configs.get("sender1", 0) + 1))
+        file.writelines(filter_users_block(i) for i in range(1, configs.get("filter-users", 0) + 1))
+        file.writelines(filter_stores_block(i) for i in range(1, configs.get("filter-stores", 0) + 1))
+        file.writelines(filter_menu_items_block(i) for i in range(1, configs.get("filter-menu-items", 0) + 1))
+        
 
         
+        file.writelines(concat_block(i) for i in range(1, configs.get("concat1", 0) + 1))
+        
+        file.writelines(sender_block(i, "1") for i in range(1, configs.get("sender1", 0) + 1))
+        file.writelines(sender_block(i, "2a") for i in range(1, configs.get("sender2a", 0) + 1))
+        file.writelines(sender_block(i, "2b") for i in range(1, configs.get("sender2b", 0) + 1))
+        file.writelines(sender_block(i, "3") for i in range(1, configs.get("sender3", 0) + 1))
+        file.writelines(sender_block(i, "4") for i in range(1, configs.get("sender4", 0) + 1))
+        
+        file.writelines(counter_block(i, "2a") for i in range(1, configs.get("counter2a", 0) + 1))
+        file.writelines(counter_block(i, "2b") for i in range(1, configs.get("counter2b", 0) + 1))
+        file.writelines(counter_block(i, "4") for i in range(1, configs.get("counter4", 0) + 1))
+
+        file.writelines(global_aggregator_block(i, "2a") for i in range(1, configs.get("global-aggregator2a", 0) + 1))
+        file.writelines(global_aggregator_block(i, "2b") for i in range(1, configs.get("global-aggregator2b", 0) + 1))
+        file.writelines(global_aggregator_block(i, "3") for i in range(1, configs.get("global-aggregator3", 0) + 1))
+        file.writelines(global_aggregator_block(i, "4") for i in range(1, configs.get("global-aggregator4", 0) + 1))
+
+        file.writelines(joiner_block(i, "2a") for i in range(1, configs.get("joiner2a", 0) + 1))
+        file.writelines(joiner_block(i, "2b") for i in range(1, configs.get("joiner2b", 0) + 1))
+        file.writelines(joiner_block(i, "3") for i in range(1, configs.get("joiner3", 0) + 1))
+        file.writelines(joiner_block(i, "4") for i in range(1, configs.get("joiner4", 0) + 1))
+
+        file.writelines(partial_aggregator_block(i, "3") for i in range(1, configs.get("partial-aggregator3", 0) + 1))
+        file.writelines(partial_aggregator_block(i, "4") for i in range(1, configs.get("partial-aggregator4", 0) + 1))
+
         file.write(networks())
 
 if __name__ == "__main__":

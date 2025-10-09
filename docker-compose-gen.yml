@@ -64,8 +64,44 @@ services:
     depends_on:
         - server
 
-  concat:
-    container_name: concat
+  filter_users1:
+    container_name: filter_users1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 users
+    volumes:
+      - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  filter_stores1:
+    container_name: filter_stores1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 stores
+    volumes:
+      - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  filter_menu_items1:
+    container_name: filter_menu_items1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 menu_items
+    volumes:
+      - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  concat_1:
+    container_name: concat_1
     image: ubuntu:24.04
     working_dir: /app
     entrypoint: ./bin/concat rabbitmq:5672
@@ -77,8 +113,8 @@ services:
       - server
       - rabbitmq
 
-  sender1:
-    container_name: sender1
+  sender1_1:
+    container_name: sender1_1
     image: ubuntu:24.04
     working_dir: /app
     entrypoint: ./bin/sender rabbitmq:5672 Query1
@@ -88,9 +124,208 @@ services:
       - testing_net
     depends_on:
       - server
-      - concat
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  sender2a_1:
+    container_name: sender2a_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/sender rabbitmq:5672 Query2a
+    volumes:
+      - ./bin/sender:/app/bin/sender
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  sender2b_1:
+    container_name: sender2b_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/sender rabbitmq:5672 Query2b
+    volumes:
+      - ./bin/sender:/app/bin/sender
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  sender3_1:
+    container_name: sender3_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/sender rabbitmq:5672 Query3
+    volumes:
+      - ./bin/sender:/app/bin/sender
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  sender4_1:
+    container_name: sender4_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/sender rabbitmq:5672 Query4
+    volumes:
+      - ./bin/sender:/app/bin/sender
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  counter2a_1:
+    container_name: counter2a_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/counter rabbitmq:5672 Query2a
+    volumes:
+      - ./bin/counter:/app/bin/counter
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  counter2b_1:
+    container_name: counter2b_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/counter rabbitmq:5672 Query2b
+    volumes:
+      - ./bin/counter:/app/bin/counter
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  counter4_1:
+    container_name: counter4_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/counter rabbitmq:5672 Query4
+    volumes:
+      - ./bin/counter:/app/bin/counter
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  global_aggregator2a_1:
+    container_name: global_aggregator2a_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query2a
+    volumes:
+      - ./bin/global_aggregator:/app/bin/global_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  global_aggregator2b_1:
+    container_name: global_aggregator2b_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query2b
+    volumes:
+      - ./bin/global_aggregator:/app/bin/global_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  global_aggregator3_1:
+    container_name: global_aggregator3_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query3
+    volumes:
+      - ./bin/global_aggregator:/app/bin/global_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  global_aggregator4_1:
+    container_name: global_aggregator4_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query4
+    volumes:
+      - ./bin/global_aggregator:/app/bin/global_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  joiner2a_1:
+    container_name: joiner2a_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/joiner rabbitmq:5672 Query2a
+    volumes:
+      - ./bin/joiner:/app/bin/joiner
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  joiner2b_1:
+    container_name: joiner2b_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/joiner rabbitmq:5672 Query2b
+    volumes:
+      - ./bin/joiner:/app/bin/joiner
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  joiner3_1:
+    container_name: joiner3_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/joiner rabbitmq:5672 Query3
+    volumes:
+      - ./bin/joiner:/app/bin/joiner
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  joiner4_1:
+    container_name: joiner4_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/joiner rabbitmq:5672 Query4
+    volumes:
+      - ./bin/joiner:/app/bin/joiner
+    networks:
+      - testing_net
+    depends_on:
+      - server
+
+  partial_aggregator3_1:
+    container_name: partial_aggregator3_1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/partial_aggregator rabbitmq:5672 Query3
+    volumes:
+      - ./bin/partial_aggregator:/app/bin/partial_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
 
 networks:
   testing_net:
