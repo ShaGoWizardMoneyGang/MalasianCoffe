@@ -64,6 +64,30 @@ services:
     depends_on:
         - server
 
+  filter_transaction_items2:
+    container_name: filter_transaction_items2
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 transaction_items
+    volumes:
+        - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+        - testing_net
+    depends_on:
+        - server
+
+  filter_transaction_items3:
+    container_name: filter_transaction_items3
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 transaction_items
+    volumes:
+        - ./bin/filter_mapper:/app/bin/filter_mapper
+    networks:
+        - testing_net
+    depends_on:
+        - server
+
   filter_users1:
     container_name: filter_users1
     image: ubuntu:24.04
