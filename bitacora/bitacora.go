@@ -23,14 +23,11 @@ const (
 	BCError BCLevel = iota
 )
 
-type Logger struct {
-	level BCLevel
-	mode BCMode
+// Nos guardamos el modo con el que el logger va actuar.
+// Por defecto esta en debug.
+var globalMode BCMode = DebugMode;
 
-	logger *slog.Logger
-}
-
-func NewLogger(level BCLevel, mode BCMode) Logger {
+func InitializeLogging(level BCLevel, mode BCMode) {
 	var slogLevel slog.Level
 	switch level {
 	case BCDebug:
@@ -45,30 +42,24 @@ func NewLogger(level BCLevel, mode BCMode) Logger {
 		Level: slogLevel, // Set the minimum log level
 		AddSource: true,  // Add file and line number to logs
 	})
+	slog.SetDefault(slog.New(handler))
 
-	// Create a new Logger with the custom handler
-	logger := slog.New(handler)
+	globalMode = mode
 
-
-	return Logger {
-		level: level,
-		mode: mode,
-		logger: logger,
-	}
 }
 
 // Programacion orientada a objetos: Enterprise edition.
-func (l *Logger) Debug(message string) {
+func Debug(message string) {
 	slog.Debug(message)
 }
 
-func (l *Logger) Info(message string) {
+func Info(message string) {
 	slog.Info(message)
 }
 
 // :0
-func (l *Logger) Error(message string) {
-	if l.mode == DebugMode {
+func Error(message string) {
+	if globalMode == DebugMode {
 		panic(message)
 	} else {
 	   slog.Error(message)
