@@ -5,14 +5,13 @@ import (
 	"strings"
 
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/system/middleware"
 	// "malasian_coffe/system/queries/query4"
 )
 
 type GlobalAggregator interface {
 	Build(rabbitAddr string)
-	GetInput() *middleware.MessageMiddlewareQueue
-	Process(pkt packet.Packet) []packet.OutBoundMessage
+	PassPacketToSession(pkt packet.Packet)
+	Process()
 }
 
 func GlobalAggregatorBuilder(name, rabbitAddr string) GlobalAggregator {
