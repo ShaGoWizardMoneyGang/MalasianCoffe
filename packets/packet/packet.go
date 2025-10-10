@@ -111,7 +111,9 @@ func ChangePayloadJoin(pkt Packet, datasets []string, newPayload []string) []Pac
 	}
 
 	uuid := strings.Join(datasetsIDs, "-")
-	eof  := pkt.IsEOF()
+
+	// NOTA: Cuando hagamos packet splitting, solo devolver true en el ultimo paquete.
+	eof         := true
 	packet_uuid := packetUuid {
 		uuid: uuid,
 		eof: eof,
@@ -146,7 +148,8 @@ func ChangePayloadGlobalAggregator(pkt Packet, datasetName string, newPayload []
 	}
 	datasetIDs := strconv.FormatUint(datasetID, 10)
 
-	eof  := pkt.IsEOF()
+	// NOTA: Cuando hagamos packet splitting, solo devolver true en el ultimo paquete.
+	eof         := true
 	packet_uuid := packetUuid {
 		uuid: datasetIDs,
 		eof: eof,
