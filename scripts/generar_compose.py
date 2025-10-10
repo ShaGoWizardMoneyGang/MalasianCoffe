@@ -28,9 +28,9 @@ def commons():
     container_name: server
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./server_bin 0.0.0.0:9091 rabbitmq:5672
+    entrypoint: ./bin/server_bin 0.0.0.0:9091 rabbitmq:5672
     volumes:
-      - ./bin/server:/app/server_bin
+      - ./bin/server:/app/bin/server_bin
     networks:
       - testing_net
     depends_on:
