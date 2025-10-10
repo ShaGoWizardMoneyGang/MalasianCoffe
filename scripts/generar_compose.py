@@ -1,3 +1,5 @@
+import os
+
 def header():
     return """name: tp1
 services:
@@ -221,17 +223,21 @@ def partial_aggregator_block(n, query):
 """
 
 def client(n):
+    # Creo un directorio en out para que no sea creado por root
+    os.mkdir(f"out/client{n}")
+
     port_number = 9093 + n
+
     return f"""
   client{n}:
     container_name: client{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/client ./dataset/ ./out/ gateway:9090 client{n}:{port_number}
+    entrypoint: ./bin/client ./dataset/ ./out/client{n}/ gateway:9090 client{n}:{port_number}
     volumes:
       - ./bin/client:/app/bin/client
       - ./dataset:/app/dataset
-      - ./out:/app/out
+      - ./out/client{n}:/app/out/client{n}
     depends_on:
       - gateway
     networks:
@@ -290,7 +296,7 @@ def main():
         file.writelines(partial_aggregator_block(i, "3") for i in range(1, configs.get("partial-aggregator3", 0) + 1))
         file.writelines(partial_aggregator_block(i, "4") for i in range(1, configs.get("partial-aggregator4", 0) + 1))
 
-        file.writelines(client(1))
+        file.writelines(client(i) for i in range(1, configs.get("cliente", 0) + 1))
 
         file.write(networks())
 
