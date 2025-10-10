@@ -3,16 +3,12 @@ package global_aggregator
 import (
 	"fmt"
 	"strings"
-
-	"malasian_coffe/packets/packet"
-	"malasian_coffe/system/middleware"
 	// "malasian_coffe/system/queries/query4"
 )
 
 type GlobalAggregator interface {
 	Build(rabbitAddr string)
-	GetInput() *middleware.MessageMiddlewareQueue
-	Process(pkt packet.Packet) []packet.OutBoundMessage
+	Process()
 }
 
 func GlobalAggregatorBuilder(name, rabbitAddr string) GlobalAggregator {

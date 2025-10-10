@@ -1,9 +1,11 @@
 package global_aggregator
 
 import (
+	"bytes"
 	"fmt"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
 	"sort"
 	"strconv"
@@ -16,108 +18,127 @@ type keyQuery3 struct {
 }
 
 type aggregator3Global struct {
+	inputChannel  chan packet.Packet
+	outputChannel chan packet.Packet
+
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
 	acc         map[keyQuery3]float64
 
-	receiver packet.PacketReceiver
+	receiver       packet.PacketReceiver
+	sessionHandler sessionhandler.SessionHandler
 }
 
 func (g *aggregator3Global) Build(rabbitAddr string) {
+	g.inputChannel = make(chan packet.Packet)
+	g.outputChannel = make(chan packet.Packet)
+
 	g.colaEntrada = colas.InstanceQueue("PartialAggregations3", rabbitAddr)
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
-	//g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 	g.acc = make(map[keyQuery3]float64)
 
 	g.receiver = packet.NewPacketReceiver("Aggregator 3")
+
+	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery3, g.outputChannel)
 }
 
-func (g *aggregator3Global) GetInput() *middleware.MessageMiddlewareQueue {
-	return g.colaEntrada
-}
+func aggregateQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
+	localReceiver := packet.NewPacketReceiver("Agregador global 3")
+	localAcc := make(map[keyQuery3]float64)
 
-func (g *aggregator3Global) ingestBatch(input string) {
-	lines := strings.Split(input, "\n")
-	lines = lines[:len(lines)-1]
+	for {
+		pkt := <-inputChannel
 
-	for _, line := range lines {
-		if line == "" {
+		localReceiver.ReceivePacket(pkt)
+
+		if !localReceiver.ReceivedAll() {
 			continue
 		}
-		cols := strings.Split(line, ",")
-		if len(cols) != 3 {
-			panic("Se esperaban 3 columnas")
-		}
-		yh := cols[0]
-		storeID := cols[1]
-		amountStr := cols[2]
 
-		amount, err := strconv.ParseFloat(amountStr, 64)
+		consolidatedInput := localReceiver.GetPayload()
+
+		lines := strings.Split(consolidatedInput, "\n")
+		lines = lines[:len(lines)-1]
+
+		for _, line := range lines {
+			if line == "" {
+				continue
+			}
+			cols := strings.Split(line, ",")
+			if len(cols) != 3 {
+				panic("Se esperaban 3 columnas")
+			}
+			yearHalf := cols[0]
+			storeID := cols[1]
+			totalStr := cols[2]
+
+			total, err := strconv.ParseFloat(totalStr, 64)
+			if err != nil {
+				panic("Total con formato inválido")
+			}
+
+			k := keyQuery3{yearHalf: yearHalf, storeID: storeID}
+			localAcc[k] += total
+		}
+
+		if len(localAcc) == 0 {
+			localReceiver = packet.NewPacketReceiver("Agregador global 3")
+			continue
+		}
+
+		keys := make([]keyQuery3, 0, len(localAcc))
+		for k := range localAcc {
+			keys = append(keys, k)
+		}
+
+		sort.Slice(keys, func(i, j int) bool {
+			if keys[i].yearHalf == keys[j].yearHalf {
+				return keys[i].storeID < keys[j].storeID
+			}
+			return keys[i].yearHalf < keys[j].yearHalf
+		})
+
+		var b strings.Builder
+		for _, k := range keys {
+			total := localAcc[k]
+			fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearHalf, k.storeID, total)
+		}
+
+		final := b.String()
+		if final != "" {
+			newPkts := packet.ChangePayloadGlobalAggregator(pkt, "transactions", []string{final})
+			outputChannel <- newPkts[0]
+		}
+
+		localAcc = make(map[keyQuery3]float64)
+		localReceiver = packet.NewPacketReceiver("Agregador global 3")
+	}
+}
+
+func inputQueueQuery3(queue *middleware.MessageMiddlewareQueue, inputChannel chan<- packet.Packet) {
+	msgQueue := colas.ConsumeInput(queue)
+	for message := range *msgQueue {
+		packetReader := bytes.NewReader(message.Body)
+		pkt, _ := packet.DeserializePackage(packetReader)
+
+		err := message.Ack(false)
 		if err != nil {
-			panic("tpv con formato inválido")
+			panic(fmt.Errorf("Could not ack, %w", err))
 		}
 
-		k := keyQuery3{yearHalf: yh, storeID: storeID}
-		g.acc[k] += amount
+		inputChannel <- pkt
 	}
 }
 
-func (g *aggregator3Global) flushAndBuild() string {
-	if len(g.acc) == 0 {
-		fmt.Println("No recibidi ningun dato. Raro. Ojo")
-		return ""
-	}
+func (g *aggregator3Global) Process() {
+	go inputQueueQuery3(g.colaEntrada, g.inputChannel)
 
-	keys := make([]keyQuery3, 0, len(g.acc))
-	for k := range g.acc {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].yearHalf == keys[j].yearHalf {
-			return keys[i].storeID < keys[j].storeID
+	for {
+		select {
+		case inputPacket := <-g.inputChannel:
+			g.sessionHandler.PassPacketToSession(inputPacket)
+		case packetAgregado := <-g.outputChannel:
+			g.colaSalida.Send(packetAgregado.Serialize())
 		}
-		return keys[i].yearHalf < keys[j].yearHalf
-	})
-
-	// // NOTE: Usar despues de la entrega
-	var b strings.Builder
-	for k, val := range g.acc {
-		yearHalf := k.yearHalf
-		storeID := k.storeID
-		value := val
-
-		fmt.Fprintf(&b, "%s,%s,%.2f\n", yearHalf, storeID, value)
-	}
-
-	g.acc = make(map[keyQuery3]float64)
-	return b.String()
-}
-
-func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	g.receiver.ReceivePacket(pkt)
-
-	if !g.receiver.ReceivedAll() {
-		return nil
-	}
-
-	consolidatedInput := g.receiver.GetPayload()
-
-	g.ingestBatch(consolidatedInput)
-
-	final := g.flushAndBuild()
-	if final == "" {
-		return nil
-	}
-
-	g.receiver = packet.NewPacketReceiver("Aggregator 3")
-
-	newPkts := packet.ChangePayloadGlobalAggregator(pkt, "transactions", []string{final})
-	return []packet.OutBoundMessage{
-		{
-			Packet:     newPkts[0],
-			ColaSalida: g.colaSalida,
-		},
 	}
 }
-
-// ============================ AggregatorQuery3 ===============================
