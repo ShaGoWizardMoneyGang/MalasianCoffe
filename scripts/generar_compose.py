@@ -226,7 +226,7 @@ def client(n):
     container_name: client{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/client ./dataset/ ./out/ gateway:9090 client{n}:9093 client{n}:9093
+    entrypoint: ./bin/client ./dataset/ ./out/ gateway:9090 client{n}:9093
     volumes:
       - ./bin/client:/app/bin/client
       - ./dataset:/app/dataset

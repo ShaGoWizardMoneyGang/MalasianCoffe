@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	packetanswer "malasian_coffe/packets/packet_answer"
 	"malasian_coffe/protocol"
@@ -66,7 +65,6 @@ func main() {
 	out_dir := os.Args[2]
 	gateway_addr := os.Args[3]
 	listen_addr := os.Args[4]
-	sender_conn_addr := os.Args[5]
 
 	conn, err := net.Dial("tcp", gateway_addr)
 
@@ -80,6 +78,7 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("Mi session ID es: %s\n", session_id)
+	fmt.Printf("Mi IP es: %s\n", conn.LocalAddr().String())
 
 	entries, err := os.ReadDir(dataset_directory)
 	if err != nil {
@@ -92,7 +91,7 @@ func main() {
 			continue
 		}
 		subDirPath := dataset_directory + entry.Name()
-		err := createPackagesFrom(subDirPath, session_id, sender_conn_addr, conn)
+		err := createPackagesFrom(subDirPath, session_id, listen_addr, conn)
 		if err != nil {
 			panic(err)
 		}
@@ -227,7 +226,6 @@ func waitForAnswers(listen_addr string, out_dir string) error {
 	go func() {
 		for {
 			conn, err := list.Accept()
-			bitacora.Info(fmt.Sprintf("Recibi una conexion"))
 			if err != nil {
 				panic(err)
 			}
