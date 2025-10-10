@@ -123,7 +123,7 @@ func (g *aggregator2bGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage
 
 	g.receiver = packet.NewPacketReceiver("Aggretor 2b")
 
-	newPkts := packet.ChangePayload(pkt, []string{final})
+	newPkts := packet.ChangePayloadGlobalAggregator(pkt, "transaction_items", []string{final})
 	return []packet.OutBoundMessage{
 		{
 			Packet:     newPkts[0],

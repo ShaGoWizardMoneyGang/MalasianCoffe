@@ -39,7 +39,7 @@ func main() {
 		outMsgs := worker.Process(pkt)
 
 		for _, out := range outMsgs {
-			bitacora.Info(fmt.Sprintf("Sending packet, with UUID %s, to joiner", pkt.GetUUID()))
+			bitacora.Info(fmt.Sprintf("Sending packet, with UUID %s, to joiner", out.Packet.GetUUID()))
 			_ = out.ColaSalida.Send(out.Packet.Serialize())
 		}
 

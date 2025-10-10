@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 
@@ -48,7 +49,7 @@ func (g *aggregator4Global) Process(pkt packet.Packet) []packet.OutBoundMessage 
 
 	g.receiver = packet.NewPacketReceiver("Aggregator 4")
 
-	newPkts := packet.ChangePayload(pkt, []string{final})
+	newPkts := packet.ChangePayloadGlobalAggregator(pkt, "transactions", []string{final})
 	return []packet.OutBoundMessage{
 		{
 			Packet:     newPkts[0],

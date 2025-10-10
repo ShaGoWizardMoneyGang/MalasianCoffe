@@ -127,9 +127,42 @@ func ChangePayloadJoin(pkt Packet, datasets []string, newPayload []string) []Pac
 
 	for i, payload := range newPayload {
 		newheader := header
-		if len(packets) > 1 {
-			newheader = header.split(i)
+		newheader = header.split(i)
+		packets[i] = Packet{
+			header:  newheader,
+			payload: payload,
 		}
+	}
+	return packets
+}
+
+
+// Devuelve packets que fueron el resultado de hacer un global aggregator
+// - pkt es un paquete usado solo para extraer la metadata
+// - dataset es el *NOMBRE* del dataset
+// - newPayload es el contenido
+func ChangePayloadGlobalAggregator(pkt Packet, datasetName string, newPayload []string) []Packet {
+	datasetID, err := dataset.DatasetToID(datasetName)
+	if err != nil {
+		panic(fmt.Errorf("%s unknown dataset", datasetName))
+	}
+	datasetIDs := strconv.FormatUint(datasetID, 10)
+
+	eof  := pkt.IsEOF()
+	packet_uuid := packetUuid {
+		uuid: datasetIDs,
+		eof: eof,
+	};
+
+	session_id := pkt.GetSessionID()
+	clientAddr := pkt.GetClientAddr()
+
+	header     := newHeader(session_id, packet_uuid, clientAddr)
+	packets     := make([]Packet, len(newPayload))
+
+	for i, payload := range newPayload {
+		newheader := header
+		newheader = header.split(i)
 		packets[i] = Packet{
 			header:  newheader,
 			payload: payload,
