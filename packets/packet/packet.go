@@ -86,9 +86,7 @@ func ChangePayload(packet Packet, newpayload []string) []Packet {
 
 	for i, payload := range newpayload {
 		newheader := packet.header
-		if len(packets) > 1 {
-			newheader = packet.header.split(i)
-		}
+
 		packets[i] = Packet{
 			header:  newheader,
 			payload: payload,
