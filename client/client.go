@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	packetanswer "malasian_coffe/packets/packet_answer"
 	"malasian_coffe/protocol"
@@ -224,12 +225,15 @@ func waitForAnswers(listen_addr string, out_dir string) error {
 	}
 
 	go func() {
-		conn, err := list.Accept()
-		if err != nil {
-			panic(err)
-		}
+		for {
+			conn, err := list.Accept()
+			bitacora.Info(fmt.Sprintf("Recibi una conexion"))
+			if err != nil {
+				panic(err)
+			}
 
-		new_connection <- conn
+			new_connection <- conn
+		}
 	}()
 
 	for {
