@@ -59,7 +59,7 @@ func newHeader(session_id string, packet_uuid packetUuid, client_ip_port string)
 		client_ip_port: client_ip_port,
 	}
 }
-func (h *Header) split(id int) Header {
+func (h *Header) append(id int) Header {
 	new_uuid := h.packet_uuid.uuid + "." + strconv.Itoa(id)
 
 	new_header := Header{
@@ -125,7 +125,7 @@ func ChangePayloadJoin(pkt Packet, datasets []string, newPayload []string) []Pac
 
 	for i, payload := range newPayload {
 		newheader := header
-		newheader = header.split(i)
+		newheader = header.append(i)
 		packets[i] = Packet{
 			header:  newheader,
 			payload: payload,
@@ -160,7 +160,7 @@ func ChangePayloadGlobalAggregator(pkt Packet, datasetName string, newPayload []
 
 	for i, payload := range newPayload {
 		newheader := header
-		newheader = header.split(i)
+		newheader = header.append(i)
 		packets[i] = Packet{
 			header:  newheader,
 			payload: payload,
