@@ -82,8 +82,8 @@ jobs:
       - name: Check tests
         run: |
           make test
-  
-  full_run_with_tests:
+
+  full_run_1DeCada:
     runs-on: ubuntu-latest
 
     steps:
@@ -94,5 +94,19 @@ jobs:
 
       - name: Run full local script
         run: |
-          chmod +x scripts/run_all_and_test_ci.sh
+          make generate-config CONFIG=1DeCada
+          bash scripts/run_all_and_test_ci.sh
+
+  full_run_MuchosSinEstado:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure Docker Compose
+        run: docker compose version
+
+      - name: Run full local script
+        run: |
+          make generate-config CONFIG=MuchosSinEstado
           bash scripts/run_all_and_test_ci.sh
