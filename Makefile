@@ -115,7 +115,7 @@ test-outputs-reduced:
 generate-compose:
 	python3 scripts/generar_compose.py
 
-docker-multi: build generate-compose
+docker-multi: docker-down clean-out build generate-compose
 	docker compose -f docker-compose-gen.yml up -d
 	@echo "Docker levantado, usar 'make run-client' para correr un cliente"
 
