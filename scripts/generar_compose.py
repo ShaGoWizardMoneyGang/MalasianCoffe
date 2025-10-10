@@ -220,6 +220,23 @@ def partial_aggregator_block(n, query):
       - server
 """
 
+def client(n):
+    return f"""
+  client{n}:
+    container_name: client{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/client ./dataset/ ./out/ gateway:9090 client{n}:9093 client{n}:9093
+    volumes:
+      - ./bin/client:/app/bin/client
+      - ./dataset:/app/dataset
+      - ./out:/app/out
+    depends_on:
+      - gateway
+    networks:
+      - testing_net
+"""
+
 def read_config_file():
     with open("compose.config", "r") as file:
         lines = file.readlines()
@@ -271,6 +288,8 @@ def main():
 
         file.writelines(partial_aggregator_block(i, "3") for i in range(1, configs.get("partial-aggregator3", 0) + 1))
         file.writelines(partial_aggregator_block(i, "4") for i in range(1, configs.get("partial-aggregator4", 0) + 1))
+
+        file.writelines(client(1))
 
         file.write(networks())
 
