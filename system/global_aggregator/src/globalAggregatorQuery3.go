@@ -2,7 +2,6 @@ package global_aggregator
 
 import (
 	"fmt"
-	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
@@ -20,6 +19,8 @@ type aggregator3Global struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
 	acc         map[keyQuery3]float64
+
+	receiver packet.PacketReceiver
 }
 
 func (g *aggregator3Global) Build(rabbitAddr string) {
@@ -27,6 +28,8 @@ func (g *aggregator3Global) Build(rabbitAddr string) {
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 	//g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 	g.acc = make(map[keyQuery3]float64)
+
+	g.receiver = packet.NewPacketReceiver("Aggregator 3")
 }
 
 func (g *aggregator3Global) GetInput() *middleware.MessageMiddlewareQueue {
@@ -34,8 +37,10 @@ func (g *aggregator3Global) GetInput() *middleware.MessageMiddlewareQueue {
 }
 
 func (g *aggregator3Global) ingestBatch(input string) {
-	lines := strings.SplitSeq(input, "\n")
-	for line := range lines {
+	lines := strings.Split(input, "\n")
+	lines = lines[:len(lines)-1]
+
+	for _, line := range lines {
 		if line == "" {
 			continue
 		}
@@ -89,22 +94,24 @@ func (g *aggregator3Global) flushAndBuild() string {
 }
 
 func (g *aggregator3Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	slog.Info("Processing packet in Global Aggregator 3")
-	input := pkt.GetPayload()
+	g.receiver.ReceivePacket(pkt)
 
-	isEOF := pkt.IsEOF()
-
-	g.ingestBatch(input)
-	if !isEOF {
+	if !g.receiver.ReceivedAll() {
 		return nil
 	}
+
+	consolidatedInput := g.receiver.GetPayload()
+
+	g.ingestBatch(consolidatedInput)
 
 	final := g.flushAndBuild()
 	if final == "" {
 		return nil
 	}
 
-	newPkts := packet.ChangePayload(pkt, []string{final})
+	g.receiver = packet.NewPacketReceiver("Aggregator 3")
+
+	newPkts := packet.ChangePayloadGlobalAggregator(pkt, "transactions", []string{final})
 	return []packet.OutBoundMessage{
 		{
 			Packet:     newPkts[0],

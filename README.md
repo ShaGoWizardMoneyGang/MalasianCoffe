@@ -16,5 +16,5 @@ make build && docker compose -f ./compose-files/queryN/queryN.yml up -d
 
 # Comando para correr tests sobre output (RED => reducido, cuando tengamos full hay que correrlo con FULL)
 ```bash
-bash test_outputs.sh RED
+make test-outputs-reduced
 ```

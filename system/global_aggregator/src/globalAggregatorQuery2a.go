@@ -2,12 +2,14 @@ package global_aggregator
 
 import (
 	"fmt"
-	"malasian_coffe/packets/packet"
-	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/colas"
 	"sort"
 	"strconv"
 	"strings"
+
+	"malasian_coffe/bitacora"
+	"malasian_coffe/packets/packet"
+	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/colas"
 )
 
 // AggregatorGLobal de la query2a ES LA QUANTITY
@@ -20,6 +22,8 @@ type aggregator2aGlobal struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
 	acc         map[keyQuery2a]int64
+
+	receiver packet.PacketReceiver
 }
 
 func (g *aggregator2aGlobal) Build(rabbitAddr string) {
@@ -27,6 +31,8 @@ func (g *aggregator2aGlobal) Build(rabbitAddr string) {
 	// aca va GlobalAggregation2a
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation2a", rabbitAddr)
 	g.acc = make(map[keyQuery2a]int64)
+
+	g.receiver = packet.NewPacketReceiver("Agregador global")
 }
 
 func (g *aggregator2aGlobal) GetInput() *middleware.MessageMiddlewareQueue {
@@ -34,24 +40,25 @@ func (g *aggregator2aGlobal) GetInput() *middleware.MessageMiddlewareQueue {
 }
 
 func (g *aggregator2aGlobal) ingestBatch(input string) {
-	lines := strings.SplitSeq(input, "\n")
-	for line := range lines {
+	lines := strings.Split(input, "\n")
+	lines = lines[:len(lines)-1]
+
+	for _, line := range lines {
 		if line == "" {
 			continue
 		}
 		cols := strings.Split(line, ",")
 		if len(cols) != 3 {
-			panic("Se esperaban 3 columnas")
+			bitacora.Debug("Se esperaban 3 columnas")
+			continue
 		}
-		fmt.Println(line)
 		yearMonth := cols[0]
 		itemID := cols[1]
 		quantityStr := cols[2]
-		fmt.Println(quantityStr)
+
 		quantity, err := strconv.ParseInt(quantityStr, 10, 64)
 		if err != nil {
-			fmt.Println(quantity)
-			panic("quantity con formato inválido")
+			panic("Quantity con formato inválido")
 		}
 
 		k := keyQuery2a{yearMonth: yearMonth, itemID: itemID}
@@ -100,21 +107,25 @@ func (g *aggregator2aGlobal) flushAndBuild() string {
 }
 
 func (g *aggregator2aGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	input := pkt.GetPayload()
-	fmt.Println(pkt.GetPayload())
-	isEOF := pkt.IsEOF()
-	g.ingestBatch(input)
-	if !isEOF {
 
+	g.receiver.ReceivePacket(pkt)
+
+	if !g.receiver.ReceivedAll() {
 		return nil
 	}
+
+	consolidatedInput := g.receiver.GetPayload()
+
+	g.ingestBatch(consolidatedInput)
 
 	final := g.flushAndBuild()
 	if final == "" {
 		return nil
 	}
 
-	newPkts := packet.ChangePayload(pkt, []string{final})
+	g.receiver = packet.NewPacketReceiver("Agregator 2a")
+
+	newPkts := packet.ChangePayloadGlobalAggregator(pkt, "transaction_items", []string{final})
 	return []packet.OutBoundMessage{
 		{
 			Packet:     newPkts[0],

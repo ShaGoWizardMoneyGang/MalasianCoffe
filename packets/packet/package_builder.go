@@ -2,14 +2,16 @@ package packet
 
 import (
 	"errors"
+	"fmt"
 
 	"net"
 	"strings"
 
 	"strconv"
 
-	"malasian_coffe/utils/network"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/utils/dataset"
+	"malasian_coffe/utils/network"
 )
 
 const (
@@ -99,6 +101,8 @@ func (pb *PacketBuilder) End() error {
 
 	pb.payload_buffer.Reset()
 
+	bitacora.Info(fmt.Sprintf("Envie %d paquetes, del dataset %s", pb.currentSequenceNumber, pb.directory_name))
+
 	return nil
 }
 
@@ -118,7 +122,7 @@ func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, erro
 	packet_id := strconv.FormatUint(dir_id, 10) + "." + strconv.FormatUint(uint64(pb.currentSequenceNumber), 10)
 	pb.currentSequenceNumber += 1
 
-	packet_uuid := PacketUuid{
+	packet_uuid := packetUuid{
 		uuid: packet_id,
 		eof:  is_eof,
 	}

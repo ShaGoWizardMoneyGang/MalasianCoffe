@@ -2,11 +2,12 @@ package joiner
 
 import (
 	"bytes"
-	"fmt"
-	"log/slog"
+
 	"strconv"
 	"strings"
+	"fmt"
 
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
@@ -15,51 +16,41 @@ import (
 
 type joinerQuery4 struct {
 	// Tenemos una go routine por cada session
-	sessions map[string] (chan packet.Packet)
+	sessions map[string](chan packet.Packet)
 
 	colaStoresInput   *middleware.MessageMiddlewareQueue
-	colaUsersInput   *middleware.MessageMiddlewareQueue
+	colaUsersInput    *middleware.MessageMiddlewareQueue
 	colaAggTransInput *middleware.MessageMiddlewareQueue
 
-	colaSalidaQuery4  *middleware.MessageMiddlewareQueue
+	colaSalidaQuery4 *middleware.MessageMiddlewareQueue
 }
 
-
-func addUserToMap(storePkt packet.Packet, storeMap map[string]string) bool {
-	stores := storePkt.GetPayload()
-	lines := strings.Split(stores, "\n")
+func createUserMap(userReceiver packet.PacketReceiver) map[string]string {
+	storePkt := userReceiver.GetPayload()
+	lines := strings.Split(storePkt, "\n")
 	lines = lines[:len(lines)-1]
+
+	// Le damos un tamano inicial de lines porque deberia tener un tamano igual
+	// al de la cantidad de lineas. Ademas, ya pre-alocamos la memoria.
+	storeID2Name := make(map[string]string, len(lines))
+
 	for _, line := range lines {
-		// store_id , store_name
 		cols := strings.Split(line, ",")
 		store_id, store_name := cols[0], cols[1]
-		storeMap[store_id] = store_name
+		storeID2Name[store_id] = store_name
 	}
 
-	// TODO: verificar paquetes fuera de orden. En teoria se deberia poder
-	// aislar en esta funcion o packet receiver en el directorio de packets
-	// Ver: https://github.com/ShaGoWizardMoneyGang/MalasianCoffe/issues/46
-	if storePkt.IsEOF() {
-		// Me llegaron todos
-		return true
-	} else {
-		return false
-	}
+	return storeID2Name
 }
 
 func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
-	// store_id -> store_name
-	storeID2Name        := make(map[string]string)
-	all_stores_received := false
+	storeReceiver := packet.NewPacketReceiver("Store")
 
-	// store_id -> store_name
-	userID2Birthday     := make(map[string]string)
-	all_users_received  := false
+	userReceiver := packet.NewPacketReceiver("User")
 
-	all_transactions_received := false
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
 	// stores. Deberian ser pocos (si es que existen)
-	var transactions strings.Builder
+	transactionReceiver := packet.NewPacketReceiver("Transactions")
 
 	// Resultado final
 	var joinedTransactions strings.Builder
@@ -69,8 +60,7 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 	var last_packet packet.Packet
 
 	for {
-		pkt :=  <- inputChannel
-		// println(pkt.GetPayload())
+		pkt := <-inputChannel
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -79,44 +69,23 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 		}
 
 		if dataset_name == "stores" {
-			all_stores_received = addStoreToMap(pkt, storeID2Name)
+			storeReceiver.ReceivePacket(pkt)
 		} else if dataset_name == "users" {
-			all_users_received = addUserToMap(pkt, userID2Birthday)
+			userReceiver.ReceivePacket(pkt)
 		} else if dataset_name == "transactions" {
-
-			// Nos guardamos los que llegaron
-			_, err := transactions.WriteString(pkt.GetPayload())
-			if err != nil {
-				panic("Joiner failed to add payload to transaction buffer")
-			}
-
-			all_transactions_received = pkt.IsEOF()
+			transactionReceiver.ReceivePacket(pkt)
 
 		} else {
-			panic(fmt.Errorf("JoinerQuery4 received packet from dataset that was not expecting: %s", dataset_name))
+			bitacora.Error(fmt.Sprintf("JoinerQuery4 received packet from dataset that was not expecting: %s", dataset_name))
 		}
 
-		// Casos posibles:
-		// 1:
-		//   Recibi todos los transactions antes que stores y users.
-		//   Apenas reciba los stores y users que me faltan, hago el join y
-		//   termina el loop al toque.
-		// 2:
-		//   Recibi todas las stores y users antes que transactions.
-		//   Voy a ir recibiendo transacciones de a poquito y las voy a ir
-		//   anadiendo en el join.  Cuando llegue la ultima, esto va a cortar,
-		//   y el join va a tener el resultado final en joined transactions.
+		// No joineamos hasta tenerlo todo.
+		if storeReceiver.ReceivedAll() && userReceiver.ReceivedAll() && transactionReceiver.ReceivedAll() {
+			// jq4.logger.Info("Comienza proceso de join")
+			joinerFunctionQuery4(storeReceiver, userReceiver, transactionReceiver, &joinedTransactions)
 
-		// No joineamos hasta tener todos las stores
-		if all_stores_received == true && all_users_received == true {
-			slog.Info("Comienza proceso de join")
-			// WARNING: transactions queda vacio despues de esta funcion
-			joinerFunctionQuery4(&transactions, storeID2Name, userID2Birthday, &joinedTransactions)
-
-			if all_transactions_received {
-				last_packet = pkt
-				break
-			}
+			last_packet = pkt
+			break
 		}
 	}
 
@@ -125,25 +94,21 @@ func joinQuery4(inputChannel chan packet.Packet, outputQueue *middleware.Message
 	// Liberamos
 	joinedTransactions.Reset()
 
-	slog.Info("Envio pkt joineado al sender")
-	// Deberia ser 1 solo
 	for _, pkt := range pkt_joineado {
-		fmt.Printf("%+v\n", pkt)
-	   outputQueue.Send(pkt.Serialize())
+		bitacora.Info(fmt.Sprintf("Envio paquete joineado de ID %v, al sender", pkt.GetUUID()))
+		outputQueue.Send(pkt.Serialize())
 	}
 }
 
 func (jq4 *joinerQuery4) passPacketToJoiner(pkt packet.Packet) {
-	slog.Info("Envio packete a la session")
 	sessionID := pkt.GetSessionID()
 	channel, exists := jq4.sessions[sessionID]
-
 
 	// Nos creamos una rutina por cada session. Nosotros le enviamos los
 	// paquetes correspondientes a cada rutina
 	if !exists {
 		// Joiner
-		slog.Info("Creo un hilo joiner")
+		bitacora.Info("Creo un hilo joiner")
 		assigned_channel := make(chan packet.Packet)
 		go joinQuery4(assigned_channel, jq4.colaSalidaQuery4)
 
@@ -159,14 +124,13 @@ func (jq4 *joinerQuery4) passPacketToJoiner(pkt packet.Packet) {
 }
 
 func (jq4 *joinerQuery4) Build(rabbitAddr string) {
-	slog.Info("Inicializo el Joiner 4")
 	// SessionID -> channel
-	sessionHandler           := make(map[string](chan packet.Packet))
+	sessionHandler := make(map[string](chan packet.Packet))
 
-	colaSalidaQuery4  := colas.InstanceQueue("SalidaQuery4", rabbitAddr)
+	colaSalidaQuery4 := colas.InstanceQueue("SalidaQuery4", rabbitAddr)
 
-	colaStoresInput   := colas.InstanceQueue("FilteredStores4", rabbitAddr)
-	colaUsersInput    := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
+	colaStoresInput := colas.InstanceQueue("FilteredStores4", rabbitAddr)
+	colaUsersInput := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
 	colaAggTransInput := colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
 
 	jq4.sessions = sessionHandler
@@ -179,11 +143,10 @@ func (jq4 *joinerQuery4) Build(rabbitAddr string) {
 }
 
 func (jq4 *joinerQuery4) Process() {
-	slog.Info("Arranca procesamiento del joiner 4")
-	storeListener            := make(chan packet.Packet)
-	userListener             := make(chan packet.Packet)
+	bitacora.Info("Arranca procesamiento del joiner 4")
+	storeListener := make(chan packet.Packet)
+	userListener := make(chan packet.Packet)
 	aggregatorGlobalListener := make(chan packet.Packet)
-
 
 	// Stores
 	go func() {
@@ -191,13 +154,12 @@ func (jq4 *joinerQuery4) Process() {
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de stores")
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
 			err := message.Ack(false)
 			if err != nil {
-				panic(fmt.Errorf("Could not ack, %w", err))
+				bitacora.Error(fmt.Errorf("Falle al tratar de enviar un ack al pkt de ID %s, con error: %w", pkt.GetUUID(), err).Error())
 			}
 
 			storeListener <- pkt
@@ -210,13 +172,12 @@ func (jq4 *joinerQuery4) Process() {
 
 		messages := colas.ConsumeInput(colasEntrada)
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de users")
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
 
 			err := message.Ack(false)
 			if err != nil {
-				panic(fmt.Errorf("Could not ack, %w", err))
+				bitacora.Error(fmt.Errorf("Falle al tratar de enviar un ack al pkt de ID %s, con error: %w", pkt.GetUUID(), err).Error())
 			}
 
 			userListener <- pkt
@@ -231,16 +192,13 @@ func (jq4 *joinerQuery4) Process() {
 		messages := colas.ConsumeInput(colasEntrada)
 
 		for message := range *messages {
-			slog.Info("Recibi mensaje de cola de aggregated filtered transactions")
 
 			packetReader := bytes.NewReader(message.Body)
 			pkt, _ := packet.DeserializePackage(packetReader)
-			fmt.Printf("%+v\n", pkt)
-			fmt.Printf("TUKI")
 
 			err := message.Ack(false)
 			if err != nil {
-				panic(fmt.Errorf("Could not ack, %w", err))
+				bitacora.Error(fmt.Errorf("Falle al tratar de enviar un ack al pkt de ID %s, con error: %w", pkt.GetUUID(), err).Error())
 			}
 
 			aggregatorGlobalListener <- pkt
@@ -264,7 +222,7 @@ func (jq4 *joinerQuery4) Process() {
 // import (
 // 	"bytes"
 // 	"fmt"
-// 	"log/slog"
+// 	"log/jq4.logger"
 // 	"malasian_coffe/packets/packet"
 // 	"malasian_coffe/system/middleware"
 // 	"malasian_coffe/utils/network"
@@ -283,7 +241,7 @@ func (jq4 *joinerQuery4) Process() {
 // // Recibe year_half_created_at, store_id, tpv
 // // joinea con stores.csv cargado en memoria con store_id, store_name
 // // y me devuelve year_half_created_at, store_name, tpv
-func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string]string, userMap map[string]string, joinedResult *strings.Builder) {
+/*func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string]string, userMap map[string]string, joinedResult *strings.Builder) {
 	input := inputTransaction.String()
 
 	// Liberamos el buffer de input
@@ -307,6 +265,32 @@ func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string
 
 		// Necesito algo del estilo: storeName, birthday
 		fmt.Fprintf(joinedResult, "%s,%s\n", storeName, userBirthday)
+	}
+}*/
+
+func joinerFunctionQuery4(storeReceiver packet.PacketReceiver, userReceiver packet.PacketReceiver, transactionReceiver packet.PacketReceiver, joinedTransactions *strings.Builder) {
+	userMap := createUserMap(userReceiver)
+	storeMap := createStoreMap(storeReceiver)
+
+	transactions := transactionReceiver.GetPayload()
+	lines := strings.Split(transactions, "\n")
+	lines = lines[:len(lines)-1]
+	for _, r := range lines {
+		cols := strings.Split(r, ",")
+		if len(cols) < 2 {
+			panic("No hay 3 columnas como se esperaba")
+		}
+		// transactionID, storeID, userID
+		// TODO: EN ESTA PORONGA EL USER ID ES UN FLOAT
+		storeID, userID := cols[0], cols[1]
+		storeName := storeMap[storeID]
+		userBirthday, exits := userMap[userID]
+		if !exits {
+			userBirthday = "2002-12-08"
+		}
+
+		// Necesito algo del estilo: storeName, birthday
+		fmt.Fprintf(joinedTransactions, "%s,%s\n", storeName, userBirthday)
 	}
 }
 
@@ -390,7 +374,7 @@ func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string
 
 // 		for message := range *msgQueue { //idealmente esto sería solo una vez para cargar las 10 stores en memoria
 // 			println("[JOINER QUERY3] Leyendo stores para memoria")
-// 			// slog.Debug("[Joiner Q3] Leyendo stores para memoria")
+// 			// jq4.logger.Debug("[Joiner Q3] Leyendo stores para memoria")
 // 			packet_reader := bytes.NewReader(message.Body)
 // 			packet, _ := packet.DeserializePackage(packet_reader)
 // 			lines := strings.Split(packet.GetPayload(), "\n") //leo el paquete
@@ -425,7 +409,7 @@ func joinerFunctionQuery4(inputTransaction *strings.Builder, storeMap map[string
 // 			paquetesSalida := worker.Process(pkt, "query3")
 // 			fmt.Printf("PAQUETES SALIDA %v\n", paquetesSalida)
 // 			for _, pkt := range paquetesSalida {
-// 				slog.Info("[Joiner Q3] Mando packet joineado a siguiente cola")
+// 				jq4.logger.Info("[Joiner Q3] Mando packet joineado a siguiente cola")
 // 				colaSalida, err := middleware.CreateQueue("SalidaQuery4", middleware.ChannelOptionsDefault())
 // 				if err != nil {
 // 					panic(fmt.Errorf("CreateQueue(SalidaQuery4): %w", err))

@@ -65,7 +65,6 @@ func main() {
 	out_dir := os.Args[2]
 	gateway_addr := os.Args[3]
 	listen_addr := os.Args[4]
-	sender_conn_addr := os.Args[5]
 
 	conn, err := net.Dial("tcp", gateway_addr)
 
@@ -78,7 +77,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	println(session_id)
+	fmt.Printf("Mi session ID es: %s\n", session_id)
+	fmt.Printf("Mi IP es: %s\n", conn.LocalAddr().String())
 
 	entries, err := os.ReadDir(dataset_directory)
 	if err != nil {
@@ -91,12 +91,13 @@ func main() {
 			continue
 		}
 		subDirPath := dataset_directory + entry.Name()
-		err := createPackagesFrom(subDirPath, session_id, sender_conn_addr, conn)
+		err := createPackagesFrom(subDirPath, session_id, listen_addr, conn)
 		if err != nil {
 			panic(err)
 		}
 
 	}
+	conn.Close()
 
 	fmt.Println("All dataset sent, now waiting for replies")
 
@@ -146,9 +147,9 @@ func new_received_answers() received_answers {
 	return received_answers
 }
 
-func (ra *received_answers) addAnswer(pkt packetanswer.PacketAnswer) {
+func (ra *received_answers) addAnswer(queryName string) {
 	var index int
-	switch pkt.GetQuery() {
+	switch queryName {
 	case "Query1":
 		index = 0
 	case "Query2a":
@@ -160,13 +161,12 @@ func (ra *received_answers) addAnswer(pkt packetanswer.PacketAnswer) {
 	case "Query4":
 		index = 4
 	default:
-		panic(fmt.Sprintf("Unknown query: %s", pkt.GetQuery()))
+		panic(fmt.Sprintf("Unknown query: %s", queryName))
 	}
 
 	ra.received[index].received = true
 
-	// TODO: Escribir texto a archivo
-	fmt.Printf("Recibi paquete respuesta de la %s: \n", pkt.GetQuery())
+	fmt.Printf("Recibi paquete respuesta de la %s: \n", queryName)
 }
 
 func (ra *received_answers) allReceived() bool {
@@ -190,6 +190,24 @@ func (ra *received_answers) display() {
 	}
 }
 
+func receiveAnswer(conn net.Conn, out_dir string, finish_ch chan <- string) {
+	packet_answer_b, err := network.ReceiveFromNetwork(conn)
+	if err != nil {
+		panic(fmt.Errorf("Failed to receive packet from %s because of %s", conn.LocalAddr().String(), err))
+		}
+
+	packet_answer_reader := bytes.NewReader(packet_answer_b)
+	packet_answer, err := packetanswer.DeserializePackageAnswer(packet_answer_reader)
+	if err != nil {
+		panic(fmt.Errorf("Failed to deserialize packet because of %s", err))
+	}
+
+	write_to_file(packet_answer, out_dir)
+	queryName := packet_answer.GetQuery()
+
+	finish_ch <- queryName
+}
+
 func waitForAnswers(listen_addr string, out_dir string) error {
 	err := os.MkdirAll(out_dir, 0777)
 	if err != nil {
@@ -197,37 +215,38 @@ func waitForAnswers(listen_addr string, out_dir string) error {
 	}
 	received_answers := new_received_answers()
 
+	finish     := make(chan string)
+	new_connection := make(chan net.Conn)
+
 	list, err := net.Listen("tcp", listen_addr)
 	if err != nil {
 		panic(fmt.Errorf("Failed to create listener %w", err))
 	}
+
+	go func() {
+		for {
+			conn, err := list.Accept()
+			if err != nil {
+				panic(err)
+			}
+
+			new_connection <- conn
+		}
+	}()
+
 	for {
-		received_answers.display()
-		// NOTE: Esto supone que la respuesta te llega en un solo Packet
-		conn, err := list.Accept()
-		if err != nil {
-			return err
-		}
-
-		packet_answer_b, err := network.ReceiveFromNetwork(conn)
-		if err != nil {
-			return fmt.Errorf("Failed to receive packet from %s because of %s", conn.LocalAddr().String(), err)
-		}
-
-		packet_answer_reader := bytes.NewReader(packet_answer_b)
-		packet_answer, err := packetanswer.DeserializePackageAnswer(packet_answer_reader)
-		if err != nil {
-			return fmt.Errorf("Failed to deserialize packet because of %s", err)
-		}
-
-		write_to_file(packet_answer, out_dir)
-		received_answers.addAnswer(packet_answer)
-
-		if received_answers.allReceived() {
-			received_answers.display()
-			os.Exit(0)
+		select {
+		case conn := <-new_connection:
+			go receiveAnswer(conn, out_dir, finish)
+		case query_name := <-finish:
+			received_answers.addAnswer(query_name)
+			if received_answers.allReceived() {
+				received_answers.display()
+				os.Exit(0)
+			}
 		}
 	}
+
 }
 
 func write_to_file(pkt packetanswer.PacketAnswer, out_dir string) error {

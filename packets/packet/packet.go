@@ -20,7 +20,7 @@ type OutBoundMessage struct {
 // Donde:
 // - A: A es el identificador del archivo del cual se obtuvo este paquete
 // - El resto de los campos representan la particion del archivo, es decir cuantas particiones y subparticiones tuvo el archivo.
-type PacketUuid struct {
+type packetUuid struct {
 	uuid string
 
 	// End of file. Este paquete es el ultimo paquete del archivo correspondiente
@@ -28,16 +28,23 @@ type PacketUuid struct {
 }
 
 
-func (pu *PacketUuid) getDirID() string {
+func (pu *packetUuid) getDirID() string {
 	dir_id := string(pu.uuid[0])
 	return dir_id
+}
+
+func newPacketUuid(uuid string, eof bool) packetUuid {
+	return packetUuid{
+		uuid: uuid,
+		eof: eof,
+	}
 }
 
 type Header struct {
 	// ID de la session a la que este paquete corresponde
 	session_id string
 
-	packet_uuid PacketUuid
+	packet_uuid packetUuid
 
 	// TODO: esto potencialmente se puede guardar aparte en un nodo que guarde
 	// las IPS. No me gusta esa decision porque introducis comunicacion extra.
@@ -45,19 +52,19 @@ type Header struct {
 	client_ip_port string
 }
 
-func newHeader(session_id string, packet_uuid PacketUuid, client_ip_port string) Header {
+func newHeader(session_id string, packet_uuid packetUuid, client_ip_port string) Header {
 	return Header{
 		session_id:     session_id,
 		packet_uuid:    packet_uuid,
 		client_ip_port: client_ip_port,
 	}
 }
-func (h *Header) split(id int) Header {
-	new_uuid := h.packet_uuid.uuid + strconv.Itoa(id)
+func (h *Header) append(id int) Header {
+	new_uuid := h.packet_uuid.uuid + "." + strconv.Itoa(id)
 
 	new_header := Header{
 		session_id: h.session_id,
-		packet_uuid: PacketUuid{
+		packet_uuid: packetUuid{
 			uuid: new_uuid,
 			eof:  h.packet_uuid.eof,
 		},
@@ -79,9 +86,7 @@ func ChangePayload(packet Packet, newpayload []string) []Packet {
 
 	for i, payload := range newpayload {
 		newheader := packet.header
-		if len(packets) > 1 {
-			newheader = packet.header.split(i)
-		}
+
 		packets[i] = Packet{
 			header:  newheader,
 			payload: payload,
@@ -106,8 +111,10 @@ func ChangePayloadJoin(pkt Packet, datasets []string, newPayload []string) []Pac
 	}
 
 	uuid := strings.Join(datasetsIDs, "-")
-	eof  := pkt.IsEOF()
-	packet_uuid := PacketUuid {
+
+	// NOTA: Cuando hagamos packet splitting, solo devolver true en el ultimo paquete.
+	eof         := true
+	packet_uuid := packetUuid {
 		uuid: uuid,
 		eof: eof,
 	};
@@ -120,9 +127,43 @@ func ChangePayloadJoin(pkt Packet, datasets []string, newPayload []string) []Pac
 
 	for i, payload := range newPayload {
 		newheader := header
-		if len(packets) > 1 {
-			newheader = header.split(i)
+		newheader = header.append(i)
+		packets[i] = Packet{
+			header:  newheader,
+			payload: payload,
 		}
+	}
+	return packets
+}
+
+
+// Devuelve packets que fueron el resultado de hacer un global aggregator
+// - pkt es un paquete usado solo para extraer la metadata
+// - dataset es el *NOMBRE* del dataset
+// - newPayload es el contenido
+func ChangePayloadGlobalAggregator(pkt Packet, datasetName string, newPayload []string) []Packet {
+	datasetID, err := dataset.DatasetToID(datasetName)
+	if err != nil {
+		panic(fmt.Errorf("%s unknown dataset", datasetName))
+	}
+	datasetIDs := strconv.FormatUint(datasetID, 10)
+
+	// NOTA: Cuando hagamos packet splitting, solo devolver true en el ultimo paquete.
+	eof         := true
+	packet_uuid := packetUuid {
+		uuid: datasetIDs,
+		eof: eof,
+	};
+
+	session_id := pkt.GetSessionID()
+	clientAddr := pkt.GetClientAddr()
+
+	header     := newHeader(session_id, packet_uuid, clientAddr)
+	packets     := make([]Packet, len(newPayload))
+
+	for i, payload := range newPayload {
+		newheader := header
+		newheader = header.append(i)
 		packets[i] = Packet{
 			header:  newheader,
 			payload: payload,
@@ -134,6 +175,10 @@ func ChangePayloadJoin(pkt Packet, datasets []string, newPayload []string) []Pac
 
 func (p *Packet) GetPayload() string {
 	return p.payload
+}
+
+func (p *Packet) GetUUID() string {
+	return p.header.packet_uuid.uuid
 }
 
 func (p *Packet) IsEOF() bool {
@@ -150,4 +195,17 @@ func (p *Packet) GetClientAddr() string {
 
 func (p *Packet) GetDirID() string {
 	return p.header.packet_uuid.getDirID()
+}
+
+func (p *Packet) GetSequenceNumber() int {
+	uuid       := p.header.packet_uuid.uuid;
+	uuid_split := strings.Split(uuid, ".")
+	sequence_n, err := strconv.ParseInt(uuid_split[1], 10, 64)
+	if err != nil {
+		// Esto no deberia pasar porque nosotros construimos los headers con
+		// valores bien conocidos. No son valores arbitrarios.
+		panic(fmt.Errorf("Failed to get sequence number, %w", err))
+	}
+
+	return int(sequence_n)
 }

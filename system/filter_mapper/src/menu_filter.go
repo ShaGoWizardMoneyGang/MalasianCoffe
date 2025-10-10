@@ -1,7 +1,7 @@
 package filter_mapper
 
 import (
-	"log/slog"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/colas"
@@ -9,7 +9,6 @@ import (
 )
 
 func filterMenus(input string) []string {
-	print("[FILTER MENU ITEMS]:", input)
 	lines := strings.Split(input, "\n")
 	final := ""
 	for _, line := range lines {
@@ -23,7 +22,7 @@ func filterMenus(input string) []string {
 
 		if data[0] == "" ||
 			data[1] == "" {
-			slog.Debug("Registro con campos de interes vacios, dropeado")
+			bitacora.Debug("Registro con campos de interes vacios, dropeado")
 			continue
 		}
 		final += data[0] + "," + data[1] + "\n"

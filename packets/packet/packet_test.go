@@ -8,7 +8,7 @@ import (
 
 
 func TestPacketSerialization(t *testing.T) {
-	packet_uuid := PacketUuid {
+	packet_uuid := packetUuid {
 		"0.0",
 		false,
 	};

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	filter_mapper "malasian_coffe/system/filter_mapper/src"
 	"malasian_coffe/system/middleware"
@@ -47,7 +48,7 @@ make run-filter RUN_FUNCTION=transactions
 
 		err := message.Ack(false)
 		if err != nil {
-			panic(fmt.Errorf("Could not ack, %w", err))
+			bitacora.Error(fmt.Errorf("Could not ack, %w", err).Error())
 		}
 	}
 }
