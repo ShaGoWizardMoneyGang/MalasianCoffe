@@ -1,3 +1,5 @@
+import time
+
 def header():
     return """name: tp1
 services:
@@ -248,9 +250,26 @@ def read_config_file():
         configs[key] = int(value)
     return configs
 
+def display_config_table(configs):
+    longest_var = 0
+    for key, _ in configs.items():
+        if len(key) > longest_var:
+            longest_var = len(key)
+
+    # NOTA: Le deseo lo mejor a quien sea que tenga que debugear esto.
+    # Lo hice porque queria descansar, perdon.
+    padding_to_bar = lambda word: longest_var - len(word) - 1 + 4
+    print("┌" + "─" * (longest_var + 3) + "┬" + "─" * (len("Amount"))  + "┐")
+    print("│" + "Worker" + " " * padding_to_bar("Worker") + "│" + "Amount" + "│")
+    for key, value in configs.items():
+        print("│" + key + " " * (padding_to_bar(key)) + "│" + " " * 2 + str(value) + " " * (len("Amount") - len(str(value)) - 2) + "│")
+    print("└" + "─" * (longest_var + 3) + "┴" + "─" * (len("Amount"))  + "┘")
+
+    time.sleep(1)
+
 def main():
     configs = read_config_file()
-    print(f"Configuration values: {configs}")
+    display_config_table(configs)
 
     output_file = "docker-compose-gen.yml"        
     with open(output_file, 'w') as file:
