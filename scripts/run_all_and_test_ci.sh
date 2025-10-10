@@ -1,12 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-make build
-
 make download-reduced-dataset
 
+make generate-compose
+
 # Levantar todos los servicios en detached mode
-make docker-ci
+make docker-multi
 
 # Seguir logs de client1 en tiempo real
 docker logs -f client1 &

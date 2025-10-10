@@ -111,6 +111,9 @@ test-outputs-reduced:
 	bash scripts/test_outputs.sh RED
 
 #=================================== Docker ====================================
+CONFIG                  ?= MuchosSinEstado
+generate-config:
+	bash scripts/generate-config.sh ${CONFIG}
 
 generate-compose:
 	python3 scripts/generar_compose.py
