@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"net"
 	"os"
 	"time"
@@ -35,7 +36,8 @@ func main() {
 		panic("Couldn't start consuming queue 2")
 	}
 	// NOTE: Este sleep lo pongo porque si el dataset es corto, el cliente envia todo y no le da tiempo a crear un socket
-	time.Sleep(10 * time.Second)
+	time_to_sleep := 10 + rand.IntN(10)
+	time.Sleep(time.Duration(time_to_sleep) * time.Second)
 	for message := range *msgs {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
