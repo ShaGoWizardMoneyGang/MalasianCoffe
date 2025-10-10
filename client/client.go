@@ -97,6 +97,7 @@ func main() {
 		}
 
 	}
+	conn.Close()
 
 	fmt.Println("All dataset sent, now waiting for replies")
 
