@@ -87,11 +87,16 @@ check_query4() {
     fi
 }
 
-check_file "ExpectedQuery1.csv"  "Query1.csv"
-check_file "ExpectedQuery2a.csv" "Query2a.csv"
-check_file "ExpectedQuery2b.csv" "Query2b.csv"
-check_file "ExpectedQuery3.csv"  "Query3.csv"
-check_query4 "ExpectedQuery4.csv"  "Query4.csv"
+cantClientes=$(grep cliente compose.config | awk -F = '{print $2}')
+
+for (( i=1; i<=$cantClientes; i++ )); do
+    check_file "ExpectedQuery1.csv"    "client$i/Query1.csv"
+    check_file "ExpectedQuery2a.csv"   "client$i/Query2a.csv"
+    check_file "ExpectedQuery2b.csv"   "client$i/Query2b.csv"
+    check_file "ExpectedQuery3.csv"    "client$i/Query3.csv"
+    check_query4 "ExpectedQuery4.csv"  "client$i/Query4.csv"
+done
+
 
 # If any check failed, exit with -1
 if [ "${ANY_FAIL:-0}" -ne 0 ]; then
