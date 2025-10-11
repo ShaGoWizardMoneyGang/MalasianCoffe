@@ -72,7 +72,6 @@ func inputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- pa
 
 	messages := colas.ConsumeInput(colasEntrada)
 	for message := range *messages {
-		bitacora.Info("Recibi mensaje de cola de stores")
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
