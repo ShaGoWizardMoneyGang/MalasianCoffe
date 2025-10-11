@@ -52,6 +52,7 @@ func aggregateSessionQuery2b(inputChannel <-chan packet.Packet, outputChannel ch
 		localReceiver.ReceivePacket(pkt)
 
 		if localReceiver.ReceivedAll() {
+			last_packet = pkt
 			break
 		}
 	}
