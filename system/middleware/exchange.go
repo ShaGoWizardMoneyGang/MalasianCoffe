@@ -3,6 +3,7 @@ package middleware
 
 import (
 	"fmt"
+	"malasian_coffe/packets/packet"
 
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -10,7 +11,7 @@ import (
 
 type ExchangeOptions struct {
 	// Donde hablo con rabbit
-	daemonAddress string
+	DaemonAddress string
 	// routeKeys     []string
 	/*	q, err := ch.QueueDeclare(
 		"",    // name
@@ -24,13 +25,13 @@ type ExchangeOptions struct {
 
 func OptionsDefault() ExchangeOptions {
 	return ExchangeOptions{
-		daemonAddress: "amqp://guest:guest@localhost:5672/",
+		DaemonAddress: "amqp://guest:guest@localhost:5672/",
 		// routeKeys:     []string{"info"},
 	}
 }
 
 func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExchange, error) {
-	conn, err := amqp.Dial(options.daemonAddress)
+	conn, err := amqp.Dial(options.DaemonAddress)
 	if err != nil {
 		return nil, fmt.Errorf(`failed to connect to RabbitMQ: %w. Is the daemon active?
 		Try running:
@@ -98,7 +99,11 @@ Envía un mensaje a la cola o al tópico con el que se inicializó el exchange.
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 */
-func (e *MessageMiddlewareExchange) Send(message []byte, routingKey string) (error MessageMiddlewareError) {
+// func (e *MessageMiddlewareExchange) Send(message []byte, routingKey string) (error MessageMiddlewareError) {
+func (e *MessageMiddlewareExchange) Send(pkt packet.Packet) (error MessageMiddlewareError) {
+	message    := pkt.Serialize()
+	routingKey := packet.GenerateRoutingKey(pkt, e.QueueAmount)
+
 	err := (*e.channel).Publish(
 		e.exchangeName, // exchange
 		routingKey,     // routing key

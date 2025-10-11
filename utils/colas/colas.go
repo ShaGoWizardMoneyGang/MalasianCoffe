@@ -32,6 +32,14 @@ func InstanceQueue(inputQueueName string, rabbitAddr string) *middleware.Message
 	return cola
 }
 
+func InstanceExchange(exchangeName string, rabbitAddr string) *middleware.MessageMiddlewareExchange {
+	exchange, err := middleware.CreateExchange(exchangeName, middleware.ExchangeOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
+	if err != nil {
+		panic(fmt.Errorf("Failed to CreateExchange(%s): %w", exchangeName, err))
+	}
+	return exchange
+}
+
 func InputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- packet.Packet) {
 	colasEntrada := input
 
