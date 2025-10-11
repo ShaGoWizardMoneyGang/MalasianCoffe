@@ -47,7 +47,7 @@ func aggregateQuery2a(inputChannel <-chan packet.Packet, outputChannel chan<- pa
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
 	// jugosa metadata
 	var last_packet packet.Packet
-	 
+
 	for {
 		pkt := <-inputChannel
 

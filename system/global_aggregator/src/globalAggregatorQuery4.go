@@ -38,93 +38,94 @@ func aggregateQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- pac
 	localReceiver := packet.NewPacketReceiver("Agregador global 4")
 	localAcc := make(map[string]map[string]uint64)
 
+	var last_packet packet.Packet
+
 	for {
 		pkt := <-inputChannel
 
 		localReceiver.ReceivePacket(pkt)
 
-		if !localReceiver.ReceivedAll() {
-			continue
+		if localReceiver.ReceivedAll() {
+			last_packet = pkt
+			break
 		}
-
-		consolidatedInput := localReceiver.GetPayload()
-
-		lines := strings.Split(consolidatedInput, "\n")
-		lines = lines[:len(lines)-1]
-
-		for _, line := range lines {
-			if line == "" {
-				continue
-			}
-			cols := strings.Split(line, ",")
-			if len(cols) != 3 {
-				panic("Se esperaban 3 columnas")
-			}
-			userID := cols[0]
-			storeID := cols[1]
-			amountStr := cols[2]
-
-			amount, err := strconv.ParseUint(amountStr, 10, 64)
-			if err != nil {
-				panic("Amount con formato inválido")
-			}
-
-			if localAcc[storeID] == nil {
-				localAcc[storeID] = make(map[string]uint64)
-			}
-			localAcc[storeID][userID] += amount
-		}
-
-		if len(localAcc) == 0 {
-			localReceiver = packet.NewPacketReceiver("Agregador global 4")
-			continue
-		}
-
-		var b strings.Builder
-		stores := make([]string, 0, len(localAcc))
-		for store := range localAcc {
-			stores = append(stores, store)
-		}
-		sort.Strings(stores)
-
-		for _, store := range stores {
-			users := localAcc[store]
-
-			type UserAmount struct {
-				user   string
-				amount uint64
-			}
-
-			sortedSlice := make([]UserAmount, 0, len(users))
-			for user, amount := range users {
-				sortedSlice = append(sortedSlice, UserAmount{user: user, amount: amount})
-			}
-
-			sort.Slice(sortedSlice, func(i, j int) bool {
-				return sortedSlice[i].amount > sortedSlice[j].amount
-			})
-
-			var size int
-			if len(sortedSlice) < 3 {
-				size = len(sortedSlice)
-			} else {
-				size = 3
-			}
-
-			for i := 0; i < size; i++ {
-				fmt.Fprintf(&b, "%s,%s\n", store, sortedSlice[i].user)
-			}
-		}
-
-		final := b.String()
-		if final != "" {
-			newPkts := packet.ChangePayloadGlobalAggregator(pkt, "transactions", []string{final})
-			outputChannel <- newPkts[0]
-		}
-
-		localAcc = make(map[string]map[string]uint64)
-		localReceiver = packet.NewPacketReceiver("Agregador global 4")
 	}
+
+	consolidatedInput := localReceiver.GetPayload()
+
+	lines := strings.Split(consolidatedInput, "\n")
+	lines = lines[:len(lines)-1]
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		cols := strings.Split(line, ",")
+		if len(cols) != 3 {
+			panic("Se esperaban 3 columnas")
+		}
+		userID := cols[0]
+		storeID := cols[1]
+		amountStr := cols[2]
+
+		amount, err := strconv.ParseUint(amountStr, 10, 64)
+		if err != nil {
+			panic("Amount con formato inválido")
+		}
+
+		if localAcc[storeID] == nil {
+			localAcc[storeID] = make(map[string]uint64)
+		}
+		localAcc[storeID][userID] += amount
+	}
+
+	// if len(localAcc) == 0 {
+	// 	localReceiver = packet.NewPacketReceiver("Agregador global 4")
+	// 	continue
+	// }
+
+	var b strings.Builder
+	stores := make([]string, 0, len(localAcc))
+	for store := range localAcc {
+		stores = append(stores, store)
+	}
+	sort.Strings(stores)
+
+	for _, store := range stores {
+		users := localAcc[store]
+
+		type UserAmount struct {
+			user   string
+			amount uint64
+		}
+
+		sortedSlice := make([]UserAmount, 0, len(users))
+		for user, amount := range users {
+			sortedSlice = append(sortedSlice, UserAmount{user: user, amount: amount})
+		}
+
+		sort.Slice(sortedSlice, func(i, j int) bool {
+			return sortedSlice[i].amount > sortedSlice[j].amount
+		})
+
+		var size int
+		if len(sortedSlice) < 3 {
+			size = len(sortedSlice)
+		} else {
+			size = 3
+		}
+
+		for i := 0; i < size; i++ {
+			fmt.Fprintf(&b, "%s,%s\n", store, sortedSlice[i].user)
+		}
+	}
+
+	final := b.String()
+	// if final != "" {
+	newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{final})
+	outputChannel <- newPkts[0]
+	// }
+
 }
 
 func (g *aggregator4Global) Process() {
