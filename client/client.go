@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	packetanswer "malasian_coffe/packets/packet_answer"
 	"malasian_coffe/protocol"
@@ -15,6 +16,19 @@ import (
 
 	"github.com/fatih/color"
 )
+
+type Client struct {
+	sessionID string
+
+	listen_addr net.Conn
+
+	received_answers received_answers
+}
+
+func (c *Client) displayInfo() {
+	bitacora.Info(fmt.Sprintf("Mi session ID es: %s\n", c.sessionID))
+	bitacora.Info(fmt.Sprintf("Mi IP es: %s\n", c.listen_addr.LocalAddr().String()))
+}
 
 func createPackagesFrom(dir string, session_ID string, listen_addr string, send_addr net.Conn) error {
 	directory_name := filepath.Base(dir)
@@ -77,8 +91,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Mi session ID es: %s\n", session_id)
-	fmt.Printf("Mi IP es: %s\n", conn.LocalAddr().String())
+
+	client := Client {
+		sessionID: session_id,
+		listen_addr: conn,
+	}
+
+	client.displayInfo()
 
 	entries, err := os.ReadDir(dataset_directory)
 	if err != nil {
@@ -101,7 +120,7 @@ func main() {
 
 	fmt.Println("All dataset sent, now waiting for replies")
 
-	error := waitForAnswers(listen_addr, out_dir)
+	error := client.waitForAnswers(listen_addr, out_dir)
 	if error != nil {
 		panic(error)
 	}
@@ -190,7 +209,7 @@ func (ra *received_answers) display() {
 	}
 }
 
-func receiveAnswer(conn net.Conn, out_dir string, finish_ch chan <- string) {
+func receiveAnswer(conn net.Conn, out_dir string, sessionID string, finish_ch chan <- string) {
 	packet_answer_b, err := network.ReceiveFromNetwork(conn)
 	if err != nil {
 		panic(fmt.Errorf("Failed to receive packet from %s because of %s", conn.LocalAddr().String(), err))
@@ -202,13 +221,17 @@ func receiveAnswer(conn net.Conn, out_dir string, finish_ch chan <- string) {
 		panic(fmt.Errorf("Failed to deserialize packet because of %s", err))
 	}
 
+	if packet_answer.GetSessionID() != sessionID {
+		bitacora.Error(fmt.Sprintf("ERROR, obtuve paquete de otra session %s\n", sessionID))
+	}
+
 	write_to_file(packet_answer, out_dir)
 	queryName := packet_answer.GetQuery()
 
 	finish_ch <- queryName
 }
 
-func waitForAnswers(listen_addr string, out_dir string) error {
+func (c *Client) waitForAnswers(listen_addr string, out_dir string) error {
 	err := os.MkdirAll(out_dir, 0777)
 	if err != nil {
 		panic(fmt.Errorf("Failed to create directory %s", out_dir))
@@ -237,7 +260,7 @@ func waitForAnswers(listen_addr string, out_dir string) error {
 	for {
 		select {
 		case conn := <-new_connection:
-			go receiveAnswer(conn, out_dir, finish)
+			go receiveAnswer(conn, out_dir, c.sessionID, finish)
 		case query_name := <-finish:
 			received_answers.addAnswer(query_name)
 			if received_answers.allReceived() {
