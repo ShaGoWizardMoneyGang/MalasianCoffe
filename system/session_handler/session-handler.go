@@ -1,6 +1,10 @@
 package sessionhandler
 
-import "malasian_coffe/packets/packet"
+import (
+	"fmt"
+	"malasian_coffe/bitacora"
+	"malasian_coffe/packets/packet"
+)
 
 type SessionHandler struct {
 	outputChannel      chan<- packet.Packet
@@ -29,6 +33,7 @@ func (sh *SessionHandler) PassPacketToSession(pkt packet.Packet) {
 	// Nos creamos una rutina por cada session. Nosotros le enviamos los
 	// paquetes correspondientes a cada rutina
 	if !exists {
+		bitacora.Info(fmt.Sprintf("Nueva session detectada: %s", sessionID))
 		// Canal de input asignado a esta session
 		assigned_channel := make(chan packet.Packet)
 		go sh.associatedFunction(assigned_channel, sh.outputChannel)
