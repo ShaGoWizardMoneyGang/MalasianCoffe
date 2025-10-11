@@ -6,6 +6,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
+	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/uuid"
 )
 
@@ -148,7 +149,9 @@ Envía un mensaje a la cola o al tópico con el que se inicializó el exchange.
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 */
-func (q *MessageMiddlewareQueue) Send(message []byte) (error MessageMiddlewareError) {
+func (q *MessageMiddlewareQueue) Send(pkt packet.Packet) (error MessageMiddlewareError) {
+
+	message    := pkt.Serialize()
 	err := (*q.channel).Publish(
 		"",          // exchange
 		q.queueName, // routing key

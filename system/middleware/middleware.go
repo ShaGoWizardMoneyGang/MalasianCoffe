@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"malasian_coffe/packets/packet"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -56,7 +58,7 @@ type MessageMiddleware interface {
 	   Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 	   Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 	*/
-	Send(message []byte) (error MessageMiddlewareError)
+	Send(pkt packet.Packet) (error MessageMiddlewareError)
 
 	/*
 	   Se desconecta de la cola o exchange al que estaba conectado.

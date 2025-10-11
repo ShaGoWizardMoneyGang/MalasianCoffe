@@ -81,7 +81,7 @@ cada mensaje de datos o de control.
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 */
-func (q *MessageMiddlewareExchange) StartConsuming() (messageQueue MessageQueue, error MessageMiddlewareError) {
+func (q *MessageMiddlewareExchange) StartConsuming() (messageQueue ConsumeChannel, error MessageMiddlewareError) {
 	panic("Tried to listen from an exchange")
 }
 
