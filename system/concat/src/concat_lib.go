@@ -44,7 +44,7 @@ func concat(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packe
 	}
 
 
-	pkt_joineado := packet.ChangePayloadGlobalAggregator(last_packet, "transaction", []string{concatenatedPackets.String()})
+	pkt_joineado := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{concatenatedPackets.String()})
 
 	// Liberamos
 	concatenatedPackets.Reset()
