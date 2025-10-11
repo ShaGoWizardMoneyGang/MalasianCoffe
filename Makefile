@@ -120,7 +120,10 @@ generate-compose:
 
 docker-multi: docker-down clean-out build generate-compose
 	docker compose -f docker-compose-gen.yml up -d
-	@echo "Docker levantado, usar 'make run-client' para correr un cliente"
+	@echo "Docker levantado, usar 'make docker-wait ; make test-outputs-reduced'"
+
+docker-wait:
+	bash scripts/wait_for_clients.sh
 
 docker-down:
 	docker compose -f docker-compose-gen.yml down -v --remove-orphans
