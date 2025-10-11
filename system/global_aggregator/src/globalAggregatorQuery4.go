@@ -34,25 +34,7 @@ func (g *aggregator4Global) Build(rabbitAddr string) {
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery4, g.outputChannel)
 }
 
-func aggregateQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	localReceiver := packet.NewPacketReceiver("Agregador global 4")
-	localAcc := make(map[string]map[string]uint64)
-
-	var last_packet packet.Packet
-
-	for {
-		pkt := <-inputChannel
-
-		localReceiver.ReceivePacket(pkt)
-
-		if localReceiver.ReceivedAll() {
-			last_packet = pkt
-			break
-		}
-	}
-
-	consolidatedInput := localReceiver.GetPayload()
-
+func updateAccumulator(consolidatedInput string, localAcc map[string]map[string]uint64) {
 	lines := strings.Split(consolidatedInput, "\n")
 	lines = lines[:len(lines)-1]
 
@@ -78,12 +60,9 @@ func aggregateQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- pac
 		}
 		localAcc[storeID][userID] += amount
 	}
+}
 
-	// if len(localAcc) == 0 {
-	// 	localReceiver = packet.NewPacketReceiver("Agregador global 4")
-	// 	continue
-	// }
-
+func buildOutput(localAcc map[string]map[string]uint64) string {
 	var b strings.Builder
 	stores := make([]string, 0, len(localAcc))
 	for store := range localAcc {
@@ -109,22 +88,40 @@ func aggregateQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- pac
 		})
 
 		var size int
-		if len(sortedSlice) < 3 {
-			size = len(sortedSlice)
-		} else {
-			size = 3
-		}
+		size = min(len(sortedSlice), 3)
 
-		for i := 0; i < size; i++ {
+		for i := range size {
 			fmt.Fprintf(&b, "%s,%s\n", store, sortedSlice[i].user)
 		}
 	}
+	return b.String()
+}
 
-	final := b.String()
-	// if final != "" {
-	newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{final})
+func aggregateQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
+	localReceiver := packet.NewPacketReceiver("Agregador global 4")
+	localAcc := make(map[string]map[string]uint64)
+
+	var last_packet packet.Packet
+
+	for {
+		pkt := <-inputChannel
+
+		localReceiver.ReceivePacket(pkt)
+
+		if localReceiver.ReceivedAll() {
+			last_packet = pkt
+			break
+		}
+	}
+
+	consolidatedInput := localReceiver.GetPayload()
+
+	updateAccumulator(consolidatedInput, localAcc)
+
+	output := buildOutput(localAcc)
+
+	newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{output})
 	outputChannel <- newPkts[0]
-	// }
 
 }
 
