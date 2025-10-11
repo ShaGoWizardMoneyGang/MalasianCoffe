@@ -205,3 +205,18 @@ func (p *Packet) GetSequenceNumber() int {
 
 	return int(sequence_n)
 }
+
+// Dado un paquete, y la cantidad de colas destino, te devuelve un string con su routing key
+// devuelve un string
+func GenerateRoutingKey(pkt Packet, queueAmount uint64) string {
+	h := fnv.New64a()
+	h.Write([]byte(pkt.GetSessionID()))
+	hash := h.Sum64()
+
+	// Modulo esta en el rango [0, queueAmount - 1]
+	modulo := hash % queueAmount;
+
+	modulo_s := strconv.FormatUint(modulo, 10)
+
+	return modulo_s
+}
