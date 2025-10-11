@@ -35,39 +35,38 @@ type storeFilterMapper struct {
 	colaEntradaStore *middleware.MessageMiddlewareQueue
 
 	colaSalida3 *middleware.MessageMiddlewareQueue
-	colaSalida4 *middleware.MessageMiddlewareQueue
+	exchangeSalida4 *middleware.MessageMiddlewareExchange
 }
 
 func (sfm *storeFilterMapper) Build(rabbitAddr string) {
 	colaEntradaStore := colas.InstanceQueue("DataStores", rabbitAddr)
 
 	colaSalida3 := colas.InstanceQueue("FilteredStores3", rabbitAddr)
-	colaSalida4 := colas.InstanceQueue("FilteredStores4", rabbitAddr)
 
 	sfm.colaEntradaStore = colaEntradaStore
 
-	sfm.colaSalida3 = colaSalida3
-	sfm.colaSalida4 = colaSalida4
+	sfm.colaSalida3      = colaSalida3
+	sfm.exchangeSalida4  = colas.InstanceExchange("FilteredStores4", rabbitAddr)
 }
 
 func (sfm *storeFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
 	return sfm.colaEntradaStore
 }
 
-func (sfm *storeFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (sfm *storeFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
 	mapped_stores := filterStores(input)
 	newPayload := packet.ChangePayload(pkt, mapped_stores)
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
 			ColaSalida: sfm.colaSalida3,
 		},
 		{
 			Packet:     newPayload[1],
-			ColaSalida: sfm.colaSalida4,
+			ColaSalida: sfm.exchangeSalida4,
 		},
 	}
 

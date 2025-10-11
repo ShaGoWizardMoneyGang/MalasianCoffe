@@ -49,14 +49,14 @@ func (ufm *userFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
 	return ufm.colaEntradaUsers
 }
 
-func (ufm *userFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (ufm *userFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
 	filtered_users := []string{filterUsers(input)}
 
 	newPayload := packet.ChangePayload(pkt, filtered_users)
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
 			ColaSalida: ufm.colaSalida4,

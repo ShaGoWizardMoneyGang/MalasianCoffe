@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/colas"
 	"strconv"
 	"time"
 )
@@ -51,7 +52,7 @@ type FilterMapper interface {
 	GetInput() *middleware.MessageMiddlewareQueue
 
 	// Funcio que hace el filtrado
-	Process(pkt packet.Packet) []packet.OutBoundMessage
+	Process(pkt packet.Packet) []colas.OutBoundMessage
 }
 
 func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {

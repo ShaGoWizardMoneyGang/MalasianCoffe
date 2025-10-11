@@ -54,13 +54,13 @@ func (mifm *menuItemFilterMapper) GetInput() *middleware.MessageMiddlewareQueue 
 	return mifm.colaEntradaStore
 }
 
-func (mifm *menuItemFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (mifm *menuItemFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
 	mapped_stores := filterMenus(input)
 	newPayload := packet.ChangePayload(pkt, mapped_stores)
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
 			ColaSalida: mifm.colaSalida2a,

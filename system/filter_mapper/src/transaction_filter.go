@@ -136,7 +136,7 @@ func (tfm *transactionFilterMapper) Build(rabbitAddr string) {
 	tfm.colaSalida3 = colaSalida3
 	tfm.colaSalida4 = colaSalida4
 }
-func (tfm *transactionFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (tfm *transactionFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Vienen en este orden: final_query1, final_query3, final_query4
@@ -144,7 +144,7 @@ func (tfm *transactionFilterMapper) Process(pkt packet.Packet) []packet.OutBound
 
 	newPayload := packet.ChangePayload(pkt, payloadResults)
 
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
 			ColaSalida: tfm.colaSalida1,
