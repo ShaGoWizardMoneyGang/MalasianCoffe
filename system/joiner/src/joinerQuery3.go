@@ -70,7 +70,7 @@ func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 	joinedTransactions.Reset()
 
 	for _, pkt := range pkt_joineado {
-		bitacora.Info(fmt.Sprintf("Envio pkt joineado al sender: %v\n", pkt))
+		bitacora.Info(fmt.Sprintf("Envio pkt joineado al sender, session: %s", pkt.GetSessionID()))
 		outputChannel <- pkt
 	}
 }

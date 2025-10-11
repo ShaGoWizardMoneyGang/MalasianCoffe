@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
@@ -66,9 +67,8 @@ func joinQuery2b(inputChannel  <-chan packet.Packet, outputChannel chan<- packet
 
 	joinedTransactionItems.Reset()
 
-	slog.Info("Envio pkt joineado al sender")
 	for _, pkt := range pkt_joineado {
-		fmt.Printf("%+v\n", pkt)
+		bitacora.Info(fmt.Sprintf("Envio pkt joineado al sender, session: %s", pkt.GetSessionID()))
 		outputChannel <- pkt
 	}
 }
