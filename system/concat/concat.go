@@ -1,12 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
-	"log/slog"
-	"malasian_coffe/packets/packet"
 	concat "malasian_coffe/system/concat/src"
-	"malasian_coffe/utils/colas"
 	"os"
 )
 
@@ -16,43 +11,20 @@ import (
 func main() {
 	rabbit_addr := os.Args[1]
 	print("Rabbit address: ", rabbit_addr, "\n")
-	colaEntrada := colas.InstanceQueue("FilteredTransactions1", rabbit_addr)
-	// colaEntrada, err := middleware.CreateQueue("FilteredTransactions1", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbit_addr)})
-	// if err != nil {
-	// 	panic(fmt.Errorf("CreateQueue(FilteredTransactions1): %w", err))
-	// }
-	msgQueue, consumeError := colaEntrada.StartConsuming()
-	if consumeError != 0 {
-		panic(fmt.Errorf("StartConsuming failed with code %d", consumeError))
-	}
 
-	colaSalida := colas.InstanceQueue("SalidaQuery1", rabbit_addr)
-
-	worker := concat.Concat{}
-	var result []packet.Packet
-	for message := range *msgQueue {
-
-		slog.Debug("Recibi mensaje")
-		packet_reader := bytes.NewReader(message.Body)
-		packet, err := packet.DeserializePackage(packet_reader)
-		if err != nil {
-			panic(fmt.Errorf("Error deserializing packet: %w", err))
-		}
-
-		slog.Debug("Procesando packet", "eof", packet.IsEOF(), "payload_len", len(packet.GetPayload()))
-		result = worker.Process(packet)
-		ackErr := message.Ack(false)
-		if ackErr != nil {
-			panic(fmt.Errorf("Could not ack, %w", ackErr))
-		}
-		if len(result) != 0 {
-			slog.Info("Obtuve EOF, mando todo empaquetado a la cola de sending")
-			for _, pkt := range result {
-				err := colaSalida.Send(pkt.Serialize())
-				if err != 0 {
-					panic(fmt.Errorf("Error sending packet: %d", err))
-				}
-			}
-		}
-	}
+	concater    := concat.Concat{}
+	concater.Build(rabbit_addr)
+	concater.Process()
 }
+// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⣤⣤⡄
+// ⠀⣴⣶⣶⣶⡶⠶⠶⡶⣶⣦⣄⠀⠀⠀⢀⣴⣶⠶⢶⣶⠀⢠⡴⠶⠶⢶⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⡾⠶⠶⢶⣶⡶⠶⠶⠶⠶⢶⣿⣿⡋⠉⠉⣹⡇
+// ⠈⣿⣿⠀⣄⢠⣤⣤⣄⣈⠙⣿⣷⠀⠀⣼⡿⠁⠀⠀⢻⣆⢸⡇⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠃⠀⠀⢸⣿⠁⠀⠀⠀⠀⠀⠘⢿⣿⠀⠀⣿⠇
+// ⠀⣿⣿⠀⡏⠘⢋⡟⠋⠉⠀⣨⣿⡆⣼⣿⠁⠀⠀⠀⠈⣿⡄⣷⠀⠀⠈⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡜⠀⠀⠀⣾⠃⠀⠀⠀⠀⠀⠀⠀⢸⣿⠀⠀⣿⠀
+// ⠀⣿⣿⠀⣇⣼⣿⠟⠀⢀⣰⣿⠟⡰⢿⠃⠀⠀⠀⠀⠀⢹⣷⣻⠀⠀⠀⢻⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⢠⡿⠀⠀⠀⠀⠀⠀⠀⠀⣸⡟⠀⢰⣿⠀
+// ⠀⣿⡿⠀⡀⣀⣀⣤⣶⣾⣿⢃⢰⣾⠏⠀⠀⠀⠀⠀⠀⠀⢻⣿⡄⠀⠀⢸⣇⠀⢠⣿⠟⠋⣷⣆⠀⢠⡇⠀⠀⣼⡇⠀⠀⠀⠀⣀⣤⣤⣴⣿⠃⠀⢸⡇⠀
+// ⠀⣿⡇⠀⠈⠉⠻⣿⣷⡀⠀⠀⣼⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⣇⠀⠀⠘⣿⣠⡿⠁⣀⣤⠸⢿⡄⢸⠀⠀⠀⣿⠀⠀⣿⡀⠀⠹⣧⠀⠈⣿⠀⠀⣾⡇⠀
+// ⠀⣿⡇⠀⢰⣆⠀⠀⢻⣷⡀⣰⠏⠀⠀⠀⣀⣀⣀⣀⣀⡀⠀⠸⣿⠀⠀⠀⣿⡟⠁⠀⣾⣿⡀⠘⣷⣼⠀⠀⢰⣿⠀⠀⣿⣧⠀⠀⢻⣧⠀⣿⠀⠀⣿⠃⠀
+// ⠀⣿⡇⠀⢸⡏⣶⣥⠈⢿⣿⡿⠀⠀⢰⡿⠛⠛⠋⠉⢻⣇⠀⠀⢹⡄⠀⠀⠉⠁⠀⣼⠏⠹⣇⠀⠹⣿⠀⠀⢸⡟⠀⠀⣿⠻⣧⠀⠀⢻⣧⣸⣧⣠⣿⠀⠀
+// ⠀⣿⣇⠀⢸⡇⠹⣿⣶⠈⠻⣧⠀⢀⣿⠇⠀⠀⠀⠀⠀⢿⣇⠀⠈⣷⡀⠀⠀⠀⣼⡏⠀⠀⢿⡆⠀⠀⠀⠀⣼⣷⠀⠀⢸⠀⢻⣧⠀⠀⢻⣏⢉⢉⣿⡄⠀
+// ⠀⣿⣿⣦⣿⡇⠀⠹⣿⣧⣠⣾⡇⣻⡟⠀⠀⠀⠀⠀⠀⠘⣿⣆⠀⠸⠇⠀⠀⣼⡟⠀⠀⠀⠘⣿⡀⠀⠀⢀⡿⣿⠀⠀⢸⠀⠀⢻⣧⡀⠀⣻⣶⣤⣿⡇⠀
+// ⠀⠻⠿⠛⠛⠃⠀⠀⠻⠿⠿⠿⠿⠛⠁⠀⠀⠀⠀⠀⠀⠀⠘⠛⠛⠻⠿⠷⠾⠟⠀⠀⠀⠀⠀⠙⠿⠿⠷⠾⠟⠿⠿⠿⠟⠃⠀⠀⠛⠿⠿⠿⠿⠛⠛⠁⠀
