@@ -26,7 +26,6 @@ type aggregator2aGlobal struct {
 
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
-	acc         map[keyQuery2a]int64
 
 	receiver packet.PacketReceiver
 
@@ -40,7 +39,6 @@ func (g *aggregator2aGlobal) Build(rabbitAddr string) {
 	g.colaEntrada = colas.InstanceQueue("CountedItems2a", rabbitAddr)
 	// aca va GlobalAggregation2a
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation2a", rabbitAddr)
-	g.acc = make(map[keyQuery2a]int64)
 
 	g.receiver = packet.NewPacketReceiver("Agregador global 2a")
 
