@@ -35,7 +35,7 @@ type storeFilterMapper struct {
 	colaEntradaStore *middleware.MessageMiddlewareQueue
 
 	colaSalida3 *middleware.MessageMiddlewareQueue
-	colaSalida4 *middleware.MessageMiddlewareQueue
+	exchangeSalida4 *middleware.MessageMiddlewareExchange
 }
 
 func (sfm *storeFilterMapper) Build(rabbitAddr string) {
@@ -46,8 +46,7 @@ func (sfm *storeFilterMapper) Build(rabbitAddr string) {
 	sfm.colaEntradaStore = colaEntradaStore
 
 	sfm.colaSalida3      = colaSalida3
-	// sfm.exchangeSalida4  = colas.InstanceExchange("FilteredStores4", rabbitAddr)
-	sfm.colaSalida4 = colas.InstanceQueue("FilteredStores4", rabbitAddr)
+	sfm.exchangeSalida4  = colas.InstanceExchange("FilteredStores4", rabbitAddr)
 }
 
 func (sfm *storeFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
@@ -67,7 +66,7 @@ func (sfm *storeFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage
 		},
 		{
 			Packet:     newPayload[1],
-			ColaSalida: sfm.colaSalida4,
+			ColaSalida: sfm.exchangeSalida4,
 		},
 	}
 
