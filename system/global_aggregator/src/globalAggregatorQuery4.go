@@ -8,58 +8,34 @@ import (
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	sessionhandler "malasian_coffe/system/session_handler"
 
 	// "malasian_coffe/system/queries/query4"
 	"malasian_coffe/utils/colas"
 )
 
 type aggregator4Global struct {
+	inputChannel  chan packet.Packet
+	outputChannel chan packet.Packet
+
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
-	acc         map[string]map[string]uint64
 
-	receiver packet.PacketReceiver
+	sessionHandler sessionhandler.SessionHandler
 }
 
 func (g *aggregator4Global) Build(rabbitAddr string) {
+	g.inputChannel = make(chan packet.Packet)
+	g.outputChannel = make(chan packet.Packet)
+
 	g.colaEntrada = colas.InstanceQueue("PartialCountedUsers4", rabbitAddr)
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
-	g.acc = make(map[string]map[string]uint64)
 
-	g.receiver = packet.NewPacketReceiver("Aggregator 4")
+	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery4, g.outputChannel)
 }
 
-// user_id | store_id | #transactions
-func (g *aggregator4Global) Process(pkt packet.Packet) []packet.OutBoundMessage {
-	g.receiver.ReceivePacket(pkt)
-
-	if !g.receiver.ReceivedAll() {
-		return nil
-	}
-
-	consolidatedInput := g.receiver.GetPayload()
-
-	g.ingestBatch(consolidatedInput)
-
-	final := g.flushAndBuild()
-	if final == "" {
-		return nil
-	}
-
-	g.receiver = packet.NewPacketReceiver("Aggregator 4")
-
-	newPkts := packet.ChangePayloadGlobalAggregator(pkt, "transactions", []string{final})
-	return []packet.OutBoundMessage{
-		{
-			Packet:     newPkts[0],
-			ColaSalida: g.colaSalida,
-		},
-	}
-}
-
-// user_id | store_id | #transactions
-func (g *aggregator4Global) ingestBatch(input string) {
-	lines := strings.Split(input, "\n")
+func updateAccumulator(consolidatedInput string, localAcc map[string]map[string]uint64) {
+	lines := strings.Split(consolidatedInput, "\n")
 	lines = lines[:len(lines)-1]
 
 	for _, line := range lines {
@@ -70,38 +46,41 @@ func (g *aggregator4Global) ingestBatch(input string) {
 		if len(cols) != 3 {
 			panic("Se esperaban 3 columnas")
 		}
-		user_id, store_id, transaction_number := cols[0], cols[1], cols[2]
+		userID := cols[0]
+		storeID := cols[1]
+		amountStr := cols[2]
 
-		amount, err := strconv.ParseUint(transaction_number, 10, 64)
+		amount, err := strconv.ParseUint(amountStr, 10, 64)
 		if err != nil {
-			panic("tpv con formato inválido")
+			panic("Amount con formato inválido")
 		}
 
-		_, exists := g.acc[store_id]
-		if !exists {
-			g.acc[store_id] = make(map[string]uint64)
+		if localAcc[storeID] == nil {
+			localAcc[storeID] = make(map[string]uint64)
 		}
-		g.acc[store_id][user_id] += amount
+		localAcc[storeID][userID] += amount
 	}
 }
 
-func (g *aggregator4Global) flushAndBuild() string {
-	if len(g.acc) == 0 {
-		return ""
-	}
-
-	type kv struct {
-		user   string
-		amount uint64
-	}
-
+func buildOutput(localAcc map[string]map[string]uint64) string {
 	var b strings.Builder
-	for store, user2amount := range g.acc {
-		var sortedSlice []kv
-		for user, amount := range user2amount {
-			sortedSlice = append(sortedSlice, kv{
-				user,
-				amount})
+	stores := make([]string, 0, len(localAcc))
+	for store := range localAcc {
+		stores = append(stores, store)
+	}
+	sort.Strings(stores)
+
+	for _, store := range stores {
+		users := localAcc[store]
+
+		type UserAmount struct {
+			user   string
+			amount uint64
+		}
+
+		sortedSlice := make([]UserAmount, 0, len(users))
+		for user, amount := range users {
+			sortedSlice = append(sortedSlice, UserAmount{user: user, amount: amount})
 		}
 
 		sort.Slice(sortedSlice, func(i, j int) bool {
@@ -109,21 +88,52 @@ func (g *aggregator4Global) flushAndBuild() string {
 		})
 
 		var size int
-		if len(sortedSlice) < 3 {
-			size = len(sortedSlice)
-		} else {
-			size = 3
-		}
+		size = min(len(sortedSlice), 3)
 
-		for i := 0; i < size; i++ {
+		for i := range size {
 			fmt.Fprintf(&b, "%s,%s\n", store, sortedSlice[i].user)
 		}
 	}
-
-	g.acc = make(map[string]map[string]uint64)
 	return b.String()
 }
 
-func (g *aggregator4Global) GetInput() *middleware.MessageMiddlewareQueue {
-	return g.colaEntrada
+func aggregateQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
+	localReceiver := packet.NewPacketReceiver("Agregador global 4")
+	localAcc := make(map[string]map[string]uint64)
+
+	var last_packet packet.Packet
+
+	for {
+		pkt := <-inputChannel
+
+		localReceiver.ReceivePacket(pkt)
+
+		if localReceiver.ReceivedAll() {
+			last_packet = pkt
+			break
+		}
+	}
+
+	consolidatedInput := localReceiver.GetPayload()
+
+	updateAccumulator(consolidatedInput, localAcc)
+
+	output := buildOutput(localAcc)
+
+	newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{output})
+	outputChannel <- newPkts[0]
+
+}
+
+func (g *aggregator4Global) Process() {
+	go colas.InputQueue(g.colaEntrada, g.inputChannel)
+
+	for {
+		select {
+		case inputPacket := <-g.inputChannel:
+			g.sessionHandler.PassPacketToSession(inputPacket)
+		case packetAgregado := <-g.outputChannel:
+			g.colaSalida.Send(packetAgregado.Serialize())
+		}
+	}
 }

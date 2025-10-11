@@ -41,3 +41,7 @@ func (p* PacketAnswer) GetQuery() string {
 func (p* PacketAnswer) GetPayload() string {
 	return p.payload
 }
+
+func (p* PacketAnswer) GetSessionID() string {
+	return p.header.session_id
+}

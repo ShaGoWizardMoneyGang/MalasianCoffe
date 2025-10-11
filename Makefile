@@ -111,6 +111,8 @@ test-outputs-reduced:
 	bash scripts/test_outputs.sh RED
 
 #=================================== Docker ====================================
+all-reduced: docker-multi docker-wait test-outputs-reduced
+
 CONFIG                  ?= MuchosSinEstado
 generate-config:
 	bash scripts/generate-config.sh ${CONFIG}
@@ -120,7 +122,10 @@ generate-compose:
 
 docker-multi: docker-down clean-out build generate-compose
 	docker compose -f docker-compose-gen.yml up -d
-	@echo "Docker levantado, usar 'make run-client' para correr un cliente"
+	@echo "Docker levantado, usar 'make docker-wait ; make test-outputs-reduced'"
+
+docker-wait:
+	bash scripts/wait_for_clients.sh
 
 docker-down:
 	docker compose -f docker-compose-gen.yml down -v --remove-orphans
@@ -133,7 +138,7 @@ docker-ci:
 
 #============================== Misc directives ===============================
 clean-out:
-	rm -f out/Query*.csv
+	find out/ ! -name '.gitignore' ! -name 'out' -type d -exec rm -irf {} +
 
 download-dataset:
 	curl -C - -L https://www.kaggle.com/api/v1/datasets/download/geraldooizx/g-coffee-shop-transaction-202307-to-202506 -o dataset/dataset.zip

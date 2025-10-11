@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	packetanswer "malasian_coffe/packets/packet_answer"
 	"malasian_coffe/system/middleware"
@@ -35,19 +36,40 @@ func main() {
 	if err_2 != 0 {
 		panic("Couldn't start consuming queue 2")
 	}
+
+
+
+
+
 	// NOTE: Este sleep lo pongo porque si el dataset es corto, el cliente envia todo y no le da tiempo a crear un socket
-	time_to_sleep := 10 + rand.IntN(10)
+	time_to_sleep := 10 + rand.IntN(15)
 	time.Sleep(time.Duration(time_to_sleep) * time.Second)
+
+
+
+
+
 	for message := range *msgs {
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
 		client_receiver := pkt.GetClientAddr()
-		// client_receiver := "host.docker.internal:9093"
+
 		print("Client receiver address: ", client_receiver, "\n")
-		conn, err := net.Dial("tcp", client_receiver)
-		if err != nil {
-			panic(err)
+		var conn net.Conn
+		var connectionAttempts int
+		for {
+			if connectionAttempts == 5 {
+				bitacora.Error("Failed to connect to sender 5 times")
+			}
+			conn, err = net.Dial("tcp", client_receiver)
+			if err != nil {
+				bitacora.Info("Failed to connect to client")
+				connectionAttempts += 1
+				time.Sleep(time.Duration(time_to_sleep) * time.Second)
+			} else {
+				break
+			}
 		}
 
 		// TODO: Como averiguo de que cola vino?

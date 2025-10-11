@@ -61,3 +61,4 @@ func createMenuItemMap(menuItemReceiver packet.PacketReceiver) map[string]string
 
 	return itemID2Name
 }
+
