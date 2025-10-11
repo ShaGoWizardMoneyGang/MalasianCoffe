@@ -100,7 +100,7 @@ func (jq3 *joinerQuery3) Process() {
 		case inputPacket := <-jq3.inputChannel:
 			jq3.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq3.outputChannel:
-			jq3.colaSalidaQuery3.Send(packetJoineado.Serialize())
+			jq3.colaSalidaQuery3.Send(packetJoineado)
 		}
 	}
 }

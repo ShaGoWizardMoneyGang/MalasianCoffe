@@ -36,7 +36,7 @@ make run-filter RUN_FUNCTION=transactions
 		for _, outbound := range outboundMessages {
 			cola := outbound.ColaSalida
 			packet := outbound.Packet
-			cola.Send(packet.Serialize())
+			cola.Send(packet)
 		}
 
 		err := message.Ack(false)

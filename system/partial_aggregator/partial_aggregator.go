@@ -39,7 +39,7 @@ func main() {
 		for _, outbound := range outboundMessages {
 			cola := outbound.ColaSalida
 			p := outbound.Packet
-			if err := cola.Send(p.Serialize()); err != 0 {
+			if err := cola.Send(p); err != 0 {
 				slog.Error("Error enviando a cola de salida", "err", err)
 			}
 		}

@@ -75,7 +75,7 @@ func (c *Concat) Process() {
 		case inputPacket := <-c.inputChannel:
 			c.sessionHandler.PassPacketToSession(inputPacket)
 		case packetConcatenado := <-c.outputChannel:
-			c.colaSalida.Send(packetConcatenado.Serialize())
+			c.colaSalida.Send(packetConcatenado)
 		}
 	}
 }

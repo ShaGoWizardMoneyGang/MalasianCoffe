@@ -97,7 +97,7 @@ func (jq2a *joinerQuery2a) Process() {
 		case inputPacket := <-jq2a.inputChannel:
 			jq2a.sessionHandler.PassPacketToSession(inputPacket)
 		case aggregatedPacket := <-jq2a.outputChannel:
-			jq2a.colaSalidaQuery2a.Send(aggregatedPacket.Serialize())
+			jq2a.colaSalidaQuery2a.Send(aggregatedPacket)
 		}
 	}
 }

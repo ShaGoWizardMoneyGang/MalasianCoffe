@@ -5,6 +5,7 @@ import (
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/system/queries/query4"
+	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/network"
 	"strings"
 )
@@ -66,13 +67,13 @@ func (c *CounterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
 	return c.colaEntradaFilteredTransactions4
 }
 
-func (c *CounterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (c *CounterQuery4) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	counted_result := []string{c.countFunctionQuery4(input)}
 
 	newPayload := packet.ChangePayload(pkt, counted_result)
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
 			ColaSalida: c.colaSalidaPartialCountedUsers4,

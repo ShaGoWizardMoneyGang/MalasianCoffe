@@ -81,7 +81,7 @@ func aggregator3BySemesterTPV(input string) string {
 type PartialAggregator interface {
 	Build(rabbitAddr string)
 	GetInput() *middleware.MessageMiddlewareQueue
-	Process(pkt packet.Packet) []packet.OutBoundMessage
+	Process(pkt packet.Packet) []colas.OutBoundMessage
 }
 
 type aggregator3Partial struct {
@@ -99,14 +99,14 @@ func (a *aggregator3Partial) GetInput() *middleware.MessageMiddlewareQueue {
 	return a.colaEntrada
 }
 
-func (a *aggregator3Partial) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (a *aggregator3Partial) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 	slog.Debug("Aggregator3Partial.Process: recibí payload")
 
 	result := aggregator3BySemesterTPV(input)
 
 	newPkts := packet.ChangePayload(pkt, []string{result})
-	return []packet.OutBoundMessage{
+	return []colas.OutBoundMessage{
 		{
 			Packet:     newPkts[0],
 			ColaSalida: a.colaSalida,

@@ -98,7 +98,7 @@ func (jq2b *joinerQuery2b) Process() {
 		case inputPacket := <-jq2b.inputChannel:
 			jq2b.sessionHandler.PassPacketToSession(inputPacket)
 		case aggregatedPacket := <-jq2b.outputChannel:
-			jq2b.colaSalidaQuery2b.Send(aggregatedPacket.Serialize())
+			jq2b.colaSalidaQuery2b.Send(aggregatedPacket)
 		}
 	}
 }

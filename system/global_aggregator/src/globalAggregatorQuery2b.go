@@ -138,7 +138,7 @@ func (g *aggregator2bGlobal) Process() {
 		case inputPacket := <-g.inputChannel:
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
-			g.colaSalida.Send(packetAgregado.Serialize())
+			g.colaSalida.Send(packetAgregado)
 		}
 	}
 }

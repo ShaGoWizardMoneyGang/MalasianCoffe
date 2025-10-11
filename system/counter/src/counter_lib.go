@@ -6,6 +6,7 @@ import (
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/colas"
 )
 
 type Counter interface {
@@ -16,7 +17,7 @@ type Counter interface {
 	GetInput() *middleware.MessageMiddlewareQueue
 
 	// Funcio que hace el filtrado
-	Process(pkt packet.Packet) []packet.OutBoundMessage
+	Process(pkt packet.Packet) []colas.OutBoundMessage
 }
 
 func CounterBuilder(counterName string, rabbitAddr string) Counter {

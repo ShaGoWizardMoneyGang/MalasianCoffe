@@ -130,7 +130,7 @@ func (jq4 *joinerQuery4) Process() {
 		case inputPacket := <-jq4.inputChannel:
 			jq4.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq4.outputChannel:
-			jq4.colaSalidaQuery4.Send(packetJoineado.Serialize())
+			jq4.colaSalidaQuery4.Send(packetJoineado)
 		}
 	}
 }
