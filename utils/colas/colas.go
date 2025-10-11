@@ -9,6 +9,11 @@ import (
 	"malasian_coffe/utils/network"
 )
 
+type OutBoundMessage struct {
+	Packet packet.Packet
+	ColaSalida middleware.MessageMiddleware
+}
+
 // Wrapper function a las colas para hacerlo mas amigable
 
 func ConsumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.ConsumeChannel {

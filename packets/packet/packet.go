@@ -2,18 +2,14 @@ package packet
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strconv"
 	"strings"
 
-	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/dataset"
 )
 
 // Struct que asocia un paquete a enviar con la cola a la cual lo tiene que enviar
-type OutBoundMessage struct {
-	Packet Packet
-	ColaSalida *middleware.MessageMiddlewareQueue
-}
 
 // Formato:
 // String del estilo A.B.C.D...
