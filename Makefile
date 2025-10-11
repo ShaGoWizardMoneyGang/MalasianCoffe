@@ -111,6 +111,8 @@ test-outputs-reduced:
 	bash scripts/test_outputs.sh RED
 
 #=================================== Docker ====================================
+all-reduced: docker-multi docker-wait test-outputs-reduced
+
 CONFIG                  ?= MuchosSinEstado
 generate-config:
 	bash scripts/generate-config.sh ${CONFIG}
