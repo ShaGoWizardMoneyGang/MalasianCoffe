@@ -13,7 +13,7 @@ docker logs -f client1 &
 LOG_PID=$!
 
 # Esperar a que client1 termine
-docker wait client1
+make docker-wait
 
 # Terminar seguimiento de logs
 kill $LOG_PID || true

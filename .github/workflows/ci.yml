@@ -110,3 +110,31 @@ jobs:
         run: |
           make generate-config CONFIG=MuchosSinEstado
           bash scripts/run_all_and_test_ci.sh
+
+  full_run_MuchosSinEstadoMultiplesClientes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure Docker Compose
+        run: docker compose version
+
+      - name: Run full local script
+        run: |
+          make generate-config CONFIG=MuchosSinEstadoMultiplesClientes
+          bash scripts/run_all_and_test_ci.sh
+
+  full_run_1DeCadaMultiplesClientes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure Docker Compose
+        run: docker compose version
+
+      - name: Run full local script
+        run: |
+          make generate-config CONFIG=1DeCadaMultiplesClientes
+          bash scripts/run_all_and_test_ci.sh
