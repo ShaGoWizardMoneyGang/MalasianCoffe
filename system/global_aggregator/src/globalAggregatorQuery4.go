@@ -22,8 +22,6 @@ type aggregator4Global struct {
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
 
-	receiver packet.PacketReceiver
-
 	sessionHandler sessionhandler.SessionHandler
 }
 
@@ -34,7 +32,6 @@ func (g *aggregator4Global) Build(rabbitAddr string) {
 	g.colaEntrada = colas.InstanceQueue("PartialCountedUsers4", rabbitAddr)
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
 
-	g.receiver = packet.NewPacketReceiver("Aggregator 4")
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery4, g.outputChannel)
 }
 
