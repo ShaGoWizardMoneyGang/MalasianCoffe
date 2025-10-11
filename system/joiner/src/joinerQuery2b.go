@@ -89,9 +89,9 @@ func (jq2b *joinerQuery2b) Build(rabbitAddr string) {
 func (jq2b *joinerQuery2b) Process() {
 	slog.Info("Arranca procesamiento del joiner 2b")
 
-	go inputQueue(jq2b.colaMenuItemsInput, jq2b.inputChannel)
+	go colas.InputQueue(jq2b.colaMenuItemsInput, jq2b.inputChannel)
 
-	go inputQueue(jq2b.colaAggItemsInput, jq2b.inputChannel)
+	go colas.InputQueue(jq2b.colaAggItemsInput, jq2b.inputChannel)
 
 	for {
 		select {

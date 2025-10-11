@@ -1,12 +1,7 @@
 package joiner
 
 import (
-	"bytes"
-	"fmt"
-	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/colas"
 	"strings"
 )
 
@@ -67,19 +62,3 @@ func createMenuItemMap(menuItemReceiver packet.PacketReceiver) map[string]string
 	return itemID2Name
 }
 
-func inputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- packet.Packet) {
-	colasEntrada := input
-
-	messages := colas.ConsumeInput(colasEntrada)
-	for message := range *messages {
-		packetReader := bytes.NewReader(message.Body)
-		pkt, _ := packet.DeserializePackage(packetReader)
-
-		err := message.Ack(false)
-		if err != nil {
-			bitacora.Error(fmt.Errorf("Could not ack, %w", err).Error())
-		}
-
-		inputChannel <- pkt
-	}
-}

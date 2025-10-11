@@ -91,9 +91,9 @@ func (jq3 *joinerQuery3) Build(rabbitAddr string) {
 func (jq3 *joinerQuery3) Process() {
 	slog.Info("Arranca procesamiento del joiner 3")
 	// Stores
-	go inputQueue(jq3.colaStoresInput, jq3.inputChannel)
+	go colas.InputQueue(jq3.colaStoresInput, jq3.inputChannel)
 
-	go inputQueue(jq3.colaAggTransInput, jq3.inputChannel)
+	go colas.InputQueue(jq3.colaAggTransInput, jq3.inputChannel)
 
 	for {
 		select {

@@ -119,11 +119,11 @@ func (jq4 *joinerQuery4) Build(rabbitAddr string) {
 }
 
 func (jq4 *joinerQuery4) Process() {
-	go inputQueue(jq4.colaStoresInput, jq4.inputChannel)
+	go colas.InputQueue(jq4.colaStoresInput, jq4.inputChannel)
 
-	go inputQueue(jq4.colaUsersInput, jq4.inputChannel)
+	go colas.InputQueue(jq4.colaUsersInput, jq4.inputChannel)
 
-	go inputQueue(jq4.colaAggTransInput, jq4.inputChannel)
+	go colas.InputQueue(jq4.colaAggTransInput, jq4.inputChannel)
 
 	for {
 		select {
