@@ -89,12 +89,14 @@ check_query4() {
 
 cantClientes=$(grep cliente compose.config | awk -F = '{print $2}')
 
+echo "──────────────────────────────────────────────────────────────────────"
 for (( i=1; i<=$cantClientes; i++ )); do
     check_file "ExpectedQuery1.csv"    "client$i/Query1.csv"
     check_file "ExpectedQuery2a.csv"   "client$i/Query2a.csv"
     check_file "ExpectedQuery2b.csv"   "client$i/Query2b.csv"
     check_file "ExpectedQuery3.csv"    "client$i/Query3.csv"
     check_query4 "ExpectedQuery4.csv"  "client$i/Query4.csv"
+    echo "──────────────────────────────────────────────────────────────────────"
 done
 
 
