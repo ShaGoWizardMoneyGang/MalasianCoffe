@@ -1,29 +1,36 @@
 package joiner
 
 import (
-	"bytes"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
 
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	"malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
 )
 
 type joinerQuery3 struct {
-	// Tenemos una go routine por cada session
-	sessions map[string](chan packet.Packet)
+	inputChannel   chan packet.Packet
+
+	outputChannel   chan packet.Packet
+
 
 	colaStoresInput   *middleware.MessageMiddlewareQueue
 	colaAggTransInput *middleware.MessageMiddlewareQueue
 
 	colaSalidaQuery3 *middleware.MessageMiddlewareQueue
+
+	// Tenemos una go routine por cada session
+	sessionHandler sessionhandler.SessionHandler
+
 }
 
-func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.MessageMiddlewareQueue) {
+func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
 	storeReceiver := packet.NewPacketReceiver("Stores")
 
 	transactionReceiver := packet.NewPacketReceiver("Transactions")
@@ -62,93 +69,38 @@ func joinQuery3(inputChannel chan packet.Packet, outputQueue *middleware.Message
 
 	joinedTransactions.Reset()
 
-	slog.Info("Envio pkt joineado al sender")
 	for _, pkt := range pkt_joineado {
-		outputQueue.Send(pkt.Serialize())
+		bitacora.Info(fmt.Sprintf("Envio pkt joineado al sender, session: %s", pkt.GetSessionID()))
+		outputChannel <- pkt
 	}
-}
-
-func (jq3 *joinerQuery3) passPacketToJoiner(pkt packet.Packet) {
-	slog.Info("Envio packete a la session")
-	sessionID := pkt.GetSessionID()
-	channel, exists := jq3.sessions[sessionID]
-
-	if !exists {
-		slog.Info("Creo un hilo joiner")
-		assigned_channel := make(chan packet.Packet)
-		go joinQuery3(assigned_channel, jq3.colaSalidaQuery3)
-
-		jq3.sessions[sessionID] = assigned_channel
-
-		channel = assigned_channel
-	}
-
-	channel <- pkt
 }
 
 func (jq3 *joinerQuery3) Build(rabbitAddr string) {
-	slog.Info("Inicializo el Joiner 3")
-	sessionHandler := make(map[string](chan packet.Packet))
+	jq3.inputChannel      = make(chan packet.Packet)
+	jq3.outputChannel     = make(chan packet.Packet)
 
-	colaSalidaQuery3 := colas.InstanceQueue("SalidaQuery3", rabbitAddr)
+	jq3.colaStoresInput   = colas.InstanceQueue("FilteredStores3", rabbitAddr)
+	jq3.colaAggTransInput = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
 
-	colaStoresInput := colas.InstanceQueue("FilteredStores3", rabbitAddr)
-	colaAggTransInput := colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
+	jq3.colaSalidaQuery3  = colas.InstanceQueue("SalidaQuery3", rabbitAddr)
 
-	jq3.sessions = sessionHandler
-
-	jq3.colaStoresInput = colaStoresInput
-	jq3.colaAggTransInput = colaAggTransInput
-
-	jq3.colaSalidaQuery3 = colaSalidaQuery3
+	jq3.sessionHandler    = sessionhandler.NewSessionHandler(joinQuery3, jq3.outputChannel)
 }
+
 
 func (jq3 *joinerQuery3) Process() {
 	slog.Info("Arranca procesamiento del joiner 3")
-	storeListener := make(chan packet.Packet)
-	aggregatorGlobalListener := make(chan packet.Packet)
+	// Stores
+	go colas.InputQueue(jq3.colaStoresInput, jq3.inputChannel)
 
-	go func() {
-		colasEntrada := jq3.colaStoresInput
-
-		messages := colas.ConsumeInput(colasEntrada)
-		for message := range *messages {
-			packetReader := bytes.NewReader(message.Body)
-			pkt, _ := packet.DeserializePackage(packetReader)
-
-			err := message.Ack(false)
-			if err != nil {
-				panic(fmt.Errorf("Could not ack, %w", err))
-			}
-
-			storeListener <- pkt
-		}
-	}()
-
-	go func() {
-		colasEntrada := jq3.colaAggTransInput
-
-		messages := colas.ConsumeInput(colasEntrada)
-
-		for message := range *messages {
-			packetReader := bytes.NewReader(message.Body)
-			pkt, _ := packet.DeserializePackage(packetReader)
-
-			err := message.Ack(false)
-			if err != nil {
-				panic(fmt.Errorf("Could not ack, %w", err))
-			}
-
-			aggregatorGlobalListener <- pkt
-		}
-	}()
+	go colas.InputQueue(jq3.colaAggTransInput, jq3.inputChannel)
 
 	for {
 		select {
-		case storePacket := <-storeListener:
-			jq3.passPacketToJoiner(storePacket)
-		case aggregatedPacket := <-aggregatorGlobalListener:
-			jq3.passPacketToJoiner(aggregatedPacket)
+		case inputPacket := <-jq3.inputChannel:
+			jq3.sessionHandler.PassPacketToSession(inputPacket)
+		case packetJoineado := <-jq3.outputChannel:
+			jq3.colaSalidaQuery3.Send(packetJoineado.Serialize())
 		}
 	}
 }

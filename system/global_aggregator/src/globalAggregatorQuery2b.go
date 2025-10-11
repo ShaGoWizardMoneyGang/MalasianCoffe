@@ -5,6 +5,7 @@ import (
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
 	"sort"
 	"strconv"
@@ -18,28 +19,47 @@ type keyQuery2b struct {
 }
 
 type aggregator2bGlobal struct {
+	inputChannel  chan packet.Packet
+	outputChannel chan packet.Packet
+
 	colaEntrada *middleware.MessageMiddlewareQueue
 	colaSalida  *middleware.MessageMiddlewareQueue
-	acc         map[keyQuery2b]float64
 
-	receiver packet.PacketReceiver
+	sessionHandler sessionhandler.SessionHandler
 }
 
 func (g *aggregator2bGlobal) Build(rabbitAddr string) {
+	g.inputChannel = make(chan packet.Packet)
+	g.outputChannel = make(chan packet.Packet)
+
 	g.colaEntrada = colas.InstanceQueue("CountedItems2b", rabbitAddr)
 	// aca va GlobalAggregation2b
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation2b", rabbitAddr)
-	g.acc = make(map[keyQuery2b]float64)
 
-	g.receiver = packet.NewPacketReceiver("Aggregator 2b")
+	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateSessionQuery2b, g.outputChannel)
 }
 
-func (g *aggregator2bGlobal) GetInput() *middleware.MessageMiddlewareQueue {
-	return g.colaEntrada
-}
+func aggregateSessionQuery2b(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
+	localReceiver := packet.NewPacketReceiver("Agregador global 2b")
+	localAcc := make(map[keyQuery2b]float64)
 
-func (g *aggregator2bGlobal) ingestBatch(input string) {
-	lines := strings.Split(input, "\n")
+	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
+	// jugosa metadata
+	var last_packet packet.Packet
+	for {
+		pkt := <-inputChannel
+
+		localReceiver.ReceivePacket(pkt)
+
+		if localReceiver.ReceivedAll() {
+			last_packet = pkt
+			break
+		}
+	}
+
+	consolidatedInput := localReceiver.GetPayload()
+
+	lines := strings.Split(consolidatedInput, "\n")
 	lines = lines[:len(lines)-1]
 
 	for _, line := range lines {
@@ -57,27 +77,25 @@ func (g *aggregator2bGlobal) ingestBatch(input string) {
 
 		subtotal, err := strconv.ParseFloat(subtotalStr, 64)
 		if err != nil {
-			bitacora.Error("Subtotal con formato inválido")
+			panic("Subtotal con formato inválido")
 		}
 
 		k := keyQuery2b{yearMonth: yearMonth, itemID: itemID}
-		g.acc[k] += subtotal
+		localAcc[k] += subtotal
 	}
-}
 
-func (g *aggregator2bGlobal) flushAndBuild() string {
-	if len(g.acc) == 0 {
-		return ""
-	}
+	// if len(localAcc) == 0 {
+	// 	localReceiver = packet.NewPacketReceiver("Agregador global 2b")
+	// 	continue
+	// }
 
 	monthlyMax := make(map[string]struct {
 		itemID   string
 		subtotal float64
 	})
 
-	for k, value := range g.acc {
+	for k, value := range localAcc {
 		yearMonth := k.yearMonth
-
 		if current, exists := monthlyMax[yearMonth]; !exists || value > current.subtotal {
 			monthlyMax[yearMonth] = struct {
 				itemID   string
@@ -101,33 +119,26 @@ func (g *aggregator2bGlobal) flushAndBuild() string {
 		fmt.Fprintf(&b, "%s,%s,%.2f\n", month, maxItem.itemID, maxItem.subtotal)
 	}
 
-	g.acc = make(map[keyQuery2b]float64)
-	return b.String()
+	final := b.String()
+	// if final != "" {
+		newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transaction_items", []string{final})
+		outputChannel <- newPkts[0]
+	// }
+
+	// localAcc = make(map[keyQuery2b]float64)
+	// localReceiver = packet.NewPacketReceiver("Agregador global 2b")
 }
 
-func (g *aggregator2bGlobal) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (g *aggregator2bGlobal) Process() {
 
-	g.receiver.ReceivePacket(pkt)
+	go colas.InputQueue(g.colaEntrada, g.inputChannel)
 
-	if !g.receiver.ReceivedAll() {
-		return nil
-	}
-	consolidatedInput := g.receiver.GetPayload()
-
-	g.ingestBatch(consolidatedInput)
-
-	final := g.flushAndBuild()
-	if final == "" {
-		return nil
-	}
-
-	g.receiver = packet.NewPacketReceiver("Aggretor 2b")
-
-	newPkts := packet.ChangePayloadGlobalAggregator(pkt, "transaction_items", []string{final})
-	return []packet.OutBoundMessage{
-		{
-			Packet:     newPkts[0],
-			ColaSalida: g.colaSalida,
-		},
+	for {
+		select {
+		case inputPacket := <-g.inputChannel:
+			g.sessionHandler.PassPacketToSession(inputPacket)
+		case packetAgregado := <-g.outputChannel:
+			g.colaSalida.Send(packetAgregado.Serialize())
+		}
 	}
 }
