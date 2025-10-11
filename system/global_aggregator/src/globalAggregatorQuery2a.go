@@ -1,7 +1,6 @@
 package global_aggregator
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strconv"
@@ -127,23 +126,8 @@ func aggregateQuery2a(inputChannel <-chan packet.Packet, outputChannel chan<- pa
 	}
 }
 
-func inputQueueQuery2a(queue *middleware.MessageMiddlewareQueue, inputChannel chan<- packet.Packet) {
-	msgQueue := colas.ConsumeInput(queue)
-	for message := range *msgQueue {
-		packetReader := bytes.NewReader(message.Body)
-		pkt, _ := packet.DeserializePackage(packetReader)
-
-		err := message.Ack(false)
-		if err != nil {
-			panic(fmt.Errorf("Could not ack, %w", err))
-		}
-
-		inputChannel <- pkt
-	}
-}
-
 func (g *aggregator2aGlobal) Process() {
-	go inputQueueQuery2a(g.colaEntrada, g.inputChannel)
+	go colas.InputQueue(g.colaEntrada, g.inputChannel)
 
 	for {
 		select {
