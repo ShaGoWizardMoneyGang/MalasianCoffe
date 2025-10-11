@@ -7,7 +7,7 @@ for (( i=1; i<=$cantClientes; i++ )); do
     clientes_string+="client${i} "
 done
 
-comando="docker wait ${clientes_string}"
+comando="time docker wait ${clientes_string}"
 
 
 ${comando}
