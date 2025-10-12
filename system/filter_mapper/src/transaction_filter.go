@@ -113,7 +113,7 @@ func filterTransactions(input string) []string {
 type transactionFilterMapper struct {
 	colaEntradaTransaction *middleware.MessageMiddlewareQueue
 
-	colaSalida1 *middleware.MessageMiddlewareQueue
+	exchangeSalida1 *middleware.MessageMiddlewareExchange
 	colaSalida3 *middleware.MessageMiddlewareQueue
 	colaSalida4 *middleware.MessageMiddlewareQueue
 }
@@ -126,13 +126,12 @@ func (tfm *transactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueu
 func (tfm *transactionFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaTransaction := colas.InstanceQueue("DataTransactions", rabbitAddr)
 
-	colaSalida1 := colas.InstanceQueue("FilteredTransactions1", rabbitAddr)
 	colaSalida3 := colas.InstanceQueue("FilteredTransactions3", rabbitAddr)
 	colaSalida4 := colas.InstanceQueue("FilteredTransactions4", rabbitAddr)
 
 	tfm.colaEntradaTransaction = colaEntradaTransaction
 
-	tfm.colaSalida1 = colaSalida1
+	tfm.exchangeSalida1 = colas.InstanceExchange("FilteredTransactions1", rabbitAddr, queueAmount["queue1"])
 	tfm.colaSalida3 = colaSalida3
 	tfm.colaSalida4 = colaSalida4
 }
@@ -147,7 +146,7 @@ func (tfm *transactionFilterMapper) Process(pkt packet.Packet) []colas.OutBoundM
 	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
-			ColaSalida: tfm.colaSalida1,
+			ColaSalida: tfm.exchangeSalida1,
 		},
 		{
 			Packet:     newPayload[1],
