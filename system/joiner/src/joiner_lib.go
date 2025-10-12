@@ -12,7 +12,7 @@ type Joiner interface {
 	Process()
 }
 
-func JoinerBuilder(joinerName string, rabbitAddr string) Joiner {
+func JoinerBuilder(joinerName string, rabbitAddr string, routingKey string) Joiner {
 	var joiner Joiner
 
 	switch joinerName {

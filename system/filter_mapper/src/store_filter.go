@@ -38,7 +38,7 @@ type storeFilterMapper struct {
 	exchangeSalida4 *middleware.MessageMiddlewareExchange
 }
 
-func (sfm *storeFilterMapper) Build(rabbitAddr string) {
+func (sfm *storeFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaStore := colas.InstanceQueue("DataStores", rabbitAddr)
 
 	colaSalida3 := colas.InstanceQueue("FilteredStores3", rabbitAddr)
@@ -46,7 +46,7 @@ func (sfm *storeFilterMapper) Build(rabbitAddr string) {
 	sfm.colaEntradaStore = colaEntradaStore
 
 	sfm.colaSalida3      = colaSalida3
-	sfm.exchangeSalida4  = colas.InstanceExchange("FilteredStores4", rabbitAddr)
+	sfm.exchangeSalida4  = colas.InstanceExchange("FilteredStores4", rabbitAddr, 4)
 }
 
 func (sfm *storeFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {

@@ -12,6 +12,7 @@ import (
 type ExchangeOptions struct {
 	// Donde hablo con rabbit
 	DaemonAddress string
+	QueueAmount   uint64
 	// routeKeys     []string
 	/*	q, err := ch.QueueDeclare(
 		"",    // name
@@ -99,7 +100,7 @@ Envía un mensaje a la cola o al tópico con el que se inicializó el exchange.
 Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 */
-// func (e *MessageMiddlewareExchange) Send(message []byte, routingKey string) (error MessageMiddlewareError) {
+// func (e *MessageMiddlewareExchange) Send(message []byte) (error MessageMiddlewareError) {
 func (e *MessageMiddlewareExchange) Send(pkt packet.Packet) (error MessageMiddlewareError) {
 	message    := pkt.Serialize()
 	routingKey := packet.GenerateRoutingKey(pkt, e.QueueAmount)

@@ -46,7 +46,7 @@ func amountCondition(amount_s string) (bool, error) {
 
 type FilterMapper interface {
 	// Funcion que inicializa las cosas que el filter necesita
-	Build(rabbitAddr string)
+	Build(rabbitAddr string, queueAmount map[string]uint64)
 
 	// Devuelve referencia de la cola de la cual tiene que consumir
 	GetInput() *middleware.MessageMiddlewareQueue
@@ -55,7 +55,7 @@ type FilterMapper interface {
 	Process(pkt packet.Packet) []colas.OutBoundMessage
 }
 
-func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {
+func FilterMapperBuilder(datasetName string, rabbitAddr string, queueAmounts map[string] uint64) FilterMapper {
 	var filterMapper FilterMapper
 	switch datasetName {
 	case "transactions":
@@ -72,6 +72,6 @@ func FilterMapperBuilder(datasetName string, rabbitAddr string) FilterMapper {
 		panic(fmt.Sprintf("Unknown 'dataset' %s", datasetName))
 	}
 
-	filterMapper.Build(rabbitAddr)
+	filterMapper.Build(rabbitAddr, queueAmounts)
 	return filterMapper
 }

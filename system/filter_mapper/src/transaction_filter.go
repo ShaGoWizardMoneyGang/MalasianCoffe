@@ -123,7 +123,7 @@ func (tfm *transactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueu
 
 }
 
-func (tfm *transactionFilterMapper) Build(rabbitAddr string) {
+func (tfm *transactionFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaTransaction := colas.InstanceQueue("DataTransactions", rabbitAddr)
 
 	colaSalida1 := colas.InstanceQueue("FilteredTransactions1", rabbitAddr)

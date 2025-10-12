@@ -35,7 +35,7 @@ type userFilterMapper struct {
 	colaSalida4 *middleware.MessageMiddlewareQueue
 }
 
-func (ufm *userFilterMapper) Build(rabbitAddr string) {
+func (ufm *userFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaUsers := colas.InstanceQueue("DataUsers", rabbitAddr)
 
 	colaSalida4 := colas.InstanceQueue("FilteredUsers4", rabbitAddr)

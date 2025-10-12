@@ -94,7 +94,7 @@ func (tifm *transactionItemFilterMapper) GetInput() *middleware.MessageMiddlewar
 
 }
 
-func (tifm *transactionItemFilterMapper) Build(rabbitAddr string) {
+func (tifm *transactionItemFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaTransaction := colas.InstanceQueue("DataTransactionItems", rabbitAddr)
 
 	colaSalida2a := colas.InstanceQueue("FilteredTransactionItems2a", rabbitAddr)

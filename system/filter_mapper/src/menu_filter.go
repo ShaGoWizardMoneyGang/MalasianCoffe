@@ -37,7 +37,7 @@ type menuItemFilterMapper struct {
 	colaSalida2b *middleware.MessageMiddlewareQueue
 }
 
-func (mifm *menuItemFilterMapper) Build(rabbitAddr string) {
+func (mifm *menuItemFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaStore := colas.InstanceQueue("DataMenuItems", rabbitAddr)
 
 	colaSalida2a := colas.InstanceQueue("FilteredMenuItems2a", rabbitAddr)

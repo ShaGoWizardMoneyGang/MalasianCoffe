@@ -100,13 +100,13 @@ def filter_users_block(n):
       - server
 """
 
-def filter_stores_block(n):
+def filter_stores_block(n, queueAmount3, queueAmount4):
     return f"""
   filter_stores{n}:
     container_name: filter_stores{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 stores
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 stores 2 queue3:{queueAmount3} queue4:{queueAmount4}
     volumes:
       - ./bin/filter_mapper:/app/bin/filter_mapper
     networks:
@@ -194,12 +194,14 @@ def global_aggregator_block(n, query):
 """
 
 def joiner_block(n, query):
+    routing_key = int(n) - 1
+
     return f"""
   joiner{query}_{n}:
     container_name: joiner{query}_{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/joiner rabbitmq:5672 Query{query}
+    entrypoint: ./bin/joiner rabbitmq:5672 Query{query} {routing_key}
     volumes:
       - ./bin/joiner:/app/bin/joiner
     networks:
