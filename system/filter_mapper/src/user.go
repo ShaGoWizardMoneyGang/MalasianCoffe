@@ -32,7 +32,7 @@ func filterUsers(input string) string {
 type userFilterMapper struct {
 	colaEntradaUsers *middleware.MessageMiddlewareQueue
 
-	colaSalida4 *middleware.MessageMiddlewareExchange
+	exchangeSalida4 *middleware.MessageMiddlewareExchange
 }
 
 func (ufm *userFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
@@ -40,7 +40,7 @@ func (ufm *userFilterMapper) Build(rabbitAddr string, queueAmount map[string]uin
 
 	ufm.colaEntradaUsers = colaEntradaUsers
 
-	ufm.colaSalida4 = colas.InstanceExchange("FilteredUsers4", rabbitAddr, queueAmount["queue4"])
+	ufm.exchangeSalida4 = colas.InstanceExchange("FilteredUsers4", rabbitAddr, queueAmount["queue4"])
 }
 
 func (ufm *userFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
@@ -57,7 +57,7 @@ func (ufm *userFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage 
 	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
-			ColaSalida: ufm.colaSalida4,
+			ColaSalida: ufm.exchangeSalida4,
 		},
 	}
 

@@ -7,11 +7,11 @@ import (
 )
 
 type GlobalAggregator interface {
-	Build(rabbitAddr string)
+	Build(rabbitAddr string, outs map[string]uint64)
 	Process()
 }
 
-func GlobalAggregatorBuilder(name, rabbitAddr string) GlobalAggregator {
+func GlobalAggregatorBuilder(name, rabbitAddr string, outs map[string]uint64) GlobalAggregator {
 	var globalAggregator GlobalAggregator
 	switch strings.ToLower(name) {
 	case "query2a":
@@ -25,6 +25,6 @@ func GlobalAggregatorBuilder(name, rabbitAddr string) GlobalAggregator {
 	default:
 		panic(fmt.Sprintf("Unknown global aggregator '%s'", name))
 	}
-	globalAggregator.Build(rabbitAddr)
+	globalAggregator.Build(rabbitAddr, outs)
 	return globalAggregator
 }

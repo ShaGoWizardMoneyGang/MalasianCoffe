@@ -30,7 +30,6 @@ func ChannelOptionsDefault() ChannelOptions {
 }
 
 func CreateQueueUnderExchange(exchangeName string, options ChannelOptions, routingKey string) (*MessageMiddlewareQueue, error) {
-	bitacora.Info(fmt.Sprintf("HOLA"))
 	conn, err := amqp.Dial(options.DaemonAddress)
 	if err != nil {
 		return nil, fmt.Errorf(`failed to connect to RabbitMQ: %w. Is the daemon active?

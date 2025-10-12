@@ -29,7 +29,7 @@ type aggregator2aGlobal struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func (g *aggregator2aGlobal) Build(rabbitAddr string) {
+func (g *aggregator2aGlobal) Build(rabbitAddr string, outs map[string]uint64) {
 	g.inputChannel = make(chan packet.Packet)
 	g.outputChannel = make(chan packet.Packet)
 

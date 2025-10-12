@@ -19,17 +19,17 @@ type aggregator4Global struct {
 	outputChannel chan packet.Packet
 
 	colaEntrada *middleware.MessageMiddlewareQueue
-	colaSalida  *middleware.MessageMiddlewareQueue
+	exchangeSalida  *middleware.MessageMiddlewareExchange
 
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func (g *aggregator4Global) Build(rabbitAddr string) {
+func (g *aggregator4Global) Build(rabbitAddr string, outs map[string]uint64) {
 	g.inputChannel = make(chan packet.Packet)
 	g.outputChannel = make(chan packet.Packet)
 
 	g.colaEntrada = colas.InstanceQueue("PartialCountedUsers4", rabbitAddr)
-	g.colaSalida = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
+	g.exchangeSalida = colas.InstanceExchange("GlobalAggregation4", rabbitAddr, outs["queue4"])
 
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery4, g.outputChannel)
 }
@@ -133,7 +133,7 @@ func (g *aggregator4Global) Process() {
 		case inputPacket := <-g.inputChannel:
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
-			g.colaSalida.Send(packetAgregado)
+			g.exchangeSalida.Send(packetAgregado)
 		}
 	}
 }
