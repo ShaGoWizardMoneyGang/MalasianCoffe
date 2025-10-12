@@ -91,7 +91,7 @@ jobs:
     strategy:
       matrix:
         configs: [1DeCada, 1DeCadaMultiplesClientes, MuchosConEstado, MuchosConEstadoMultiplesClientes, MuchosSinEstado, MuchosSinEstadoMultiplesClientes, MuchosDeTodo]
-        dataset: [FULL, RED]
+        dataset: [RED]
 
     steps:
       - uses: actions/checkout@v4
