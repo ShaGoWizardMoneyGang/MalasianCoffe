@@ -8,6 +8,9 @@ estados() {
     echo "- '1DeCadaMultiplesClientes: 1 worker de cada tipo, multiples clientes'"
     echo "- 'MuchosSinEstado': Varios workers de los que no tienen estado"
     echo "- 'MuchosSinEstadoMultiplesClientes': Varios workers de los que no tienen estado y varios clientes"
+    echo "- 'MuchosConEstado': Varios workers de los que si tienen estado"
+    echo "- 'MuchosConEstadoMultiplesClientes': Varios workers de los que si tienen estado y varios clientes"
+    echo "- 'MuchosDeTodo': Muchos de todo"
 }
 
 if [ -z ${config} ]; then
@@ -23,6 +26,12 @@ elif [ ${config} = "MuchosSinEstado" ]; then
     cp -f .github/data/composeMuchosSinEstado.config compose.config
 elif [ ${config} = "MuchosSinEstadoMultiplesClientes" ]; then
     cp -f .github/data/composeMuchosSinEstadoMultiplesClientes.config compose.config
+elif [ ${config} = "MuchosConEstado" ]; then
+    cp -f .github/data/composeMuchosConEstado.config compose.config
+elif [ ${config} = "MuchosConEstadoMultiplesClientes" ]; then
+    cp -f .github/data/composeMuchosConEstadoMultiplesClientes.config compose.config
+elif [ ${config} = "MuchosDeTodo" ]; then
+    cp -f .github/data/composeMuchosDeTodo.config compose.config
 else
     echo "Opcion '${config}' no reconocida"
     estados
