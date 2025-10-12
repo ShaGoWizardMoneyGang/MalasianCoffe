@@ -28,11 +28,11 @@ type aggregator2bGlobal struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func (g *aggregator2bGlobal) Build(rabbitAddr string, outs map[string]uint64) {
+func (g *aggregator2bGlobal) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
 	g.inputChannel = make(chan packet.Packet)
 	g.outputChannel = make(chan packet.Packet)
 
-	g.colaEntrada = colas.InstanceQueue("CountedItems2b", rabbitAddr)
+	g.colaEntrada = colas.InstanceQueueRouted("CountedItems2b", rabbitAddr, routing_key)
 	// aca va GlobalAggregation2b
 	g.exchangeSalida = colas.InstanceExchange("GlobalAggregation2b", rabbitAddr, outs["queue"])
 

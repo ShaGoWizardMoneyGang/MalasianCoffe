@@ -49,34 +49,29 @@ func countFunctionQuery2b(input string) string {
 
 // ============================= CounterQuery2b ================================
 
-type CounterQuery2b struct {
+type counterQuery2b struct {
 	colaEntradaFilteredTransactionItems *middleware.MessageMiddlewareQueue
 
-	colaSalidaCountedSubtotal *middleware.MessageMiddlewareQueue
+	exchangeSalidaCountedSubtotal *middleware.MessageMiddlewareExchange
 }
 
-func (c *CounterQuery2b) Build(rabbitAddr string) {
+func (c *counterQuery2b) Build(rabbitAddr string, queueAmounts map[string] uint64) {
 
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactionItems2b", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactionItems2b", err))
 	}
 	//CountedItems2a
-	colaSalida, err := middleware.CreateQueue("CountedItems2b", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(%s): %w", "CountedItems2b", err))
-	}
-
 	c.colaEntradaFilteredTransactionItems = colaEntrada
 
-	c.colaSalidaCountedSubtotal = colaSalida
+	c.exchangeSalidaCountedSubtotal = colas.InstanceExchange("CountedItems2b", rabbitAddr, queueAmounts["queue"])
 }
 
-func (c *CounterQuery2b) GetInput() *middleware.MessageMiddlewareQueue {
+func (c *counterQuery2b) GetInput() *middleware.MessageMiddlewareQueue {
 	return c.colaEntradaFilteredTransactionItems
 }
 
-func (c *CounterQuery2b) Process(pkt packet.Packet) []colas.OutBoundMessage {
+func (c *counterQuery2b) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	counted_result := []string{countFunctionQuery2b(input)}
@@ -86,7 +81,7 @@ func (c *CounterQuery2b) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
-			ColaSalida: c.colaSalidaCountedSubtotal,
+			ColaSalida: c.exchangeSalidaCountedSubtotal,
 		},
 	}
 
