@@ -24,7 +24,8 @@ type aggregator2aGlobal struct {
 	outputChannel chan packet.Packet
 
 	colaEntrada *middleware.MessageMiddlewareQueue
-	colaSalida  *middleware.MessageMiddlewareQueue
+	//colaSalida  *middleware.MessageMiddlewareQueue
+	exchangeSalida *middleware.MessageMiddlewareExchange
 
 	sessionHandler sessionhandler.SessionHandler
 }
@@ -35,7 +36,7 @@ func (g *aggregator2aGlobal) Build(rabbitAddr string, outs map[string]uint64) {
 
 	g.colaEntrada = colas.InstanceQueue("CountedItems2a", rabbitAddr)
 	// aca va GlobalAggregation2a
-	g.colaSalida = colas.InstanceQueue("GlobalAggregation2a", rabbitAddr)
+	g.exchangeSalida = colas.InstanceExchange("GlobalAggregation2a", rabbitAddr, outs["queue"])
 
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery2a, g.outputChannel)
 }
@@ -142,7 +143,7 @@ func (g *aggregator2aGlobal) Process() {
 		case inputPacket := <-g.inputChannel:
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
-			g.colaSalida.Send(packetAgregado)
+			g.exchangeSalida.Send(packetAgregado)
 		}
 	}
 }

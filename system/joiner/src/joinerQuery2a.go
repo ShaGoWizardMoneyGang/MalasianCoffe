@@ -15,9 +15,9 @@ import (
 )
 
 type joinerQuery2a struct {
-	inputChannel   chan packet.Packet
+	inputChannel chan packet.Packet
 
-	outputChannel   chan packet.Packet
+	outputChannel chan packet.Packet
 
 	colaMenuItemsInput *middleware.MessageMiddlewareQueue
 	colaAggItemsInput  *middleware.MessageMiddlewareQueue
@@ -28,7 +28,7 @@ type joinerQuery2a struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func joinQuery2a(inputChannel  <-chan packet.Packet, outputChannel chan<- packet.Packet) {
+func joinQuery2a(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
 	menuItemReceiver := packet.NewPacketReceiver("Menu items")
 
 	transactionItemReceiver := packet.NewPacketReceiver("Transaction items")
@@ -74,15 +74,15 @@ func joinQuery2a(inputChannel  <-chan packet.Packet, outputChannel chan<- packet
 }
 
 func (jq2a *joinerQuery2a) Build(rabbitAddr string, routingKey string) {
-	jq2a.inputChannel       = make(chan packet.Packet)
-	jq2a.outputChannel      = make(chan packet.Packet)
+	jq2a.inputChannel = make(chan packet.Packet)
+	jq2a.outputChannel = make(chan packet.Packet)
 
-	jq2a.colaMenuItemsInput = colas.InstanceQueue("FilteredMenuItems2a", rabbitAddr)
-	jq2a.colaAggItemsInput  = colas.InstanceQueue("GlobalAggregation2a", rabbitAddr)
+	jq2a.colaMenuItemsInput = colas.InstanceQueueRouted("FilteredMenuItems2a", rabbitAddr, routingKey)
+	jq2a.colaAggItemsInput = colas.InstanceQueueRouted("GlobalAggregation2a", rabbitAddr, routingKey)
 
-	jq2a.colaSalidaQuery2a  = colas.InstanceQueue("SalidaQuery2a", rabbitAddr)
+	jq2a.colaSalidaQuery2a = colas.InstanceQueue("SalidaQuery2a", rabbitAddr)
 
-	jq2a.sessionHandler     = sessionhandler.NewSessionHandler(joinQuery2a, jq2a.outputChannel)
+	jq2a.sessionHandler = sessionhandler.NewSessionHandler(joinQuery2a, jq2a.outputChannel)
 }
 
 func (jq2a *joinerQuery2a) Process() {

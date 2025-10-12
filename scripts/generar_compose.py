@@ -115,13 +115,13 @@ def filter_stores_block(n, queueAmount3, queueAmount4):
       - server
 """
 
-def filter_menu_items_block(n):
+def filter_menu_items_block(n, queueAmount2a, queueAmount2b):
     return f"""
   filter_menu_items{n}:
     container_name: filter_menu_items{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 menu_items 0
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 menu_items 2 queue2a:{queueAmount2a} queue2b:{queueAmount2b}
     volumes:
       - ./bin/filter_mapper:/app/bin/filter_mapper
     networks:
@@ -287,7 +287,7 @@ def main():
         file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
         file.writelines(filter_users_block(i, configs["joiner4"]) for i in range(1, configs.get("filter-users", 0) + 1))
         file.writelines(filter_stores_block(i, configs["joiner3"], configs["joiner4"]) for i in range(1, configs.get("filter-stores", 0) + 1))
-        file.writelines(filter_menu_items_block(i) for i in range(1, configs.get("filter-menu-items", 0) + 1))
+        file.writelines(filter_menu_items_block(i, configs["joiner2a"], configs["joiner2b"]) for i in range(1, configs.get("filter-menu-items", 0) + 1))
         
 
         
