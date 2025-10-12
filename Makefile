@@ -107,6 +107,9 @@ lint:
 	./.github/scripts/check_go_version.sh
 	./.github/scripts/check_invariantes.sh
 
+test-outputs-full:
+	bash scripts/test_outputs.sh FULL
+
 test-outputs-reduced:
 	bash scripts/test_outputs.sh RED
 
