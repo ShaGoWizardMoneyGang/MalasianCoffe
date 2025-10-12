@@ -43,7 +43,7 @@ func (c *counterQuery4) countFunctionQuery4(input string) string {
 type counterQuery4 struct {
 	colaEntradaFilteredTransactions4 *middleware.MessageMiddlewareQueue
 
-	colaSalidaPartialCountedUsers4 *middleware.MessageMiddlewareQueue
+	exchangeSalidaPartialCountedUsers4 *middleware.MessageMiddlewareExchange
 }
 
 func (c *counterQuery4) Build(rabbitAddr string, queueAmounts map[string] uint64) {
@@ -52,15 +52,10 @@ func (c *counterQuery4) Build(rabbitAddr string, queueAmounts map[string] uint64
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactions4", err))
 	}
-	colaSalida, err := middleware.CreateQueue("PartialCountedUsers4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
-
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(%s): %w", "PartialCountedUsers4", err))
-	}
 
 	c.colaEntradaFilteredTransactions4 = colaEntrada
 
-	c.colaSalidaPartialCountedUsers4 = colaSalida
+	c.exchangeSalidaPartialCountedUsers4 = colas.InstanceExchange("PartialCountedUsers4", rabbitAddr, queueAmounts["queue"])
 }
 
 func (c *counterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
@@ -76,7 +71,7 @@ func (c *counterQuery4) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
-			ColaSalida: c.colaSalidaPartialCountedUsers4,
+			ColaSalida: c.exchangeSalidaPartialCountedUsers4,
 		},
 	}
 

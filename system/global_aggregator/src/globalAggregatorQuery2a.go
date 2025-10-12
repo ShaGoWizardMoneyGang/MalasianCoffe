@@ -33,7 +33,7 @@ func (g *aggregator2aGlobal) Build(rabbitAddr string, routing_key string, outs m
 	g.inputChannel = make(chan packet.Packet)
 	g.outputChannel = make(chan packet.Packet)
 
-	g.colaEntrada = colas.InstanceQueue("CountedItems2a", rabbitAddr)
+	g.colaEntrada = colas.InstanceQueueRouted("CountedItems2a", rabbitAddr, routing_key)
 	// aca va GlobalAggregation2a
 	g.colaSalida = colas.InstanceQueue("GlobalAggregation2a", rabbitAddr)
 
