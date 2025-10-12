@@ -55,7 +55,7 @@ type CounterQuery2b struct {
 	colaSalidaCountedSubtotal *middleware.MessageMiddlewareQueue
 }
 
-func (c *CounterQuery2b) Build(rabbitAddr string) {
+func (c *CounterQuery2b) Build(rabbitAddr string, queueAmounts map[string] uint64) {
 
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactionItems2b", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 
 	"malasian_coffe/packets/packet"
 	counter "malasian_coffe/system/counter/src"
@@ -21,7 +23,26 @@ make run-filter RUN_FUNCTION=transactions
 	}
 	rabbitAddr := os.Args[1]
 
-	worker := counter.CounterBuilder(counterFunction, rabbitAddr)
+
+	outAmount_s := os.Args[3]
+	outAmount, err   := strconv.ParseUint(outAmount_s, 10, 64)
+	if err != nil {
+		panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
+	}
+	outs := make(map[string]uint64, outAmount)
+	for i := range outAmount {
+		outputMap := os.Args[4 + i]
+		splitted  := strings.Split(outputMap, ":")
+		queueName, queueAmount_s := splitted[0], splitted[1]
+		queueAmount, err := strconv.ParseUint(queueAmount_s, 10, 64)
+		if err != nil {
+			 panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
+		}
+
+		outs[queueName] = queueAmount
+	}
+
+	worker := counter.CounterBuilder(counterFunction, rabbitAddr, outs)
 	slog.Info("Counter builded")
 
 	colaEntrada := worker.GetInput()

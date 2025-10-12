@@ -46,7 +46,7 @@ type CounterQuery4 struct {
 	colaSalidaPartialCountedUsers4 *middleware.MessageMiddlewareQueue
 }
 
-func (c *CounterQuery4) Build(rabbitAddr string) {
+func (c *CounterQuery4) Build(rabbitAddr string, queueAmounts map[string] uint64) {
 
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactions4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {

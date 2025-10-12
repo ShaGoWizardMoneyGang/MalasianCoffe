@@ -163,13 +163,13 @@ def sender_block(n, query):
       - "host.docker.internal:host-gateway"
 """
 
-def counter_block(n, query):
+def counter_block(n, query, queueAmount):
     return f"""
   counter{query}_{n}:
     container_name: counter{query}_{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/counter rabbitmq:5672 Query{query}
+    entrypoint: ./bin/counter rabbitmq:5672 Query{query} 1 queue:{queueAmount}
     volumes:
       - ./bin/counter:/app/bin/counter
     networks:
@@ -299,9 +299,9 @@ def main():
         file.writelines(sender_block(i, "3") for i in range(1, configs.get("sender3", 0) + 1))
         file.writelines(sender_block(i, "4") for i in range(1, configs.get("sender4", 0) + 1))
         
-        file.writelines(counter_block(i, "2a") for i in range(1, configs.get("counter2a", 0) + 1))
-        file.writelines(counter_block(i, "2b") for i in range(1, configs.get("counter2b", 0) + 1))
-        file.writelines(counter_block(i, "4") for i in range(1, configs.get("counter4", 0) + 1))
+        file.writelines(counter_block(i, "2a", configs["global-aggregator2a"]) for i in range(1, configs.get("counter2a", 0) + 1))
+        file.writelines(counter_block(i, "2b", configs["global-aggregator2b"]) for i in range(1, configs.get("counter2b", 0) + 1))
+        file.writelines(counter_block(i, "4", configs["global-aggregator4"]) for i in range(1, configs.get("counter4", 0) + 1))
 
         file.writelines(global_aggregator_block(i, "2a", configs["joiner2a"]) for i in range(1, configs.get("global-aggregator2a", 0) + 1))
         file.writelines(global_aggregator_block(i, "2b", configs["joiner2b"]) for i in range(1, configs.get("global-aggregator2b", 0) + 1))
