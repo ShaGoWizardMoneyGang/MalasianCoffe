@@ -26,7 +26,7 @@ type aggregator3Global struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func (g *aggregator3Global) Build(rabbitAddr string, outs map[string]uint64) {
+func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
 	fmt.Printf("OUTS: %v\n", outs)
 	g.inputChannel = make(chan packet.Packet)
 	g.outputChannel = make(chan packet.Packet)

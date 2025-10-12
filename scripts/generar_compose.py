@@ -179,12 +179,13 @@ def counter_block(n, query, queueAmount):
 """
 
 def global_aggregator_block(n, query, queueAmount):
+    routing_key = int(n) - 1
     return f"""
   global_aggregator{query}_{n}:
     container_name: global_aggregator{query}_{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query{query} 1 queue:{queueAmount}
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query{query} {routing_key} 1 queue:{queueAmount}
     volumes:
       - ./bin/global_aggregator:/app/bin/global_aggregator
     networks:
