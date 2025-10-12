@@ -17,7 +17,6 @@ type PacketReceiver struct {
 	// Para saber si llego el EOF
 	receivedEOF bool
 
-
 	buffer strings.Builder
 
 	humanIdentifier string
@@ -29,8 +28,8 @@ type PacketReceiver struct {
 func NewPacketReceiver(humanIdentifier string) PacketReceiver {
 	return PacketReceiver{
 		ordered_package: []Packet{},
-		receivedEOF: false,
-		allReceived: false,
+		receivedEOF:     false,
+		allReceived:     false,
 		humanIdentifier: humanIdentifier,
 	}
 }
@@ -45,7 +44,8 @@ func (pr *PacketReceiver) ReceivePacket(pkt Packet) bool {
 		func(i, j Packet) int {
 			sn_i := i.GetSequenceNumber()
 			sn_j := j.GetSequenceNumber()
-			return sn_i - sn_j})
+			return sn_i - sn_j
+		})
 
 	if exits {
 		bitacora.Debug(fmt.Sprintf("Duplicate packet received. UUID: %s", pkt.GetUUID()))
@@ -82,17 +82,17 @@ Nuevo:
 		pr.buffer.WriteString(pkt.GetPayload())
 
 		// Llegue al ultimo packet, tiene que ser el EOF si o si.
-		if i == len(pr.ordered_package) - 1 {
+		if i == len(pr.ordered_package)-1 {
 			allReceived = pkt.IsEOF()
 			break
 		}
 
-		nxt_pkt         := pr.ordered_package[i + 1]
-		nxt_pkt_sn      := nxt_pkt.GetSequenceNumber()
+		nxt_pkt := pr.ordered_package[i+1]
+		nxt_pkt_sn := nxt_pkt.GetSequenceNumber()
 
-		pkt_sn          := pkt.GetSequenceNumber()
+		pkt_sn := pkt.GetSequenceNumber()
 
-		if pkt_sn + 1 != nxt_pkt_sn {
+		if pkt_sn+1 != nxt_pkt_sn {
 			allReceived = false
 			break
 		}
@@ -126,4 +126,3 @@ func (pr *PacketReceiver) GetPayload() string {
 	}
 	return pr.buffer.String()
 }
-

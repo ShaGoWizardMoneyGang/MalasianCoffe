@@ -77,6 +77,7 @@ func (jq3 *joinerQuery3) Build(rabbitAddr string, routingKey string) {
 	jq3.inputChannel = make(chan packet.Packet)
 	jq3.outputChannel = make(chan packet.Packet)
 
+	print("[joiner] buildeo con routing key: ", routingKey)
 	jq3.colaStoresInput = colas.InstanceQueueRouted("FilteredStores3", rabbitAddr, routingKey)
 	jq3.colaAggTransInput = colas.InstanceQueueRouted("GlobalAggregation3", rabbitAddr, routingKey)
 

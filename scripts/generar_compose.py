@@ -303,9 +303,9 @@ def main():
         file.writelines(counter_block(i, "2b") for i in range(1, configs.get("counter2b", 0) + 1))
         file.writelines(counter_block(i, "4") for i in range(1, configs.get("counter4", 0) + 1))
 
-        file.writelines(global_aggregator_block(i, "2a", configs["joiner4"]) for i in range(1, configs.get("global-aggregator2a", 0) + 1))
-        file.writelines(global_aggregator_block(i, "2b", configs["joiner4"]) for i in range(1, configs.get("global-aggregator2b", 0) + 1))
-        file.writelines(global_aggregator_block(i, "3", configs["joiner4"]) for i in range(1, configs.get("global-aggregator3", 0) + 1))
+        file.writelines(global_aggregator_block(i, "2a", configs["joiner2a"]) for i in range(1, configs.get("global-aggregator2a", 0) + 1))
+        file.writelines(global_aggregator_block(i, "2b", configs["joiner2b"]) for i in range(1, configs.get("global-aggregator2b", 0) + 1))
+        file.writelines(global_aggregator_block(i, "3", configs["joiner3"]) for i in range(1, configs.get("global-aggregator3", 0) + 1))
         file.writelines(global_aggregator_block(i, "4", configs["joiner4"]) for i in range(1, configs.get("global-aggregator4", 0) + 1))
 
         file.writelines(joiner_block(i, "2a") for i in range(1, configs.get("joiner2a", 0) + 1))

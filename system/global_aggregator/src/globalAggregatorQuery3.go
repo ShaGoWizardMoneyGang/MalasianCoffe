@@ -27,6 +27,7 @@ type aggregator3Global struct {
 }
 
 func (g *aggregator3Global) Build(rabbitAddr string, outs map[string]uint64) {
+	fmt.Printf("OUTS: %v\n", outs)
 	g.inputChannel = make(chan packet.Packet)
 	g.outputChannel = make(chan packet.Packet)
 
