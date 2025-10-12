@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
+	"malasian_coffe/bitacora"
 	"os"
 	"sort"
 )
@@ -79,11 +81,13 @@ func main() {
 		expectedUsersInStore, storeExists := expectedByStore[store]
 
 		if !storeExists {
+			bitacora.Info(fmt.Sprintf("La tienda no existe: %s", store))
 			isAllValid = false
 		} else {
 			// Verifico cada ususario en la tienda
 			for _, outputUser := range outputUsersInStore {
 				if !userExistsInStore(outputUser, expectedUsersInStore) {
+					bitacora.Info(fmt.Sprintf("Este es invalido: %v", outputUser))
 					isAllValid = false
 				}
 			}
