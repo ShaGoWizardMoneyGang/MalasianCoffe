@@ -9,6 +9,11 @@ import (
 	"malasian_coffe/utils/network"
 )
 
+type OutBoundMessage struct {
+	Packet packet.Packet
+	ColaSalida middleware.MessageMiddleware
+}
+
 // Wrapper function a las colas para hacerlo mas amigable
 
 func ConsumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.ConsumeChannel {
@@ -19,12 +24,29 @@ func ConsumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.Con
 	return msgQueue
 }
 
+func InstanceQueueRouted(exchangeName string, rabbitAddr string, routingKey string) *middleware.MessageMiddlewareQueue {
+	cola, err := middleware.CreateQueueUnderExchange(exchangeName, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)}, routingKey)
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue: %w", err))
+	}
+
+	return cola
+}
+
 func InstanceQueue(inputQueueName string, rabbitAddr string) *middleware.MessageMiddlewareQueue {
 	cola, err := middleware.CreateQueue(inputQueueName, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", inputQueueName, err))
 	}
 	return cola
+}
+
+func InstanceExchange(exchangeName string, rabbitAddr string, queueAmount uint64) *middleware.MessageMiddlewareExchange {
+	exchange, err := middleware.CreateExchange(exchangeName, middleware.ExchangeOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr), QueueAmount: queueAmount})
+	if err != nil {
+		panic(fmt.Errorf("Failed to CreateExchange(%s): %w", exchangeName, err))
+	}
+	return exchange
 }
 
 func InputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- packet.Packet) {

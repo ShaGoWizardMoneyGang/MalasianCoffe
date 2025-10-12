@@ -94,7 +94,7 @@ func (tifm *transactionItemFilterMapper) GetInput() *middleware.MessageMiddlewar
 
 }
 
-func (tifm *transactionItemFilterMapper) Build(rabbitAddr string) {
+func (tifm *transactionItemFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaTransaction := colas.InstanceQueue("DataTransactionItems", rabbitAddr)
 
 	colaSalida2a := colas.InstanceQueue("FilteredTransactionItems2a", rabbitAddr)
@@ -106,7 +106,7 @@ func (tifm *transactionItemFilterMapper) Build(rabbitAddr string) {
 	tifm.colaSalida2b = colaSalida2b
 }
 
-func (tifm *transactionItemFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (tifm *transactionItemFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Vienen en este orden: final_query2a, final_query2b
@@ -114,7 +114,7 @@ func (tifm *transactionItemFilterMapper) Process(pkt packet.Packet) []packet.Out
 
 	newPayload     := packet.ChangePayload(pkt, payloadResults)
 
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
 			ColaSalida: tifm.colaSalida2a,

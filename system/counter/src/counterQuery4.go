@@ -5,6 +5,7 @@ import (
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/system/queries/query4"
+	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/network"
 	"strings"
 )
@@ -12,7 +13,7 @@ import (
 // NOTE: Gracias Mari por anadir estas lineas de input output
 // Recibe transaction_id, store_id, user_id
 // Devuelve user_id,store_id,cantidad por línea, ordenado por store_id y luego user_id para mantenerlo determinístico
-func (c *CounterQuery4) countFunctionQuery4(input string) string {
+func (c *counterQuery4) countFunctionQuery4(input string) string {
 	rows := strings.Split(input, "\n")
 	rows = rows[:len(rows)-1] // El split me genera 1 linea de mas vacia por el ultimo /n, la ignoro
 
@@ -39,43 +40,38 @@ func (c *CounterQuery4) countFunctionQuery4(input string) string {
 	return b.String()
 }
 
-type CounterQuery4 struct {
+type counterQuery4 struct {
 	colaEntradaFilteredTransactions4 *middleware.MessageMiddlewareQueue
 
-	colaSalidaPartialCountedUsers4 *middleware.MessageMiddlewareQueue
+	exchangeSalidaPartialCountedUsers4 *middleware.MessageMiddlewareExchange
 }
 
-func (c *CounterQuery4) Build(rabbitAddr string) {
+func (c *counterQuery4) Build(rabbitAddr string, queueAmounts map[string] uint64) {
 
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactions4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactions4", err))
 	}
-	colaSalida, err := middleware.CreateQueue("PartialCountedUsers4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
-
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(%s): %w", "PartialCountedUsers4", err))
-	}
 
 	c.colaEntradaFilteredTransactions4 = colaEntrada
 
-	c.colaSalidaPartialCountedUsers4 = colaSalida
+	c.exchangeSalidaPartialCountedUsers4 = colas.InstanceExchange("PartialCountedUsers4", rabbitAddr, queueAmounts["queue"])
 }
 
-func (c *CounterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
+func (c *counterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
 	return c.colaEntradaFilteredTransactions4
 }
 
-func (c *CounterQuery4) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (c *counterQuery4) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	counted_result := []string{c.countFunctionQuery4(input)}
 
 	newPayload := packet.ChangePayload(pkt, counted_result)
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
-			ColaSalida: c.colaSalidaPartialCountedUsers4,
+			ColaSalida: c.exchangeSalidaPartialCountedUsers4,
 		},
 	}
 

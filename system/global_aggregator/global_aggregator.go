@@ -5,6 +5,8 @@ import (
 	"malasian_coffe/bitacora"
 	aggregator "malasian_coffe/system/global_aggregator/src"
 	"os"
+	"strconv"
+	"strings"
 )
 
 // Argumentos:
@@ -14,8 +16,33 @@ func main() {
 	rabbitAddr := os.Args[1]
 	aggName := os.Args[2]
 
-	worker := aggregator.GlobalAggregatorBuilder(aggName, rabbitAddr)
+	routing_key := os.Args[3]
+
+	outAmount_s := os.Args[4]
+	outAmount, err   := strconv.ParseUint(outAmount_s, 10, 64)
+	if err != nil {
+		panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
+	}
+
+
+	outs := make(map[string]uint64, outAmount)
+	for i := range outAmount {
+		outputMap := os.Args[5 + i]
+		splitted  := strings.Split(outputMap, ":")
+		queueName, queueAmount_s := splitted[0], splitted[1]
+		queueAmount, err := strconv.ParseUint(queueAmount_s, 10, 64)
+		if err != nil {
+			 panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
+		}
+
+		outs[queueName] = queueAmount
+	}
+
+
+	worker := aggregator.GlobalAggregatorBuilder(aggName, rabbitAddr, routing_key, outs)
 	bitacora.Info(fmt.Sprintf("Starting global aggregator %s", aggName))
+
+
 
 	worker.Process()
 }

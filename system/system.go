@@ -61,19 +61,19 @@ func main() {
 		switch dataset_name {
 		case "menu_items":
 			slog.Debug("Envio a cola de menu items")
-			colaMenuItems.Send(packet.Serialize())
+			colaMenuItems.Send(packet)
 		case "stores":
 			slog.Debug("Envio a cola de stores")
-			colaStores.Send(packet.Serialize())
+			colaStores.Send(packet)
 		case "transaction_items":
 			slog.Debug("Envio a cola de transaccions items")
-			colaTransactionItems.Send(packet.Serialize())
+			colaTransactionItems.Send(packet)
 		case "transactions":
 			slog.Debug("Envio a cola de transactions")
-			colaTransactions.Send(packet.Serialize())
+			colaTransactions.Send(packet)
 		case "users":
 			slog.Debug("Envio a cola de users")
-			colaUsers.Send(packet.Serialize())
+			colaUsers.Send(packet)
 		}
 	}
 }

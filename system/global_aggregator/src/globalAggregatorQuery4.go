@@ -18,18 +18,20 @@ type aggregator4Global struct {
 	inputChannel  chan packet.Packet
 	outputChannel chan packet.Packet
 
-	colaEntrada *middleware.MessageMiddlewareQueue
-	colaSalida  *middleware.MessageMiddlewareQueue
+	colaEntrada    *middleware.MessageMiddlewareQueue
+	exchangeSalida *middleware.MessageMiddlewareExchange
 
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func (g *aggregator4Global) Build(rabbitAddr string) {
+func (g *aggregator4Global) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
 	g.inputChannel = make(chan packet.Packet)
 	g.outputChannel = make(chan packet.Packet)
 
-	g.colaEntrada = colas.InstanceQueue("PartialCountedUsers4", rabbitAddr)
-	g.colaSalida = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
+	fmt.Printf("ROUTING KEY %s\n", routing_key)
+	g.colaEntrada = colas.InstanceQueueRouted("PartialCountedUsers4", rabbitAddr, routing_key)
+
+	g.exchangeSalida = colas.InstanceExchange("GlobalAggregation4", rabbitAddr, outs["queue"])
 
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery4, g.outputChannel)
 }
@@ -133,7 +135,7 @@ func (g *aggregator4Global) Process() {
 		case inputPacket := <-g.inputChannel:
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
-			g.colaSalida.Send(packetAgregado.Serialize())
+			g.exchangeSalida.Send(packetAgregado)
 		}
 	}
 }

@@ -32,34 +32,32 @@ func filterUsers(input string) string {
 type userFilterMapper struct {
 	colaEntradaUsers *middleware.MessageMiddlewareQueue
 
-	colaSalida4 *middleware.MessageMiddlewareQueue
+	exchangeSalida4 *middleware.MessageMiddlewareExchange
 }
 
-func (ufm *userFilterMapper) Build(rabbitAddr string) {
+func (ufm *userFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaUsers := colas.InstanceQueue("DataUsers", rabbitAddr)
-
-	colaSalida4 := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
 
 	ufm.colaEntradaUsers = colaEntradaUsers
 
-	ufm.colaSalida4 = colaSalida4
+	ufm.exchangeSalida4 = colas.InstanceExchange("FilteredUsers4", rabbitAddr, queueAmount["queue4"])
 }
 
 func (ufm *userFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
 	return ufm.colaEntradaUsers
 }
 
-func (ufm *userFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (ufm *userFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
 	filtered_users := []string{filterUsers(input)}
 
 	newPayload := packet.ChangePayload(pkt, filtered_users)
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
-			ColaSalida: ufm.colaSalida4,
+			ColaSalida: ufm.exchangeSalida4,
 		},
 	}
 

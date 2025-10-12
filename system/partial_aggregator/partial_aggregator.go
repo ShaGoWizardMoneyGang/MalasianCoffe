@@ -8,6 +8,8 @@ import (
 	"malasian_coffe/system/middleware"
 	aggregator "malasian_coffe/system/partial_aggregator/src"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func consumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.ConsumeChannel {
@@ -26,7 +28,25 @@ func main() {
 		panic("No aggregator function provided")
 	}
 
-	worker := aggregator.PartialAggregatorBuilder(function, rabbitAddr)
+	outAmount_s := os.Args[3]
+	outAmount, err := strconv.ParseUint(outAmount_s, 10, 64)
+	if err != nil {
+		panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
+	}
+	outs := make(map[string]uint64, outAmount)
+	for i := range outAmount {
+		outputMap := os.Args[4+i]
+		splitted := strings.Split(outputMap, ":")
+		queueName, queueAmount_s := splitted[0], splitted[1]
+		queueAmount, err := strconv.ParseUint(queueAmount_s, 10, 64)
+		if err != nil {
+			panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
+		}
+
+		outs[queueName] = queueAmount
+	}
+
+	worker := aggregator.PartialAggregatorBuilder(function, rabbitAddr, outs)
 	colaEntrada := worker.GetInput()
 	msgQueue := consumeInput(colaEntrada)
 
@@ -39,7 +59,7 @@ func main() {
 		for _, outbound := range outboundMessages {
 			cola := outbound.ColaSalida
 			p := outbound.Packet
-			if err := cola.Send(p.Serialize()); err != 0 {
+			if err := cola.Send(p); err != 0 {
 				slog.Error("Error enviando a cola de salida", "err", err)
 			}
 		}

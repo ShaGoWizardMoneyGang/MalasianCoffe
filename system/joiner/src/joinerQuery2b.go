@@ -15,9 +15,9 @@ import (
 )
 
 type joinerQuery2b struct {
-	inputChannel   chan packet.Packet
+	inputChannel chan packet.Packet
 
-	outputChannel   chan packet.Packet
+	outputChannel chan packet.Packet
 
 	colaMenuItemsInput *middleware.MessageMiddlewareQueue
 	colaAggItemsInput  *middleware.MessageMiddlewareQueue
@@ -28,7 +28,7 @@ type joinerQuery2b struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func joinQuery2b(inputChannel  <-chan packet.Packet, outputChannel chan<- packet.Packet) {
+func joinQuery2b(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
 	menuItemReceiver := packet.NewPacketReceiver("Menu items")
 
 	transactionItemReceiver := packet.NewPacketReceiver("Transaction items")
@@ -73,16 +73,16 @@ func joinQuery2b(inputChannel  <-chan packet.Packet, outputChannel chan<- packet
 	}
 }
 
-func (jq2b *joinerQuery2b) Build(rabbitAddr string) {
-	jq2b.inputChannel       = make(chan packet.Packet)
-	jq2b.outputChannel      = make(chan packet.Packet)
+func (jq2b *joinerQuery2b) Build(rabbitAddr string, routingKey string) {
+	jq2b.inputChannel = make(chan packet.Packet)
+	jq2b.outputChannel = make(chan packet.Packet)
 
-	jq2b.colaMenuItemsInput = colas.InstanceQueue("FilteredMenuItems2b", rabbitAddr)
-	jq2b.colaAggItemsInput  = colas.InstanceQueue("GlobalAggregation2b", rabbitAddr)
+	jq2b.colaMenuItemsInput = colas.InstanceQueueRouted("FilteredMenuItems2b", rabbitAddr, routingKey)
+	jq2b.colaAggItemsInput = colas.InstanceQueueRouted("GlobalAggregation2b", rabbitAddr, routingKey)
 
-	jq2b.colaSalidaQuery2b  = colas.InstanceQueue("SalidaQuery2b", rabbitAddr)
+	jq2b.colaSalidaQuery2b = colas.InstanceQueue("SalidaQuery2b", rabbitAddr)
 
-	jq2b.sessionHandler     = sessionhandler.NewSessionHandler(joinQuery2b, jq2b.outputChannel)
+	jq2b.sessionHandler = sessionhandler.NewSessionHandler(joinQuery2b, jq2b.outputChannel)
 
 }
 
@@ -98,7 +98,7 @@ func (jq2b *joinerQuery2b) Process() {
 		case inputPacket := <-jq2b.inputChannel:
 			jq2b.sessionHandler.PassPacketToSession(inputPacket)
 		case aggregatedPacket := <-jq2b.outputChannel:
-			jq2b.colaSalidaQuery2b.Send(aggregatedPacket.Serialize())
+			jq2b.colaSalidaQuery2b.Send(aggregatedPacket)
 		}
 	}
 }

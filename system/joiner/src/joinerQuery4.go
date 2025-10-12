@@ -103,14 +103,16 @@ func joinQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 	}
 }
 
-func (jq4 *joinerQuery4) Build(rabbitAddr string) {
+func (jq4 *joinerQuery4) Build(rabbitAddr string, routingKey string) {
 	jq4.inputChannel          = make(chan packet.Packet)
 
 	jq4.outputChannel         = make(chan packet.Packet)
 
-	jq4.colaStoresInput       = colas.InstanceQueue("FilteredStores4", rabbitAddr)
-	jq4.colaUsersInput        = colas.InstanceQueue("FilteredUsers4", rabbitAddr)
-	jq4.colaAggTransInput     = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
+	jq4.colaStoresInput       = colas.InstanceQueueRouted("FilteredStores4", rabbitAddr, routingKey)
+
+	jq4.colaUsersInput        = colas.InstanceQueueRouted("FilteredUsers4", rabbitAddr, routingKey)
+
+	jq4.colaAggTransInput     = colas.InstanceQueueRouted("GlobalAggregation4", rabbitAddr, routingKey)
 
 	jq4.colaSalidaQuery4      = colas.InstanceQueue("SalidaQuery4", rabbitAddr)
 
@@ -130,7 +132,7 @@ func (jq4 *joinerQuery4) Process() {
 		case inputPacket := <-jq4.inputChannel:
 			jq4.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq4.outputChannel:
-			jq4.colaSalidaQuery4.Send(packetJoineado.Serialize())
+			jq4.colaSalidaQuery4.Send(packetJoineado)
 		}
 	}
 }

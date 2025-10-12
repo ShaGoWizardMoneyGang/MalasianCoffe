@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/network"
 	"malasian_coffe/utils/parser"
 	"strconv"
@@ -48,44 +49,39 @@ func countFunctionQuery2a(input string) string {
 
 // ============================= CounterQuery2a ================================
 
-type CounterQuery2a struct {
+type counterQuery2a struct {
 	colaEntradaFilteredTransactionItems *middleware.MessageMiddlewareQueue
 
-	colaSalidaCountedQuantity *middleware.MessageMiddlewareQueue
+	exchangeSalidaCountedQuantity *middleware.MessageMiddlewareExchange
 }
 
-func (c *CounterQuery2a) Build(rabbitAddr string) {
+func (c *counterQuery2a) Build(rabbitAddr string, queueAmounts map[string] uint64) {
 
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactionItems2a", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactionItems2a", err))
 	}
 	//CountedItems2a
-	colaSalida, err := middleware.CreateQueue("CountedItems2a", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
-	if err != nil {
-		panic(fmt.Errorf("CreateQueue(%s): %w", "CountedItems2a", err))
-	}
-
 	c.colaEntradaFilteredTransactionItems = colaEntrada
 
-	c.colaSalidaCountedQuantity = colaSalida
+	c.exchangeSalidaCountedQuantity = colas.InstanceExchange("CountedItems2a", rabbitAddr, queueAmounts["queue"])
 }
 
-func (c *CounterQuery2a) GetInput() *middleware.MessageMiddlewareQueue {
+func (c *counterQuery2a) GetInput() *middleware.MessageMiddlewareQueue {
 	return c.colaEntradaFilteredTransactionItems
 }
 
-func (c *CounterQuery2a) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (c *counterQuery2a) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	counted_result := []string{countFunctionQuery2a(input)}
 
 	newPayload := packet.ChangePayload(pkt, counted_result)
 
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
-			ColaSalida: c.colaSalidaCountedQuantity,
+			ColaSalida: c.exchangeSalidaCountedQuantity,
 		},
 	}
 

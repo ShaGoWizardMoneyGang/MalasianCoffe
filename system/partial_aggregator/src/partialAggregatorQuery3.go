@@ -79,37 +79,37 @@ func aggregator3BySemesterTPV(input string) string {
 }
 
 type PartialAggregator interface {
-	Build(rabbitAddr string)
+	Build(rabbitAddr string, outs map[string]uint64)
 	GetInput() *middleware.MessageMiddlewareQueue
-	Process(pkt packet.Packet) []packet.OutBoundMessage
+	Process(pkt packet.Packet) []colas.OutBoundMessage
 }
 
 type aggregator3Partial struct {
-	colaEntrada *middleware.MessageMiddlewareQueue
-	colaSalida  *middleware.MessageMiddlewareQueue
+	colaEntrada    *middleware.MessageMiddlewareQueue
+	exchangeSalida *middleware.MessageMiddlewareExchange
 }
 
-func (a *aggregator3Partial) Build(rabbitAddr string) {
+func (a *aggregator3Partial) Build(rabbitAddr string, outs map[string]uint64) {
 	// mismas colas que las de antes
 	a.colaEntrada = colas.InstanceQueue("FilteredTransactions3", rabbitAddr)
-	a.colaSalida = colas.InstanceQueue("PartialAggregations3", rabbitAddr)
+	a.exchangeSalida = colas.InstanceExchange("PartialAggregations3", rabbitAddr, outs["queue"])
 }
 
 func (a *aggregator3Partial) GetInput() *middleware.MessageMiddlewareQueue {
 	return a.colaEntrada
 }
 
-func (a *aggregator3Partial) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (a *aggregator3Partial) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 	slog.Debug("Aggregator3Partial.Process: recibí payload")
 
 	result := aggregator3BySemesterTPV(input)
 
 	newPkts := packet.ChangePayload(pkt, []string{result})
-	return []packet.OutBoundMessage{
+	return []colas.OutBoundMessage{
 		{
 			Packet:     newPkts[0],
-			ColaSalida: a.colaSalida,
+			ColaSalida: a.exchangeSalida,
 		},
 	}
 }

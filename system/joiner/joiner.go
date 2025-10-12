@@ -14,7 +14,9 @@ make run-joiner RUN_FUNCTION=Query3
 	}
 	rabbitAddr := os.Args[1]
 
-	joiner := joiner.JoinerBuilder(joinFunction, rabbitAddr)
+	routingKey_s := os.Args[3]
+
+	joiner := joiner.JoinerBuilder(joinFunction, rabbitAddr, routingKey_s)
 
 	joiner.Process()
 }

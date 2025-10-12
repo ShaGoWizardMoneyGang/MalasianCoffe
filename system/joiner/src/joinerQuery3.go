@@ -9,16 +9,15 @@ import (
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
-	"malasian_coffe/system/session_handler"
+	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
 )
 
 type joinerQuery3 struct {
-	inputChannel   chan packet.Packet
+	inputChannel chan packet.Packet
 
-	outputChannel   chan packet.Packet
-
+	outputChannel chan packet.Packet
 
 	colaStoresInput   *middleware.MessageMiddlewareQueue
 	colaAggTransInput *middleware.MessageMiddlewareQueue
@@ -27,7 +26,6 @@ type joinerQuery3 struct {
 
 	// Tenemos una go routine por cada session
 	sessionHandler sessionhandler.SessionHandler
-
 }
 
 func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
@@ -75,18 +73,18 @@ func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 	}
 }
 
-func (jq3 *joinerQuery3) Build(rabbitAddr string) {
-	jq3.inputChannel      = make(chan packet.Packet)
-	jq3.outputChannel     = make(chan packet.Packet)
+func (jq3 *joinerQuery3) Build(rabbitAddr string, routingKey string) {
+	jq3.inputChannel = make(chan packet.Packet)
+	jq3.outputChannel = make(chan packet.Packet)
 
-	jq3.colaStoresInput   = colas.InstanceQueue("FilteredStores3", rabbitAddr)
-	jq3.colaAggTransInput = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
+	print("[joiner] buildeo con routing key: ", routingKey)
+	jq3.colaStoresInput = colas.InstanceQueueRouted("FilteredStores3", rabbitAddr, routingKey)
+	jq3.colaAggTransInput = colas.InstanceQueueRouted("GlobalAggregation3", rabbitAddr, routingKey)
 
-	jq3.colaSalidaQuery3  = colas.InstanceQueue("SalidaQuery3", rabbitAddr)
+	jq3.colaSalidaQuery3 = colas.InstanceQueue("SalidaQuery3", rabbitAddr)
 
-	jq3.sessionHandler    = sessionhandler.NewSessionHandler(joinQuery3, jq3.outputChannel)
+	jq3.sessionHandler = sessionhandler.NewSessionHandler(joinQuery3, jq3.outputChannel)
 }
-
 
 func (jq3 *joinerQuery3) Process() {
 	slog.Info("Arranca procesamiento del joiner 3")
@@ -100,7 +98,7 @@ func (jq3 *joinerQuery3) Process() {
 		case inputPacket := <-jq3.inputChannel:
 			jq3.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq3.outputChannel:
-			jq3.colaSalidaQuery3.Send(packetJoineado.Serialize())
+			jq3.colaSalidaQuery3.Send(packetJoineado)
 		}
 	}
 }

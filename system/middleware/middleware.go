@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"malasian_coffe/packets/packet"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -24,9 +26,9 @@ type MessageMiddlewareQueue struct {
 
 type MessageMiddlewareExchange struct {
 	exchangeName   string
-	routeKeys      []string
+	// Cantidad de colas destino a las que el exchange le va a hablar.
+	QueueAmount   uint64
 	channel        MiddlewareChannel
-	consumeChannel ConsumeChannel
 	consumerTag    string
 }
 
@@ -42,7 +44,7 @@ type MessageMiddleware interface {
 	   Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 	   Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 	*/
-	StartConsuming() (messageQueue MessageQueue, error MessageMiddlewareError)
+	StartConsuming() (messageQueue ConsumeChannel, error MessageMiddlewareError)
 
 	/*
 	   Si se estaba consumiendo desde la cola/exchange, se detiene la escucha. Si
@@ -56,7 +58,7 @@ type MessageMiddleware interface {
 	   Si se pierde la conexión con el middleware eleva MessageMiddlewareDisconnectedError.
 	   Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessageError.
 	*/
-	Send(message []byte) (error MessageMiddlewareError)
+	Send(pkt packet.Packet) (error MessageMiddlewareError)
 
 	/*
 	   Se desconecta de la cola o exchange al que estaba conectado.

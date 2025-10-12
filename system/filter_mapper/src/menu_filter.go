@@ -33,20 +33,17 @@ func filterMenus(input string) []string {
 type menuItemFilterMapper struct {
 	colaEntradaStore *middleware.MessageMiddlewareQueue
 
-	colaSalida2a *middleware.MessageMiddlewareQueue
-	colaSalida2b *middleware.MessageMiddlewareQueue
+	exchangeSalida2a *middleware.MessageMiddlewareExchange
+	exchangeSalida2b *middleware.MessageMiddlewareExchange
 }
 
-func (mifm *menuItemFilterMapper) Build(rabbitAddr string) {
+func (mifm *menuItemFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaStore := colas.InstanceQueue("DataMenuItems", rabbitAddr)
 
-	colaSalida2a := colas.InstanceQueue("FilteredMenuItems2a", rabbitAddr)
-	colaSalida2b := colas.InstanceQueue("FilteredMenuItems2b", rabbitAddr)
+	mifm.exchangeSalida2a = colas.InstanceExchange("FilteredMenuItems2a", rabbitAddr, queueAmount["queue2a"])
+	mifm.exchangeSalida2b = colas.InstanceExchange("FilteredMenuItems2b", rabbitAddr, queueAmount["queue2b"])
 
 	mifm.colaEntradaStore = colaEntradaStore
-
-	mifm.colaSalida2a = colaSalida2a
-	mifm.colaSalida2b = colaSalida2b
 
 }
 
@@ -54,20 +51,20 @@ func (mifm *menuItemFilterMapper) GetInput() *middleware.MessageMiddlewareQueue 
 	return mifm.colaEntradaStore
 }
 
-func (mifm *menuItemFilterMapper) Process(pkt packet.Packet) []packet.OutBoundMessage {
+func (mifm *menuItemFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	// Ambas payloads iguales
 	mapped_stores := filterMenus(input)
 	newPayload := packet.ChangePayload(pkt, mapped_stores)
-	outBoundMessage := []packet.OutBoundMessage{
+	outBoundMessage := []colas.OutBoundMessage{
 		{
 			Packet:     newPayload[0],
-			ColaSalida: mifm.colaSalida2a,
+			ColaSalida: mifm.exchangeSalida2a,
 		},
 		{
 			Packet:     newPayload[0],
-			ColaSalida: mifm.colaSalida2b,
+			ColaSalida: mifm.exchangeSalida2b,
 		},
 	}
 

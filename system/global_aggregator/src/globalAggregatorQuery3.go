@@ -20,18 +20,19 @@ type aggregator3Global struct {
 	inputChannel  chan packet.Packet
 	outputChannel chan packet.Packet
 
-	colaEntrada *middleware.MessageMiddlewareQueue
-	colaSalida  *middleware.MessageMiddlewareQueue
+	colaEntrada    *middleware.MessageMiddlewareQueue
+	exchangeSalida *middleware.MessageMiddlewareExchange
 
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func (g *aggregator3Global) Build(rabbitAddr string) {
+func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
+	// fmt.Printf("OUTS: %v\n", outs)
 	g.inputChannel = make(chan packet.Packet)
 	g.outputChannel = make(chan packet.Packet)
 
-	g.colaEntrada = colas.InstanceQueue("PartialAggregations3", rabbitAddr)
-	g.colaSalida = colas.InstanceQueue("GlobalAggregation3", rabbitAddr)
+	g.colaEntrada = colas.InstanceQueueRouted("PartialAggregations3", rabbitAddr, routing_key)
+	g.exchangeSalida = colas.InstanceExchange("GlobalAggregation3", rabbitAddr, outs["queue"])
 
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery3, g.outputChannel)
 }
@@ -104,8 +105,8 @@ func aggregateQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- pac
 
 	final := b.String()
 	// if final != "" {
-		newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{final})
-		outputChannel <- newPkts[0]
+	newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{final})
+	outputChannel <- newPkts[0]
 	// }
 }
 
@@ -117,7 +118,7 @@ func (g *aggregator3Global) Process() {
 		case inputPacket := <-g.inputChannel:
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
-			g.colaSalida.Send(packetAgregado.Serialize())
+			g.exchangeSalida.Send(packetAgregado)
 		}
 	}
 }
