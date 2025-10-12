@@ -110,8 +110,13 @@ lint:
 test-outputs-reduced:
 	bash scripts/test_outputs.sh RED
 
+test-outputs-full:
+	bash scripts/test_outputs.sh FULL
+
 #=================================== Docker ====================================
 all-reduced: docker-multi docker-wait test-outputs-reduced
+
+all-complete: docker-multi docker-wait test-outputs-full
 
 CONFIG                  ?= MuchosSinEstado
 generate-config:
