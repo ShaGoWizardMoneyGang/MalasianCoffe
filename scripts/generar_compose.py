@@ -211,13 +211,14 @@ def joiner_block(n, query):
       - server
 """
 
-def partial_aggregator_block(n, query):
+def partial_aggregator_block(n, query, queueAmount):
+    routing_key = int(n) - 1
     return f"""
   partial_aggregator{query}_{n}:
     container_name: partial_aggregator{query}_{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/partial_aggregator rabbitmq:5672 Query{query}
+    entrypoint: ./bin/partial_aggregator rabbitmq:5672 Query{query} 1 queue:{queueAmount}
     volumes:
       - ./bin/partial_aggregator:/app/bin/partial_aggregator
     networks:
@@ -314,8 +315,7 @@ def main():
         file.writelines(joiner_block(i, "3") for i in range(1, configs.get("joiner3", 0) + 1))
         file.writelines(joiner_block(i, "4") for i in range(1, configs.get("joiner4", 0) + 1))
 
-        file.writelines(partial_aggregator_block(i, "3") for i in range(1, configs.get("partial-aggregator3", 0) + 1))
-        file.writelines(partial_aggregator_block(i, "4") for i in range(1, configs.get("partial-aggregator4", 0) + 1))
+        file.writelines(partial_aggregator_block(i, "3", configs["global-aggregator3"]) for i in range(1, configs.get("partial-aggregator3", 0) + 1))
 
         file.writelines(client(i) for i in range(1, configs.get("cliente", 0) + 1))
 

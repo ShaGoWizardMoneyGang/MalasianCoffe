@@ -27,11 +27,11 @@ type aggregator3Global struct {
 }
 
 func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
-	fmt.Printf("OUTS: %v\n", outs)
+	// fmt.Printf("OUTS: %v\n", outs)
 	g.inputChannel = make(chan packet.Packet)
 	g.outputChannel = make(chan packet.Packet)
 
-	g.colaEntrada = colas.InstanceQueue("PartialAggregations3", rabbitAddr)
+	g.colaEntrada = colas.InstanceQueueRouted("PartialAggregations3", rabbitAddr, routing_key)
 	g.exchangeSalida = colas.InstanceExchange("GlobalAggregation3", rabbitAddr, outs["queue"])
 
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery3, g.outputChannel)
