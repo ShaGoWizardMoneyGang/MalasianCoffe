@@ -24,9 +24,13 @@ func ConsumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.Con
 	return msgQueue
 }
 
-func InstanceQueueRouted(inputQueueName string, rabbitAddr string, routingKey string) *middleware.MessageMiddlewareQueue {
-	myQueue := inputQueueName + "-" + routingKey
-	return InstanceQueue(myQueue, rabbitAddr)
+func InstanceQueueRouted(exchangeName string, rabbitAddr string, routingKey string) *middleware.MessageMiddlewareQueue {
+	cola, err := middleware.CreateQueueUnderExchange(exchangeName, middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)}, routingKey)
+	if err != nil {
+		panic(fmt.Errorf("CreateQueue: %w", err))
+	}
+
+	return cola
 }
 
 func InstanceQueue(inputQueueName string, rabbitAddr string) *middleware.MessageMiddlewareQueue {

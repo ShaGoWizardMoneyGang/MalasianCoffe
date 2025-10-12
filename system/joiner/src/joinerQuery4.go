@@ -108,9 +108,9 @@ func (jq4 *joinerQuery4) Build(rabbitAddr string) {
 
 	jq4.outputChannel         = make(chan packet.Packet)
 
-	jq4.colaStoresInput       = colas.InstanceQueue("FilteredStores4", rabbitAddr)
+	jq4.colaStoresInput       = colas.InstanceQueueRouted("FilteredStores4", rabbitAddr, "0")
 
-	jq4.colaUsersInput        = colas.InstanceQueue("FilteredUsers4-0", rabbitAddr)
+	jq4.colaUsersInput        = colas.InstanceQueue("FilteredUsers4", rabbitAddr)
 
 	jq4.colaAggTransInput     = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
 

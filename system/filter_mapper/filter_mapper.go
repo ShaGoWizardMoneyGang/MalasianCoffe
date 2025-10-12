@@ -38,9 +38,9 @@ make run-filter RUN_FUNCTION=transactions
 		panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
 	}
 
-	var outs map[string]uint64
+	outs := make(map[string]uint64, outAmount)
 	for i := range outAmount {
-		outputMap := os.Args[i]
+		outputMap := os.Args[4 + i]
 		splitted  := strings.Split(outputMap, ":")
 		queueName, queueAmount_s := splitted[0], splitted[1]
 		queueAmount, err := strconv.ParseUint(queueAmount_s, 10, 64)

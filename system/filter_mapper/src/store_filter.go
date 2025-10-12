@@ -46,7 +46,7 @@ func (sfm *storeFilterMapper) Build(rabbitAddr string, queueAmount map[string]ui
 	sfm.colaEntradaStore = colaEntradaStore
 
 	sfm.colaSalida3      = colaSalida3
-	sfm.exchangeSalida4  = colas.InstanceExchange("FilteredStores4", rabbitAddr, 4)
+	sfm.exchangeSalida4  = colas.InstanceExchange("FilteredStores4", rabbitAddr, queueAmount["queue4"])
 }
 
 func (sfm *storeFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {

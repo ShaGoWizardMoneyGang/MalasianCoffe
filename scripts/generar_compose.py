@@ -61,7 +61,7 @@ def filter_transactions_block(n):
     container_name: filter_transactions{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 transactions
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 transactions 0
     volumes:
       - ./bin/filter_mapper:/app/bin/filter_mapper
     networks:
@@ -76,7 +76,7 @@ def filter_transaction_items_block(n):
     container_name: filter_transaction_items{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 transaction_items
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 transaction_items 0
     volumes:
         - ./bin/filter_mapper:/app/bin/filter_mapper
     networks:
@@ -91,7 +91,7 @@ def filter_users_block(n):
     container_name: filter_users{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 users
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 users 0
     volumes:
       - ./bin/filter_mapper:/app/bin/filter_mapper
     networks:
@@ -121,7 +121,7 @@ def filter_menu_items_block(n):
     container_name: filter_menu_items{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 menu_items
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 menu_items 0
     volumes:
       - ./bin/filter_mapper:/app/bin/filter_mapper
     networks:
@@ -286,7 +286,7 @@ def main():
         file.writelines(filter_transactions_block(i) for i in range(1, configs.get("filter-transactions", 0) + 1))
         file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
         file.writelines(filter_users_block(i) for i in range(1, configs.get("filter-users", 0) + 1))
-        file.writelines(filter_stores_block(i) for i in range(1, configs.get("filter-stores", 0) + 1))
+        file.writelines(filter_stores_block(i, configs["joiner3"], configs["joiner4"]) for i in range(1, configs.get("filter-stores", 0) + 1))
         file.writelines(filter_menu_items_block(i) for i in range(1, configs.get("filter-menu-items", 0) + 1))
         
 

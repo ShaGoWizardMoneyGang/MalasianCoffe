@@ -29,6 +29,73 @@ func ChannelOptionsDefault() ChannelOptions {
 	}
 }
 
+func CreateQueueUnderExchange(exchangeName string, options ChannelOptions, routingKey string) (*MessageMiddlewareQueue, error) {
+	bitacora.Info(fmt.Sprintf("HOLA"))
+	conn, err := amqp.Dial(options.DaemonAddress)
+	if err != nil {
+		return nil, fmt.Errorf(`failed to connect to RabbitMQ: %w. Is the daemon active?
+		Try running:
+
+		sudo systemctl start rabbitmq
+		or
+		sudo rc-service rabbitmq start`, err)
+	}
+
+	ch, err := conn.Channel()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to connect to the channel: %w", err)
+	}
+
+	queueName := exchangeName + "-" + routingKey
+
+
+
+	err = ch.ExchangeDeclare(
+		exchangeName,
+		"direct", // Queremos que el exchange envie pkts a ciertas colas nomas.
+		false, // durable
+		false, // auto-deleted
+		false, // internal
+		false, // no wait
+		nil,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to declare exchange: %w", err)
+	}
+
+
+	q, err := ch.QueueDeclare(
+		queueName,  // name
+		false, // durable
+		false, // delete when unused
+		true,  // exclusive
+		false, // no-wait
+		nil,   // arguments
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to declareQueue: %w", err)
+	}
+
+	err = ch.QueueBind(
+		q.Name,        // queue name
+		routingKey,    // routing key
+		exchangeName, // exchange
+		false,
+		nil)
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to bind queue to exchange: %w", err)
+	}
+
+	consumerTag := "ctag-" + q.Name + "-" + uuid.GenerateUUID()
+	return &MessageMiddlewareQueue{
+		queueName:   q.Name,
+		channel:     ch,
+		consumerTag: consumerTag,
+	}, nil
+}
+
 func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, error) {
 
 	conn, err := amqp.Dial(options.DaemonAddress)

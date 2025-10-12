@@ -68,6 +68,7 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 	// Aca obtenemos channel
 	return &MessageMiddlewareExchange{
 		exchangeName:   name,
+		QueueAmount: options.QueueAmount,
 		channel:        ch,
 		consumerTag: consumerTag,
 	}, nil
