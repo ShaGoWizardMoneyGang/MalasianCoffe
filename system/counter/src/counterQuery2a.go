@@ -49,13 +49,13 @@ func countFunctionQuery2a(input string) string {
 
 // ============================= CounterQuery2a ================================
 
-type CounterQuery2a struct {
+type counterQuery2a struct {
 	colaEntradaFilteredTransactionItems *middleware.MessageMiddlewareQueue
 
 	colaSalidaCountedQuantity *middleware.MessageMiddlewareQueue
 }
 
-func (c *CounterQuery2a) Build(rabbitAddr string, queueAmounts map[string] uint64) {
+func (c *counterQuery2a) Build(rabbitAddr string, queueAmounts map[string] uint64) {
 
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactionItems2a", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
@@ -72,11 +72,11 @@ func (c *CounterQuery2a) Build(rabbitAddr string, queueAmounts map[string] uint6
 	c.colaSalidaCountedQuantity = colaSalida
 }
 
-func (c *CounterQuery2a) GetInput() *middleware.MessageMiddlewareQueue {
+func (c *counterQuery2a) GetInput() *middleware.MessageMiddlewareQueue {
 	return c.colaEntradaFilteredTransactionItems
 }
 
-func (c *CounterQuery2a) Process(pkt packet.Packet) []colas.OutBoundMessage {
+func (c *counterQuery2a) Process(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 
 	counted_result := []string{countFunctionQuery2a(input)}

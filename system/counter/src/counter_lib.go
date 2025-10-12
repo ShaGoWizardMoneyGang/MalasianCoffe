@@ -24,11 +24,11 @@ func CounterBuilder(counterName string, rabbitAddr string, queueAmounts map[stri
 	var counter Counter
 	switch strings.ToLower(counterName) {
 	case "query4":
-		counter = &CounterQuery4{}
+		counter = &counterQuery4{}
 	case "query2a":
-		counter = &CounterQuery2a{}
+		counter = &counterQuery2a{}
 	case "query2b":
-		counter = &CounterQuery2b{}
+		counter = &counterQuery2b{}
 	default:
 		panic(fmt.Sprintf("Unknown counter %s", counterName))
 	}
