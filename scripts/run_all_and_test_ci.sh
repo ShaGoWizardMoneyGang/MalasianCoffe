@@ -19,4 +19,4 @@ make docker-wait
 kill $LOG_PID || true
 
 # Ejecutar tests
-make test-outputs-reduced
+bash scripts/test_outputs.sh $1

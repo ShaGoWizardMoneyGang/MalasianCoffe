@@ -90,7 +90,8 @@ jobs:
 
     strategy:
       matrix:
-        dataset: [1DeCada, 1DeCadaMultiplesClientes, MuchosConEstado, MuchosConEstadoMultiplesClientes, MuchosSinEstado, MuchosSinEstadoMultiplesClientes, MuchosDeTodo]
+        configs: [1DeCada, 1DeCadaMultiplesClientes, MuchosConEstado, MuchosConEstadoMultiplesClientes, MuchosSinEstado, MuchosSinEstadoMultiplesClientes, MuchosDeTodo]
+        dataset: [FULL, RED]
 
     steps:
       - uses: actions/checkout@v4
@@ -100,5 +101,5 @@ jobs:
 
       - name: Run full local script
         run: |
-          make generate-config CONFIG=${{ matrix.dataset }}
-          bash scripts/run_all_and_test_ci.sh
+          make generate-config CONFIG=${{ matrix.configs }}
+          bash scripts/run_all_and_test_ci.sh ${{ matrix.dataset }}
