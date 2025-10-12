@@ -110,9 +110,9 @@ func (jq4 *joinerQuery4) Build(rabbitAddr string, routingKey string) {
 
 	jq4.colaStoresInput       = colas.InstanceQueueRouted("FilteredStores4", rabbitAddr, routingKey)
 
-	jq4.colaUsersInput        = colas.InstanceQueue("FilteredUsers4", rabbitAddr)
+	jq4.colaUsersInput        = colas.InstanceQueueRouted("FilteredUsers4", rabbitAddr, routingKey)
 
-	jq4.colaAggTransInput     = colas.InstanceQueue("GlobalAggregation4", rabbitAddr)
+	jq4.colaAggTransInput     = colas.InstanceQueueRouted("GlobalAggregation4", rabbitAddr, routingKey)
 
 	jq4.colaSalidaQuery4      = colas.InstanceQueue("SalidaQuery4", rabbitAddr)
 

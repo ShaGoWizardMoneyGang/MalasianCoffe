@@ -32,17 +32,15 @@ func filterUsers(input string) string {
 type userFilterMapper struct {
 	colaEntradaUsers *middleware.MessageMiddlewareQueue
 
-	colaSalida4 *middleware.MessageMiddlewareQueue
+	colaSalida4 *middleware.MessageMiddlewareExchange
 }
 
 func (ufm *userFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaUsers := colas.InstanceQueue("DataUsers", rabbitAddr)
 
-	colaSalida4 := colas.InstanceQueue("FilteredUsers4", rabbitAddr)
-
 	ufm.colaEntradaUsers = colaEntradaUsers
 
-	ufm.colaSalida4 = colaSalida4
+	ufm.colaSalida4 = colas.InstanceExchange("FilteredUsers4", rabbitAddr, queueAmount["queue4"])
 }
 
 func (ufm *userFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
