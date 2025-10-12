@@ -37,17 +37,9 @@ func main() {
 		panic("Couldn't start consuming queue 2")
 	}
 
-
-
-
-
 	// NOTE: Este sleep lo pongo porque si el dataset es corto, el cliente envia todo y no le da tiempo a crear un socket
 	time_to_sleep := 10 + rand.IntN(15)
 	time.Sleep(time.Duration(time_to_sleep) * time.Second)
-
-
-
-
 
 	for message := range *msgs {
 		packetReader := bytes.NewReader(message.Body)
@@ -59,14 +51,14 @@ func main() {
 		var conn net.Conn
 		var connectionAttempts int
 		for {
-			if connectionAttempts == 5 {
+			if connectionAttempts == 10 {
 				bitacora.Error("Failed to connect to sender 5 times")
 			}
 			conn, err = net.Dial("tcp", client_receiver)
 			if err != nil {
 				bitacora.Info("Failed to connect to client")
 				connectionAttempts += 1
-				time.Sleep(time.Duration(time_to_sleep) * time.Second)
+				time.Sleep(time.Duration(time_to_sleep*connectionAttempts) * time.Second)
 			} else {
 				break
 			}
