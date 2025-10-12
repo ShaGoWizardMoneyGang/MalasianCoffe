@@ -55,12 +55,12 @@ func concat(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packe
 	}
 }
 
-func (c *Concat) Build(rabbitAddr string) {
+func (c *Concat) Build(rabbitAddr string, routing_key string) {
 	c.inputChannel          = make(chan packet.Packet)
 
 	c.outputChannel         = make(chan packet.Packet)
 
-	c.colaInputTransaction  = colas.InstanceQueue("FilteredTransactions1", rabbitAddr)
+	c.colaInputTransaction  = colas.InstanceQueueRouted("FilteredTransactions1", rabbitAddr, routing_key)
 
 	c.colaSalida            = colas.InstanceQueue("SalidaQuery1", rabbitAddr)
 

@@ -55,13 +55,13 @@ def commons():
       - server
 """
 
-def filter_transactions_block(n):
+def filter_transactions_block(n, queueAmount1):
     return f"""
   filter_transactions{n}:
     container_name: filter_transactions{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/filter_mapper rabbitmq:5672 transactions 0
+    entrypoint: ./bin/filter_mapper rabbitmq:5672 transactions 1 queue1:{queueAmount1}
     volumes:
       - ./bin/filter_mapper:/app/bin/filter_mapper
     networks:
@@ -131,12 +131,13 @@ def filter_menu_items_block(n, queueAmount2a, queueAmount2b):
 """
 
 def concat_block(n):
+    routing_key = int(n) - 1
     return f"""
   concat_{n}:
     container_name: concat_{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/concat rabbitmq:5672
+    entrypoint: ./bin/concat rabbitmq:5672 {routing_key}
     volumes:
       - ./bin/concat:/app/bin/concat
     networks:
@@ -284,7 +285,7 @@ def main():
     with open(output_file, 'w') as file:
         file.write(header())
         file.write(commons())
-        file.writelines(filter_transactions_block(i) for i in range(1, configs.get("filter-transactions", 0) + 1))
+        file.writelines(filter_transactions_block(i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
         file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
         file.writelines(filter_users_block(i, configs["joiner4"]) for i in range(1, configs.get("filter-users", 0) + 1))
         file.writelines(filter_stores_block(i, configs["joiner3"], configs["joiner4"]) for i in range(1, configs.get("filter-stores", 0) + 1))

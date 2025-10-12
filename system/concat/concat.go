@@ -12,8 +12,11 @@ func main() {
 	rabbit_addr := os.Args[1]
 	print("Rabbit address: ", rabbit_addr, "\n")
 
+
+	routingKey_s := os.Args[2]
+
 	concater    := concat.Concat{}
-	concater.Build(rabbit_addr)
+	concater.Build(rabbit_addr, routingKey_s)
 	concater.Process()
 }
 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⣤⣤⡄
