@@ -73,7 +73,7 @@ func joinQuery2b(inputChannel  <-chan packet.Packet, outputChannel chan<- packet
 	}
 }
 
-func (jq2b *joinerQuery2b) Build(rabbitAddr string) {
+func (jq2b *joinerQuery2b) Build(rabbitAddr string, routingKey string) {
 	jq2b.inputChannel       = make(chan packet.Packet)
 	jq2b.outputChannel      = make(chan packet.Packet)
 

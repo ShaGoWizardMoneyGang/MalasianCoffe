@@ -75,7 +75,7 @@ func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 	}
 }
 
-func (jq3 *joinerQuery3) Build(rabbitAddr string) {
+func (jq3 *joinerQuery3) Build(rabbitAddr string, routingKey string) {
 	jq3.inputChannel      = make(chan packet.Packet)
 	jq3.outputChannel     = make(chan packet.Packet)
 

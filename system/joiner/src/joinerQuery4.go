@@ -103,12 +103,12 @@ func joinQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 	}
 }
 
-func (jq4 *joinerQuery4) Build(rabbitAddr string) {
+func (jq4 *joinerQuery4) Build(rabbitAddr string, routingKey string) {
 	jq4.inputChannel          = make(chan packet.Packet)
 
 	jq4.outputChannel         = make(chan packet.Packet)
 
-	jq4.colaStoresInput       = colas.InstanceQueueRouted("FilteredStores4", rabbitAddr, "0")
+	jq4.colaStoresInput       = colas.InstanceQueueRouted("FilteredStores4", rabbitAddr, routingKey)
 
 	jq4.colaUsersInput        = colas.InstanceQueue("FilteredUsers4", rabbitAddr)
 

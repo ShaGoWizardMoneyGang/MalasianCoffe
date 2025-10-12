@@ -6,7 +6,7 @@ import (
 
 type Joiner interface {
 	// Funcion que inicializa las cosas que el filter necesita
-	Build(rabbitAddr string)
+	Build(rabbitAddr string, routingKey string)
 
 	// Funcio que hace el filtrado
 	Process()
@@ -28,7 +28,7 @@ func JoinerBuilder(joinerName string, rabbitAddr string, routingKey string) Join
 		panic(fmt.Sprintf("Unknown 'joiner' %s", joinerName))
 	}
 
-	joiner.Build(rabbitAddr)
+	joiner.Build(rabbitAddr, routingKey)
 
 	return joiner
 }
