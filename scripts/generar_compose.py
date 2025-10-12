@@ -178,13 +178,13 @@ def counter_block(n, query):
       - server
 """
 
-def global_aggregator_block(n, query, queue4Amount):
+def global_aggregator_block(n, query, queueAmount):
     return f"""
   global_aggregator{query}_{n}:
     container_name: global_aggregator{query}_{n}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query{query} 1 queue4:{queue4Amount}
+    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query{query} 1 queue:{queueAmount}
     volumes:
       - ./bin/global_aggregator:/app/bin/global_aggregator
     networks:
