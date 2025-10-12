@@ -10,7 +10,7 @@ estados() {
     echo "- 'MuchosSinEstadoMultiplesClientes': Varios workers de los que no tienen estado y varios clientes"
     echo "- 'MuchosConEstado': Varios workers de los que si tienen estado"
     echo "- 'MuchosConEstadoMultiplesClientes': Varios workers de los que si tienen estado y varios clientes"
-    echo "- 'MuchosDeTodo': Muchos de todo"
+    echo "- 'MuchosDeTodo': Muchos de todo (se pica)"
 }
 
 if [ -z ${config} ]; then
