@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
+	"malasian_coffe/bitacora"
 	joiner "malasian_coffe/system/joiner/src"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -18,5 +22,20 @@ make run-joiner RUN_FUNCTION=Query3
 
 	joiner := joiner.JoinerBuilder(joinFunction, rabbitAddr, routingKey_s)
 
-	joiner.Process()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	done := make(chan struct{})
+	go func() {
+		joiner.Process()
+		close(done)
+	}()
+
+	select {
+	case <-ctx.Done():
+		bitacora.Info("Graceful shutdown solicitado (SIGTERM/SIGINT)")
+	case <-done:
+		bitacora.Info("Procesamiento finalizado normalmente")
+	}
+
 }

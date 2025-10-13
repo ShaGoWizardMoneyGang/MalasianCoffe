@@ -2,14 +2,18 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	aggregator "malasian_coffe/system/partial_aggregator/src"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 func consumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.ConsumeChannel {
@@ -50,22 +54,36 @@ func main() {
 	colaEntrada := worker.GetInput()
 	msgQueue := consumeInput(colaEntrada)
 
-	for message := range *msgQueue {
-		packetReader := bytes.NewReader(message.Body)
-		pkt, _ := packet.DeserializePackage(packetReader)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
-		outboundMessages := worker.Process(pkt)
+	done := make(chan struct{})
+	go func() {
+		for message := range *msgQueue {
+			packetReader := bytes.NewReader(message.Body)
+			pkt, _ := packet.DeserializePackage(packetReader)
 
-		for _, outbound := range outboundMessages {
-			cola := outbound.ColaSalida
-			p := outbound.Packet
-			if err := cola.Send(p); err != 0 {
-				slog.Error("Error enviando a cola de salida", "err", err)
+			outboundMessages := worker.Process(pkt)
+
+			for _, outbound := range outboundMessages {
+				cola := outbound.ColaSalida
+				p := outbound.Packet
+				if err := cola.Send(p); err != 0 {
+					slog.Error("Error enviando a cola de salida", "err", err)
+				}
+			}
+
+			if err := message.Ack(false); err != nil {
+				panic(fmt.Errorf("Could not ack, %w", err))
 			}
 		}
+		close(done)
+	}()
 
-		if err := message.Ack(false); err != nil {
-			panic(fmt.Errorf("Could not ack, %w", err))
-		}
+	select {
+	case <-ctx.Done():
+		bitacora.Info("Graceful shutdown solicitado (SIGTERM/SIGINT)")
+	case <-done:
+		bitacora.Info("Procesamiento finalizado normalmente")
 	}
 }
