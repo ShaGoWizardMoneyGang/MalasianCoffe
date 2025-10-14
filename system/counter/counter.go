@@ -55,7 +55,6 @@ make run-filter RUN_FUNCTION=transactions
 	msgQueue := colas.ConsumeInput(colaEntrada)
 	slog.Info("Leo de cola entrada", "queue", colaEntrada)
 
-	done := make(chan struct{})
 	go func() {
 		for message := range *msgQueue { //while true hasta que terminen los mensajes
 			packetReader := bytes.NewReader(message.Body)
@@ -73,13 +72,10 @@ make run-filter RUN_FUNCTION=transactions
 				panic(fmt.Errorf("Could not ack, %w", err))
 			}
 		}
-		close(done)
 	}()
 
 	select {
 	case <-ctx.Done():
 		bitacora.Info("Graceful shutdown solicitado (SIGTERM/SIGINT)")
-	case <-done:
-		bitacora.Info("Procesamiento finalizado normalmente")
 	}
 }

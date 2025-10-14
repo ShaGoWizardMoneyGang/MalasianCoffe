@@ -47,7 +47,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	done := make(chan struct{})
 	go func() {
 		for message := range *msgs {
 			packetReader := bytes.NewReader(message.Body)
@@ -83,13 +82,10 @@ func main() {
 				panic(fmt.Errorf("Could not ack, %w", err))
 			}
 		}
-		close(done)
 	}()
 
 	select {
 	case <-ctx.Done():
 		bitacora.Info("Graceful shutdown solicitado (SIGTERM/SIGINT)")
-	case <-done:
-		bitacora.Info("Procesamiento finalizado normalmente")
 	}
 }

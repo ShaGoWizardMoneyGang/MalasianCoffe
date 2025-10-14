@@ -61,7 +61,6 @@ make run-filter RUN_FUNCTION=transactions
 	defer stop()
 
 	msgQueue := consumeInput(colaEntrada)
-	done := make(chan struct{})
 	go func() {
 		for message := range *msgQueue { //while true hasta que terminen los mensajes
 			packetReader := bytes.NewReader(message.Body)
@@ -80,13 +79,10 @@ make run-filter RUN_FUNCTION=transactions
 				bitacora.Error(fmt.Errorf("Could not ack, %w", err).Error())
 			}
 		}
-		close(done)
 	}()
 
 	select {
 	case <-ctx.Done():
 		bitacora.Info("Graceful shutdown solicitado (SIGTERM/SIGINT)")
-	case <-done:
-		bitacora.Info("Procesamiento finalizado normalmente")
 	}
 }

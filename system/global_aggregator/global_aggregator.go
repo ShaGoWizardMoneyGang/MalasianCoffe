@@ -46,16 +46,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	done := make(chan struct{})
 	go func() {
 		worker.Process()
-		close(done)
 	}()
 
 	select {
 	case <-ctx.Done():
 		bitacora.Info("Graceful shutdown solicitado (SIGTERM/SIGINT)")
-	case <-done:
-		bitacora.Info("Procesamiento finalizado normalmente")
 	}
 }
