@@ -2,14 +2,17 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	filter_mapper "malasian_coffe/system/filter_mapper/src"
 	"malasian_coffe/system/middleware"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 func consumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.ConsumeChannel {
@@ -33,45 +36,53 @@ make run-filter RUN_FUNCTION=transactions
 	print("Filter function: ", filterFunction, "\n")
 
 	outAmount_s := os.Args[3]
-	outAmount, err   := strconv.ParseUint(outAmount_s, 10, 64)
+	outAmount, err := strconv.ParseUint(outAmount_s, 10, 64)
 	if err != nil {
 		panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
 	}
 
 	outs := make(map[string]uint64, outAmount)
 	for i := range outAmount {
-		outputMap := os.Args[4 + i]
-		splitted  := strings.Split(outputMap, ":")
+		outputMap := os.Args[4+i]
+		splitted := strings.Split(outputMap, ":")
 		queueName, queueAmount_s := splitted[0], splitted[1]
 		queueAmount, err := strconv.ParseUint(queueAmount_s, 10, 64)
 		if err != nil {
-			 panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
+			panic(fmt.Errorf("Failed to parse amount of outs %s, %w", outAmount_s, err))
 		}
 
 		outs[queueName] = queueAmount
 	}
 
-
 	worker := filter_mapper.FilterMapperBuilder(filterFunction, rabbitAddr, outs)
 	colaEntrada := worker.GetInput()
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
 	msgQueue := consumeInput(colaEntrada)
+	go func() {
+		for message := range *msgQueue { //while true hasta que terminen los mensajes
+			packetReader := bytes.NewReader(message.Body)
+			pkt, _ := packet.DeserializePackage(packetReader)
 
-	for message := range *msgQueue { //while true hasta que terminen los mensajes
-		packetReader := bytes.NewReader(message.Body)
-		pkt, _ := packet.DeserializePackage(packetReader)
+			outboundMessages := worker.Process(pkt)
 
-		outboundMessages := worker.Process(pkt)
+			for _, outbound := range outboundMessages {
+				cola := outbound.ColaSalida
+				packet := outbound.Packet
+				cola.Send(packet)
+			}
 
-		for _, outbound := range outboundMessages {
-			cola := outbound.ColaSalida
-			packet := outbound.Packet
-			cola.Send(packet)
+			err := message.Ack(false)
+			if err != nil {
+				bitacora.Error(fmt.Errorf("Could not ack, %w", err).Error())
+			}
 		}
+	}()
 
-		err := message.Ack(false)
-		if err != nil {
-			bitacora.Error(fmt.Errorf("Could not ack, %w", err).Error())
-		}
+	select {
+	case <-ctx.Done():
+		bitacora.Info("Graceful shutdown solicitado (SIGTERM/SIGINT)")
 	}
 }

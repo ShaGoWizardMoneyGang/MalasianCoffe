@@ -2,12 +2,16 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/dataset"
@@ -40,40 +44,51 @@ func main() {
 	}
 	conn, _ := list.Accept()
 
-	for {
-		packet_b, err := network.ReceiveFromNetwork(conn)
-		packet_reader := bytes.NewReader(packet_b)
-		if err != nil {
-			panic(err)
-		}
-		packet, err := packet.DeserializePackage(packet_reader)
-		if err != nil {
-			fmt.Errorf("Error deserializing package: %w", err)
-		}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
-		// TODO: esto esta hardcodeado asi porque es para la query 1.
-		// Aca deberia haber un switch que lo envie a la queue correspondiente
-		packet_id, err := strconv.ParseUint(packet.GetDirID(), 10, 64)
-		dataset_name, err := dataset.IDtoDataset(packet_id)
-		if err != nil {
-			panic(err)
+	go func() {
+		for {
+			packet_b, err := network.ReceiveFromNetwork(conn)
+			packet_reader := bytes.NewReader(packet_b)
+			if err != nil {
+				panic(err)
+			}
+			packet, err := packet.DeserializePackage(packet_reader)
+			if err != nil {
+				fmt.Errorf("Error deserializing package: %w", err)
+			}
+
+			// TODO: esto esta hardcodeado asi porque es para la query 1.
+			// Aca deberia haber un switch que lo envie a la queue correspondiente
+			packet_id, err := strconv.ParseUint(packet.GetDirID(), 10, 64)
+			dataset_name, err := dataset.IDtoDataset(packet_id)
+			if err != nil {
+				panic(err)
+			}
+			switch dataset_name {
+			case "menu_items":
+				slog.Debug("Envio a cola de menu items")
+				colaMenuItems.Send(packet)
+			case "stores":
+				slog.Debug("Envio a cola de stores")
+				colaStores.Send(packet)
+			case "transaction_items":
+				slog.Debug("Envio a cola de transaccions items")
+				colaTransactionItems.Send(packet)
+			case "transactions":
+				slog.Debug("Envio a cola de transactions")
+				colaTransactions.Send(packet)
+			case "users":
+				slog.Debug("Envio a cola de users")
+				colaUsers.Send(packet)
+			}
 		}
-		switch dataset_name {
-		case "menu_items":
-			slog.Debug("Envio a cola de menu items")
-			colaMenuItems.Send(packet)
-		case "stores":
-			slog.Debug("Envio a cola de stores")
-			colaStores.Send(packet)
-		case "transaction_items":
-			slog.Debug("Envio a cola de transaccions items")
-			colaTransactionItems.Send(packet)
-		case "transactions":
-			slog.Debug("Envio a cola de transactions")
-			colaTransactions.Send(packet)
-		case "users":
-			slog.Debug("Envio a cola de users")
-			colaUsers.Send(packet)
-		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		bitacora.Info("Graceful shutdown solicitado (SIGTERM/SIGINT)")
 	}
+
 }

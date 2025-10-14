@@ -7,7 +7,7 @@ import (
 )
 
 type GlobalAggregator interface {
-	Build(rabbitAddr string, routing_key string,  outs map[string]uint64)
+	Build(rabbitAddr string, routing_key string, outs map[string]uint64)
 	Process()
 }
 
