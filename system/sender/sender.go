@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"malasian_coffe/bitacora"
@@ -41,38 +44,52 @@ func main() {
 	time_to_sleep := 10 + rand.IntN(15)
 	time.Sleep(time.Duration(time_to_sleep) * time.Second)
 
-	for message := range *msgs {
-		packetReader := bytes.NewReader(message.Body)
-		pkt, _ := packet.DeserializePackage(packetReader)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
-		client_receiver := pkt.GetClientAddr()
+	done := make(chan struct{})
+	go func() {
+		for message := range *msgs {
+			packetReader := bytes.NewReader(message.Body)
+			pkt, _ := packet.DeserializePackage(packetReader)
 
-		print("Client receiver address: ", client_receiver, "\n")
-		var conn net.Conn
-		var connectionAttempts int
-		for {
-			if connectionAttempts == 10 {
-				bitacora.Error("Failed to connect to sender 5 times")
+			client_receiver := pkt.GetClientAddr()
+
+			print("Client receiver address: ", client_receiver, "\n")
+			var conn net.Conn
+			var connectionAttempts int
+			for {
+				if connectionAttempts == 10 {
+					bitacora.Error("Failed to connect to sender 5 times")
+				}
+				conn, err = net.Dial("tcp", client_receiver)
+				if err != nil {
+					bitacora.Info("Failed to connect to client")
+					connectionAttempts += 1
+					time.Sleep(time.Duration(time_to_sleep*connectionAttempts) * time.Second)
+				} else {
+					break
+				}
 			}
-			conn, err = net.Dial("tcp", client_receiver)
+
+			// TODO: Como averiguo de que cola vino?
+			pkt_answer := packetanswer.From(pkt, numeroQuery)
+			pkt_answer_b := pkt_answer.Serialize()
+
+			slog.Info("Sending answer packet back to client")
+			network.SendToNetwork(conn, pkt_answer_b)
+			err = message.Ack(false)
 			if err != nil {
-				bitacora.Info("Failed to connect to client")
-				connectionAttempts += 1
-				time.Sleep(time.Duration(time_to_sleep*connectionAttempts) * time.Second)
-			} else {
-				break
+				panic(fmt.Errorf("Could not ack, %w", err))
 			}
 		}
+		close(done)
+	}()
 
-		// TODO: Como averiguo de que cola vino?
-		pkt_answer := packetanswer.From(pkt, numeroQuery)
-		pkt_answer_b := pkt_answer.Serialize()
-
-		slog.Info("Sending answer packet back to client")
-		network.SendToNetwork(conn, pkt_answer_b)
-		err = message.Ack(false)
-		if err != nil {
-			panic(fmt.Errorf("Could not ack, %w", err))
-		}
+	select {
+	case <-ctx.Done():
+		bitacora.Info("Graceful shutdown solicitado (SIGTERM/SIGINT)")
+	case <-done:
+		bitacora.Info("Procesamiento finalizado normalmente")
 	}
 }
