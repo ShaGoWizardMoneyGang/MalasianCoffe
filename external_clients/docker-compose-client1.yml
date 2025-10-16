@@ -1,0 +1,19 @@
+name: tp1
+services:
+
+  client1:
+    container_name: client1
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/client ./dataset/ ./out/client1/ gateway:9090 client1:9094
+    volumes:
+      - ./bin/client:/app/bin/client
+      - ./dataset:/app/dataset
+      - ./out/client1:/app/out/client1
+    networks:
+      - tp1_testing_net
+
+networks:
+  tp1_testing_net:
+    external: true
+    driver: bridge
