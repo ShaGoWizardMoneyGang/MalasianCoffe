@@ -122,13 +122,22 @@ CONFIG                  ?= MuchosSinEstado
 generate-config:
 	bash scripts/generate-config.sh ${CONFIG}
 
-generate-compose:
-	python3 scripts/generar_compose.py
+CLIENTS_AS_EXTERNALS    ?= False
+generate-compose: clean-out
+	python3 scripts/generar_compose.py ${CLIENTS_AS_EXTERNALS}
 
 docker-multi: docker-down clean-out build generate-compose
 	docker compose -f docker-compose-gen.yml up -d
 	@echo "Docker levantado, usar 'make docker-wait ; make test-outputs-reduced'"
 
+docker-multiclient-test: docker-down clean-out build generate-compose
+	docker compose -f docker-compose-gen.yml up -d
+	docker compose -f external_clients/docker-compose-client1.yml up -d
+	@echo "Docker levantado, usar 'make docker-wait ; make test-outputs-reduced'"
+
+	bash scripts/wait_for_multiclient_test.sh
+	bash scripts/test_outputs.sh RED
+	
 docker-wait:
 	bash scripts/wait_for_clients.sh
 

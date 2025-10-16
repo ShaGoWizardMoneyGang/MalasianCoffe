@@ -1,0 +1,18 @@
+name: external-client
+services:
+  clientExt:
+    container_name: clientExt
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/client ./dataset/ ./out/clientExt/ gateway:9090 clientExt:9098
+    volumes:
+      - ./bin/client:/app/bin/client
+      - ./dataset:/app/dataset
+      - ./out/clientExt:/app/out/clientExt
+    networks:
+      - tp1_testing_net
+
+networks:
+  tp1_testing_net:
+    external: true
+    driver: bridge

@@ -1,5 +1,6 @@
 import os
 import time
+import sys
 
 def header():
     return """name: tp1
@@ -10,6 +11,15 @@ def networks():
     return """
 networks:
   testing_net:
+    # external: true
+    driver: bridge
+"""
+
+def external_networks():
+    return """
+networks:
+  tp1_testing_net:
+    external: true
     driver: bridge
 """
 
@@ -250,6 +260,26 @@ def client(n):
       - testing_net
 """
 
+def ext_client(n):
+    # Creo un directorio en out para que no sea creado por root
+    os.mkdir(f"out/client{n}")
+
+    port_number = 9093 + n
+
+    return f"""
+  client{n}:
+    container_name: client{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/client ./dataset/ ./out/client{n}/ gateway:9090 client{n}:{port_number}
+    volumes:
+      - ./bin/client:/app/bin/client
+      - ./dataset:/app/dataset
+      - ./out/client{n}:/app/out/client{n}
+    networks:
+      - tp1_testing_net
+"""
+
 def read_config_file():
     with open("compose.config", "r") as file:
         lines = file.readlines()
@@ -278,11 +308,24 @@ def display_config_table(configs):
 
     time.sleep(1)
 
+def create_compose_for_each_client(configs):
+  for i in range(1, configs.get("cliente", 0) + 1):
+    output_file = f"external_clients/docker-compose-client{i}.yml"       
+    with open(output_file, 'w') as file:
+      file.write(header())
+      file.write(ext_client(i))
+      file.write(external_networks())
+
 def main():
     configs = read_config_file()
     display_config_table(configs)
+    if len(sys.argv) < 2:
+      print("Usage: python generar_compose.py <config_file>")
+      sys.exit(1)
 
-    output_file = "docker-compose-gen.yml"        
+    external_clients = sys.argv[1]
+    print(f"External clients: {external_clients}")
+    output_file = "docker-compose-gen.yml"       
     with open(output_file, 'w') as file:
         file.write(header())
         file.write(commons())
@@ -318,9 +361,14 @@ def main():
 
         file.writelines(partial_aggregator_block(i, "3", configs["global-aggregator3"]) for i in range(1, configs.get("partial-aggregator3", 0) + 1))
 
-        file.writelines(client(i) for i in range(1, configs.get("cliente", 0) + 1))
+        if int(external_clients) == 0:
+          print("LOS GENERO ADENTRO")
+          file.writelines(client(i) for i in range(1, configs.get("cliente", 0) + 1))
+        else:
+          print("LOS GENERO AFUERA")
+          create_compose_for_each_client(configs)
 
         file.write(networks())
-
+    
 if __name__ == "__main__":
     main()
