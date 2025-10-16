@@ -129,6 +129,12 @@ docker-multi: docker-down clean-out build generate-compose
 	docker compose -f docker-compose-gen.yml up -d
 	@echo "Docker levantado, usar 'make docker-wait ; make test-outputs-reduced'"
 
+docker-multiclient-test: docker-down clean-out build generate-compose
+	docker compose -f docker-compose-multiclient.yml up -d
+	@echo "Docker levantado, usar 'make docker-wait ; make test-outputs-reduced'"
+	bash scripts/wait_for_multiclient_test.sh
+	bash scripts/test_outputs.sh RED
+	
 docker-wait:
 	bash scripts/wait_for_clients.sh
 
