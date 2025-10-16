@@ -123,17 +123,27 @@ generate-config:
 	bash scripts/generate-config.sh ${CONFIG}
 
 generate-compose:
-	python3 scripts/generar_compose.py
+	python3 scripts/generar_compose.py NOEXTERNAL
+
+generate-compose-external:
+	python3 scripts/generar_compose.py EXTERNAL
 
 docker-multi: docker-down clean-out build generate-compose
 	docker compose -f docker-compose-gen.yml up -d
 	@echo "Docker levantado, usar 'make docker-wait ; make test-outputs-reduced'"
+
+docker-multi-external: docker-down-external build-client generate-compose-external
+	docker compose -f docker-compose-gen-external.yml up -d
+	@echo "Docker externo levantado"
 
 docker-wait:
 	bash scripts/wait_for_clients.sh
 
 docker-down:
 	docker compose -f docker-compose-gen.yml down -v --remove-orphans
+
+docker-down-external:
+	docker compose -f docker-compose-gen-external.yml down -v
 
 docker-logs:
 	docker compose -f docker-compose-gen.yml logs
