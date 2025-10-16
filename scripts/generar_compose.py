@@ -1,15 +1,29 @@
 import os
 import time
+import sys
+import random
 
 def header():
     return """name: tp1
 services:
 """
 
-def networks():
-    return """
-networks:
+def networks(external: bool):
+    network_name = """
   testing_net:
+    """
+    if external == True:
+        network_name = """
+  tp1_testing_net:
+    """
+
+    external_text = ""
+    if external == True:
+        external_text = "external: true"
+    return f"""
+networks:
+  {network_name}
+    {external_text}
     driver: bridge
 """
 
@@ -228,30 +242,50 @@ def partial_aggregator_block(n, query, queueAmount):
       - server
 """
 
-def client(n):
+def client(n, external):
     # Creo un directorio en out para que no sea creado por root
-    os.mkdir(f"out/client{n}")
 
     port_number = 9093 + n
+    suffix = ""
+    if external:
+        suffix = random.randint(1, 1000000)
+
+    name = str(n) + str(suffix)
+    os.mkdir(f"out/client{name}")
+
+    depends = """
+    depends_on:
+      - gateway
+    """
+    if external:
+        depends = ""
+
+    network = """
+    networks:
+      - testing_net
+    """
+    if external:
+        network = """
+    networks:
+      - tp1_testing_net
+    """
 
     return f"""
-  client{n}:
-    container_name: client{n}
+  client{name}:
+    container_name: client{name}
     image: ubuntu:24.04
     working_dir: /app
-    entrypoint: ./bin/client ./dataset/ ./out/client{n}/ gateway:9090 client{n}:{port_number}
+    entrypoint: ./bin/client ./dataset/ ./out/client{name}/ gateway:9090 client{name}:{port_number}
     volumes:
       - ./bin/client:/app/bin/client
       - ./dataset:/app/dataset
-      - ./out/client{n}:/app/out/client{n}
-    depends_on:
-      - gateway
-    networks:
-      - testing_net
+      - ./out/client{name}:/app/out/client{name}
+    {depends}
+    {network}
 """
 
-def read_config_file():
-    with open("compose.config", "r") as file:
+def read_config_file(config_file_name):
+    with open(config_file_name, "r") as file:
         lines = file.readlines()
     configs = {}
     for line in lines:
@@ -279,13 +313,27 @@ def display_config_table(configs):
     time.sleep(1)
 
 def main():
-    configs = read_config_file()
+    external = False
+    if len(sys.argv) > 1 and sys.argv[1] == "EXTERNAL":
+        external = True
+
+    config_file_name = "compose.config"
+    if external:
+        config_file_name = "compose-external.config"
+
+
+    configs = read_config_file(config_file_name)
     display_config_table(configs)
 
-    output_file = "docker-compose-gen.yml"        
+
+    output_file = "docker-compose-gen.yml"
+    if external:
+        output_file = "docker-compose-gen-external.yml"
+
     with open(output_file, 'w') as file:
         file.write(header())
-        file.write(commons())
+        if external == False:
+            file.write(commons())
         file.writelines(filter_transactions_block(i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
         file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
         file.writelines(filter_users_block(i, configs["joiner4"]) for i in range(1, configs.get("filter-users", 0) + 1))
@@ -318,9 +366,12 @@ def main():
 
         file.writelines(partial_aggregator_block(i, "3", configs["global-aggregator3"]) for i in range(1, configs.get("partial-aggregator3", 0) + 1))
 
-        file.writelines(client(i) for i in range(1, configs.get("cliente", 0) + 1))
+        for i in range(1, configs.get("cliente", 0) + 1):
+            client_line = client(i, external)
 
-        file.write(networks())
+            file.writelines(client_line)
+
+        file.write(networks(external))
 
 if __name__ == "__main__":
     main()

@@ -37,3 +37,5 @@ else
     estados
     exit 1
 fi
+
+cp -f .github/data/composeClientesExternos.config compose-external.config
