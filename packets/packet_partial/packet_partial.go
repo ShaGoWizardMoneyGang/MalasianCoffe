@@ -4,12 +4,21 @@ import (
 	"fmt"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
+	"strings"
 )
 
 // Conjunto de UUIDs
 // TODO: Usar pairing function para encodear esto.
 type uuidSet struct {
+	dirID string
 	uuids []string
+}
+
+func newUUIDSet() uuidSet {
+	return uuidSet{
+		dirID: "",
+		uuids: []string{},
+	}
 }
 
 func (uS *uuidSet) getUuids() []string {
@@ -17,7 +26,18 @@ func (uS *uuidSet) getUuids() []string {
 }
 
 func (uS *uuidSet) addUuids(uuids []string) {
-	uS.uuids = append(uS.uuids, uuids...)
+	for _, uuid := range uuids {
+		uuid_split := strings.Split(uuid, ".")
+		if uS.dirID == "" {
+			uS.dirID = uuid_split[0]
+		}
+		if uS.dirID != uuid_split[0] {
+			bitacora.Error("ERROR: Distinto Dir ID en paquetes")
+		}
+
+		uuid_id := uuid_split[1]
+		uS.uuids = append(uS.uuids, []string{uuid_id}...)
+	}
 }
 
 
@@ -40,6 +60,15 @@ func (ppu *packetPartialUuid) getEOFUuid() *string {
 	}
 }
 
+func (ppu *packetPartialUuid) getDirID() string {
+	dirID := ppu.uuids.dirID
+	if dirID == "" {
+		panic("ERROR: No DIR Id en packet")
+	}
+
+	return dirID
+}
+
 // No le pongo partial header porque sino parece incompleto.
 type packetPartialHeader struct {
 	// ID de la session a la que este paquete corresponde
@@ -51,30 +80,6 @@ type packetPartialHeader struct {
 	client_ip_port string
 }
 
-type PacketPartial struct {
-	header packetPartialHeader
-	payload string
-}
-
-func (pp *PacketPartial) getUuids() []string {
-	return pp.header.packet_uuid.uuids.getUuids()
-}
-
-func (pp *PacketPartial) getEOFUuid() *string {
-	return pp.header.packet_uuid.getEOFUuid()
-}
-
-func (pp *PacketPartial) getSessionID() string {
-	return pp.header.session_id
-}
-
-func (pp *PacketPartial) getIPPort() string {
-	return pp.header.client_ip_port
-}
-
-func (pp *PacketPartial) GetPayload() string {
-	return pp.payload
-}
 
 func createPartialHeader(partialPackets []PacketPartial, packets []packet.Packet) packetPartialHeader {
 	// Si esto se queda en "", entonces no encontramos el EOF en este batch
@@ -85,10 +90,11 @@ func createPartialHeader(partialPackets []PacketPartial, packets []packet.Packet
 	client_ip_port := ""
 
 	for _, partialPacket := range partialPackets {
-		uuids := partialPacket.getUuids()
+		uuids := partialPacket.GetUUIDs()
 		uuidsSet.addUuids(uuids)
 
 		potentialEOF := partialPacket.getEOFUuid()
+		// Si es distinto de Nil, entonces es EOF
 		if potentialEOF != nil {
 			if eofUuid != "" {
 				bitacora.Error("ERROR: Recibi doble EOF en uno de los paquetes normales")
@@ -96,7 +102,7 @@ func createPartialHeader(partialPackets []PacketPartial, packets []packet.Packet
 			eofUuid = *potentialEOF
 		}
 
-		current_sessionID := partialPacket.getSessionID()
+		current_sessionID := partialPacket.GetSessionID()
 		// NOTE: Esto es un sanity check
 		if session_id == "" {
 			session_id = current_sessionID
@@ -106,7 +112,7 @@ func createPartialHeader(partialPackets []PacketPartial, packets []packet.Packet
 			bitacora.Error(fmt.Sprintf("ERROR: Dos paquetes de distintas sessions se mezclaron. Original: %s, Nuevo: %s", session_id, current_sessionID))
 		}
 
-		currentIPort := partialPacket.getIPPort()
+		currentIPort := partialPacket.GetClientAddr()
 		if client_ip_port == "" {
 			client_ip_port = currentIPort
 		}
@@ -185,3 +191,42 @@ func CreateParcialPacket(partialPackets []PacketPartial, packets []packet.Packet
 
 	return partialPacket
 }
+
+
+type PacketPartial struct {
+	header packetPartialHeader
+	payload string
+}
+
+// Replica de las funciones de Packet
+func (pp *PacketPartial) GetPayload() string {
+	return pp.payload
+}
+
+// Originalmente en Packet GetUUID
+func (pp *PacketPartial) GetUUIDs() []string {
+	return pp.header.packet_uuid.uuids.getUuids()
+}
+
+func (pp *PacketPartial) GetSessionID() string {
+	return pp.header.session_id
+}
+
+func (pp *PacketPartial) IsEOF() bool {
+	eofUUID := pp.getEOFUuid()
+	return eofUUID != nil
+}
+
+func (pp *PacketPartial) GetClientAddr() string {
+	return pp.header.client_ip_port
+}
+
+func (pp *PacketPartial) GetDirID() string {
+	return pp.header.packet_uuid.getDirID()
+}
+
+func (pp *PacketPartial) getEOFUuid() *string {
+	return pp.header.packet_uuid.getEOFUuid()
+}
+
+
