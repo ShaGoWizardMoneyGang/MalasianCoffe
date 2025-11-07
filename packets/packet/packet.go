@@ -70,6 +70,7 @@ func (h *Header) append(id int) Header {
 	return new_header
 }
 
+
 type Packet struct {
 	header Header
 
