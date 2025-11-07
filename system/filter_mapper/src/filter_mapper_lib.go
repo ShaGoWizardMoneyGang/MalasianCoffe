@@ -2,9 +2,6 @@ package filter_mapper
 
 import (
 	"fmt"
-	"malasian_coffe/packets/packet"
-	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/colas"
 	"strconv"
 	"time"
 )
@@ -48,26 +45,23 @@ type FilterMapper interface {
 	// Funcion que inicializa las cosas que el filter necesita
 	Build(rabbitAddr string, queueAmount map[string]uint64)
 
-	// Devuelve referencia de la cola de la cual tiene que consumir
-	GetInput() *middleware.MessageMiddlewareQueue
-
 	// Funcio que hace el filtrado
-	Process(pkt packet.Packet) []colas.OutBoundMessage
+	Process()
 }
 
 func FilterMapperBuilder(datasetName string, rabbitAddr string, queueAmounts map[string] uint64) FilterMapper {
 	var filterMapper FilterMapper
 	switch datasetName {
-	case "transactions":
-		filterMapper = &transactionFilterMapper{}
+	// case "transactions":
+	// 	filterMapper = &transactionFilterMapper{}
 	case "stores":
 		filterMapper = &storeFilterMapper{}
-	case "users":
-		filterMapper = &userFilterMapper{}
-	case "menu_items":
-		filterMapper = &menuItemFilterMapper{}
-	case "transaction_items":
-		filterMapper = &transactionItemFilterMapper{}
+	// case "users":
+	// 	filterMapper = &userFilterMapper{}
+	// case "menu_items":
+	// 	filterMapper = &menuItemFilterMapper{}
+	// case "transaction_items":
+	// 	filterMapper = &transactionItemFilterMapper{}
 	default:
 		panic(fmt.Sprintf("Unknown 'dataset' %s", datasetName))
 	}

@@ -31,6 +31,8 @@ func filterStores(input string) []string {
 }
 
 type storeFilterMapper struct {
+	packet_channel chan packet.Packet
+
 	colaEntradaStore *middleware.MessageMiddlewareQueue
 
 	exchangeSalida3 *middleware.MessageMiddlewareExchange
@@ -39,6 +41,8 @@ type storeFilterMapper struct {
 
 func (sfm *storeFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
 	colaEntradaStore := colas.InstanceQueue("DataStores", rabbitAddr)
+
+	sfm.packet_channel = make(chan packet.Packet)
 
 	// colaSalida3 := colas.InstanceQueue("FilteredStores3", rabbitAddr)
 
@@ -52,22 +56,33 @@ func (sfm *storeFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
 	return sfm.colaEntradaStore
 }
 
-func (sfm *storeFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
-	input := pkt.GetPayload()
+func (sfm *storeFilterMapper) Process() {
+	slog.Info("Arranca procesamiento de store filter mapper")
 
-	// Ambas payloads iguales
-	mapped_stores := filterStores(input)
-	newPayload := packet.ChangePayload(pkt, mapped_stores)
-	outBoundMessage := []colas.OutBoundMessage{
-		{
-			Packet:     newPayload[0],
-			ColaSalida: sfm.exchangeSalida3,
-		},
-		{
-			Packet:     newPayload[1],
-			ColaSalida: sfm.exchangeSalida4,
-		},
+	go colas.InputQueue(sfm.colaEntradaStore, sfm.packet_channel)
+
+	for {
+		select {
+		case pkt := <-sfm.packet_channel:
+			input := pkt.GetPayload()
+			// Ambas payloads iguales
+			mapped_stores := filterStores(input)
+			newPayload := packet.ChangePayload(pkt, mapped_stores)
+			outBoundMessages := []colas.OutBoundMessage{
+				{
+					Packet:     newPayload[0],
+					ColaSalida: sfm.exchangeSalida3,
+				},
+				{
+					Packet:     newPayload[1],
+					ColaSalida: sfm.exchangeSalida4,
+				},
+			}
+			for _, outbound := range outBoundMessages {
+				cola := outbound.ColaSalida
+				packet := outbound.Packet
+				cola.Send(packet)
+			}
+		}
 	}
-
-	return outBoundMessage
 }
