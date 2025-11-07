@@ -105,7 +105,7 @@ Nuevo:
 	if pr.allReceived == false {
 		pr.buffer.Reset()
 	} else {
-		bitacora.Info(fmt.Sprintf("El packet receiver %s, recibio todos los paquetes que esperaba", pr.humanIdentifier))
+		bitacora.Info(fmt.Sprintf("El packet receiver %s, recibio todos los paquetes que esperaba. El tamano es de: %d", pr.humanIdentifier, len(pr.ordered_package)))
 	}
 
 	return pr.allReceived
