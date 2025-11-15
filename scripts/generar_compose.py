@@ -249,11 +249,12 @@ def watchdog_block(n):
     return f"""
   watchdog_{n}:
     container_name: watchdog_{n}
-    image: ubuntu:24.04
+    image: dind-dockerfile:latest
     working_dir: /app
     entrypoint: ./bin/watchdog
     volumes:
       - ./bin/watchdog:/app/bin/watchdog
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - testing_net
     depends_on:
