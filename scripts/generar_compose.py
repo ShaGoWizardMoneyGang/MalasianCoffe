@@ -27,7 +27,7 @@ networks:
     driver: bridge
 """
 
-def commons():
+def commons(sheeps):
     return """  rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:4.1.4-management
@@ -69,7 +69,7 @@ def commons():
       - server
 """
 
-def filter_transactions_block(n, queueAmount1):
+def filter_transactions_block(sheeps, n, queueAmount1):
     return f"""
   filter_transactions{n}:
     container_name: filter_transactions{n}
@@ -84,7 +84,7 @@ def filter_transactions_block(n, queueAmount1):
       - server
 """
 
-def filter_transaction_items_block(n):
+def filter_transaction_items_block(sheeps, n):
     return f"""
   filter_transaction_items{n}:
     container_name: filter_transaction_items{n}
@@ -99,7 +99,7 @@ def filter_transaction_items_block(n):
         - server
 """
 
-def filter_users_block(n, queueAmount4):
+def filter_users_block(sheeps, n, queueAmount4):
     return f"""
   filter_users{n}:
     container_name: filter_users{n}
@@ -114,7 +114,7 @@ def filter_users_block(n, queueAmount4):
       - server
 """
 
-def filter_stores_block(n, queueAmount3, queueAmount4):
+def filter_stores_block(sheeps, n, queueAmount3, queueAmount4):
     return f"""
   filter_stores{n}:
     container_name: filter_stores{n}
@@ -129,7 +129,7 @@ def filter_stores_block(n, queueAmount3, queueAmount4):
       - server
 """
 
-def filter_menu_items_block(n, queueAmount2a, queueAmount2b):
+def filter_menu_items_block(sheeps, n, queueAmount2a, queueAmount2b):
     return f"""
   filter_menu_items{n}:
     container_name: filter_menu_items{n}
@@ -144,7 +144,7 @@ def filter_menu_items_block(n, queueAmount2a, queueAmount2b):
       - server
 """
 
-def concat_block(n):
+def concat_block(sheeps, n):
     routing_key = int(n) - 1
     return f"""
   concat_{n}:
@@ -161,7 +161,7 @@ def concat_block(n):
       - rabbitmq
 """
 
-def sender_block(n, query):
+def sender_block(sheeps, n, query):
     return f"""
   sender{query}_{n}:
     container_name: sender{query}_{n}
@@ -178,7 +178,8 @@ def sender_block(n, query):
       - "host.docker.internal:host-gateway"
 """
 
-def counter_block(n, query, queueAmount):
+
+def counter_block(sheeps, n, query, queueAmount):
     return f"""
   counter{query}_{n}:
     container_name: counter{query}_{n}
@@ -193,7 +194,7 @@ def counter_block(n, query, queueAmount):
       - server
 """
 
-def global_aggregator_block(n, query, queueAmount):
+def global_aggregator_block(sheeps, n, query, queueAmount):
     routing_key = int(n) - 1
     return f"""
   global_aggregator{query}_{n}:
@@ -209,7 +210,7 @@ def global_aggregator_block(n, query, queueAmount):
       - server
 """
 
-def joiner_block(n, query):
+def joiner_block(sheeps, n, query):
     routing_key = int(n) - 1
 
     return f"""
@@ -226,7 +227,7 @@ def joiner_block(n, query):
       - server
 """
 
-def partial_aggregator_block(n, query, queueAmount):
+def partial_aggregator_block(sheeps, n, query, queueAmount):
     routing_key = int(n) - 1
     return f"""
   partial_aggregator{query}_{n}:
@@ -330,6 +331,7 @@ def main():
     if external:
         output_file = "docker-compose-gen-external.yml"
 
+    sheeps = open("sheeps.txt", "w")
     with open(output_file, 'w') as file:
         file.write(header())
         if external == False:

@@ -10,6 +10,7 @@ import (
 	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
+	"malasian_coffe/system/watchdog"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
 )
@@ -128,6 +129,9 @@ func (jq4 *joinerQuery4) Process() {
 	go colas.InputQueue(jq4.colaUsersInput, jq4.inputChannel)
 
 	go colas.InputQueue(jq4.colaAggTransInput, jq4.inputChannel)
+
+	watchdog := watchdog.CreateWatchdogListener()
+	go watchdog.Listen()
 
 	for {
 		select {

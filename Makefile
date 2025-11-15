@@ -57,7 +57,7 @@ run-global-aggregator: build-global-aggregator
 
 #============================== Build directives ===============================
 # Poner en order
-build: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4
+build: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4 build-watchdog
 build-server:
 	cd system; go build -o ${BINDIR}/server
 
@@ -87,6 +87,9 @@ build-partial-aggregator:
 
 build-global-aggregator:
 	cd system/global_aggregator; go build -o ${BINDIR}/global_aggregator
+
+build-watchdog:
+	cd system/watchdog; go build -o ${BINDIR}/watchdog
 
 build-test-output-query-4:
 	go build -o ${current_dir}/bin/test_output_query_4 ./test_output_query4/test_output_query4.go
