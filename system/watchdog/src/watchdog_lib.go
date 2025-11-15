@@ -3,6 +3,7 @@ package watchdog
 import (
 	"fmt"
 	"net"
+	"os"
 )
 
 const (
@@ -14,7 +15,22 @@ type WatchdogListener struct {
 }
 
 // ============================= USED BY WORKER ================================
-func pong() {
+func (wl *WatchdogListener) Pong(responseIP string) {
+	responseAddress := responseIP + ":" + fmt.Sprint(HEALTHCHECK_PORT)
+	fmt.Println(responseAddress)
+	conn, err := net.Dial("udp", responseAddress)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al conectar con %s: %v\n", responseAddress, err)
+		return
+	}
+	defer conn.Close()
+
+	_, err = conn.Write([]byte{0x01})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al enviar datos: %v\n", err)
+		return
+	}
+	fmt.Println("Joiner 4 envió PONG al watchdog")
 }
 
 // Aca creas el SocketUDP
@@ -36,12 +52,12 @@ func (wl *WatchdogListener) Listen(infoChan chan<- string) {
 
 	buffer := make([]byte, 1024)
 	for {
-		_, _, err := wl.Conn.ReadFromUDP(buffer)
+		_, addr, err := wl.Conn.ReadFromUDP(buffer)
 		if err != nil {
 			continue
 		}
-		fmt.Printf("Received: %s\n", string(buffer))
-		infoChan <- "ping"
+		fmt.Printf("Joiner 4 recibió PING del watchdog: %s\n", string(buffer))
+		infoChan <- addr.String()
 	}
 }
 
