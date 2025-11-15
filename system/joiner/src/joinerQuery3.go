@@ -8,6 +8,7 @@ import (
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
@@ -15,7 +16,7 @@ import (
 )
 
 type joinerQuery3 struct {
-	inputChannel chan packet.Packet
+	inputChannel chan colas.PacketMessage
 
 	outputChannel chan packet.Packet
 
@@ -28,17 +29,18 @@ type joinerQuery3 struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	storeReceiver := packet.NewPacketReceiver("Stores")
+func joinQuery3(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	storeReceiver := packet_receiver.NewPacketReceiver("Stores")
 
-	transactionReceiver := packet.NewPacketReceiver("Transactions")
+	transactionReceiver := packet_receiver.NewPacketReceiver("Transactions")
 
 	var joinedTransactions strings.Builder
 
 	var last_packet packet.Packet
 
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -47,9 +49,9 @@ func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 		}
 
 		if dataset_name == "stores" {
-			storeReceiver.ReceivePacket(pkt)
+			storeReceiver.ReceivePacket(pktMsg)
 		} else if dataset_name == "transactions" {
-			transactionReceiver.ReceivePacket(pkt)
+			transactionReceiver.ReceivePacket(pktMsg)
 		} else {
 			panic(fmt.Errorf("JoinerQuery3 received packet from dataset that was not expecting: %s", dataset_name))
 		}
@@ -74,7 +76,7 @@ func joinQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 }
 
 func (jq3 *joinerQuery3) Build(rabbitAddr string, routingKey string) {
-	jq3.inputChannel = make(chan packet.Packet)
+	jq3.inputChannel = make(chan colas.PacketMessage)
 	jq3.outputChannel = make(chan packet.Packet)
 
 	print("[joiner] buildeo con routing key: ", routingKey)
@@ -103,7 +105,7 @@ func (jq3 *joinerQuery3) Process() {
 	}
 }
 
-func joinerFunctionQuery3(storeReceiver packet.PacketReceiver, transactionReceiver packet.PacketReceiver, joinedTransactions *strings.Builder) {
+func joinerFunctionQuery3(storeReceiver packet_receiver.PacketReceiver, transactionReceiver packet_receiver.PacketReceiver, joinedTransactions *strings.Builder) {
 	storeMap := createStoreMap(storeReceiver)
 
 	transactions := transactionReceiver.GetPayload()

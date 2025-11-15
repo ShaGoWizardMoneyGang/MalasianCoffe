@@ -7,6 +7,7 @@ import (
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
@@ -14,7 +15,7 @@ import (
 )
 
 type joinerQuery4 struct {
-	inputChannel   chan packet.Packet
+	inputChannel   chan colas.PacketMessage
 
 	outputChannel   chan packet.Packet
 
@@ -28,7 +29,7 @@ type joinerQuery4 struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func createUserMap(userReceiver packet.PacketReceiver) map[string]string {
+func createUserMap(userReceiver packet_receiver.PacketReceiver) map[string]string {
 	storePkt := userReceiver.GetPayload()
 	lines := strings.Split(storePkt, "\n")
 	lines = lines[:len(lines)-1]
@@ -46,14 +47,14 @@ func createUserMap(userReceiver packet.PacketReceiver) map[string]string {
 	return storeID2Name
 }
 
-func joinQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	storeReceiver := packet.NewPacketReceiver("Store")
+func joinQuery4(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	storeReceiver := packet_receiver.NewPacketReceiver("Store")
 
-	userReceiver := packet.NewPacketReceiver("User")
+	userReceiver := packet_receiver.NewPacketReceiver("User")
 
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
 	// stores. Deberian ser pocos (si es que existen)
-	transactionReceiver := packet.NewPacketReceiver("Transactions")
+	transactionReceiver := packet_receiver.NewPacketReceiver("Transactions")
 
 	// Resultado final
 	var joinedTransactions strings.Builder
@@ -63,7 +64,8 @@ func joinQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 	var last_packet packet.Packet
 
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -72,11 +74,11 @@ func joinQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 		}
 
 		if dataset_name == "stores" {
-			storeReceiver.ReceivePacket(pkt)
+			storeReceiver.ReceivePacket(pktMsg)
 		} else if dataset_name == "users" {
-			userReceiver.ReceivePacket(pkt)
+			userReceiver.ReceivePacket(pktMsg)
 		} else if dataset_name == "transactions" {
-			transactionReceiver.ReceivePacket(pkt)
+			transactionReceiver.ReceivePacket(pktMsg)
 
 		} else {
 			bitacora.Error(fmt.Sprintf("JoinerQuery4 received packet from dataset that was not expecting: %s", dataset_name))
@@ -104,7 +106,7 @@ func joinQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.P
 }
 
 func (jq4 *joinerQuery4) Build(rabbitAddr string, routingKey string) {
-	jq4.inputChannel          = make(chan packet.Packet)
+	jq4.inputChannel          = make(chan colas.PacketMessage)
 
 	jq4.outputChannel         = make(chan packet.Packet)
 
@@ -137,7 +139,7 @@ func (jq4 *joinerQuery4) Process() {
 	}
 }
 
-func joinerFunctionQuery4(storeReceiver packet.PacketReceiver, userReceiver packet.PacketReceiver, transactionReceiver packet.PacketReceiver, joinedTransactions *strings.Builder) {
+func joinerFunctionQuery4(storeReceiver packet_receiver.PacketReceiver, userReceiver packet_receiver.PacketReceiver, transactionReceiver packet_receiver.PacketReceiver, joinedTransactions *strings.Builder) {
 	userMap := createUserMap(userReceiver)
 	storeMap := createStoreMap(storeReceiver)
 

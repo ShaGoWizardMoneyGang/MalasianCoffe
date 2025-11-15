@@ -8,6 +8,7 @@ import (
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
@@ -15,7 +16,7 @@ import (
 )
 
 type joinerQuery2a struct {
-	inputChannel chan packet.Packet
+	inputChannel chan colas.PacketMessage
 
 	outputChannel chan packet.Packet
 
@@ -28,17 +29,18 @@ type joinerQuery2a struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func joinQuery2a(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	menuItemReceiver := packet.NewPacketReceiver("Menu items")
+func joinQuery2a(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	menuItemReceiver := packet_receiver.NewPacketReceiver("Menu items")
 
-	transactionItemReceiver := packet.NewPacketReceiver("Transaction items")
+	transactionItemReceiver := packet_receiver.NewPacketReceiver("Transaction items")
 
 	var joinedTransactionItems strings.Builder
 
 	var last_packet packet.Packet
 
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt    := pktMsg.Packet
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -47,9 +49,9 @@ func joinQuery2a(inputChannel <-chan packet.Packet, outputChannel chan<- packet.
 		}
 
 		if dataset_name == "menu_items" {
-			menuItemReceiver.ReceivePacket(pkt)
+			menuItemReceiver.ReceivePacket(pktMsg)
 		} else if dataset_name == "transaction_items" {
-			transactionItemReceiver.ReceivePacket(pkt)
+			transactionItemReceiver.ReceivePacket(pktMsg)
 		} else {
 			panic(fmt.Errorf("JoinerQuery2a received packet from dataset that was not expecting: %s", dataset_name))
 		}
@@ -74,7 +76,7 @@ func joinQuery2a(inputChannel <-chan packet.Packet, outputChannel chan<- packet.
 }
 
 func (jq2a *joinerQuery2a) Build(rabbitAddr string, routingKey string) {
-	jq2a.inputChannel = make(chan packet.Packet)
+	jq2a.inputChannel = make(chan colas.PacketMessage)
 	jq2a.outputChannel = make(chan packet.Packet)
 
 	jq2a.colaMenuItemsInput = colas.InstanceQueueRouted("FilteredMenuItems2a", rabbitAddr, routingKey)
@@ -102,7 +104,7 @@ func (jq2a *joinerQuery2a) Process() {
 	}
 }
 
-func joinerFunctionQuery2a(menuItemReceiver packet.PacketReceiver, transactionItemReceiver packet.PacketReceiver, joinedTransactionItems *strings.Builder) {
+func joinerFunctionQuery2a(menuItemReceiver packet_receiver.PacketReceiver, transactionItemReceiver packet_receiver.PacketReceiver, joinedTransactionItems *strings.Builder) {
 	menuItemMap := createMenuItemMap(menuItemReceiver)
 
 	transactionItems := transactionItemReceiver.GetPayload()

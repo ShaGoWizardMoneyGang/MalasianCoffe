@@ -3,6 +3,7 @@ package global_aggregator
 import (
 	"fmt"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
@@ -17,7 +18,7 @@ type keyQuery3 struct {
 }
 
 type aggregator3Global struct {
-	inputChannel  chan packet.Packet
+	inputChannel  chan colas.PacketMessage
 	outputChannel chan packet.Packet
 
 	colaEntrada    *middleware.MessageMiddlewareQueue
@@ -28,7 +29,7 @@ type aggregator3Global struct {
 
 func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
 	// fmt.Printf("OUTS: %v\n", outs)
-	g.inputChannel = make(chan packet.Packet)
+	g.inputChannel = make(chan colas.PacketMessage)
 	g.outputChannel = make(chan packet.Packet)
 
 	g.colaEntrada = colas.InstanceQueueRouted("PartialAggregations3", rabbitAddr, routing_key)
@@ -37,16 +38,17 @@ func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs ma
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery3, g.outputChannel)
 }
 
-func aggregateQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	localReceiver := packet.NewPacketReceiver("Agregador global 3")
+func aggregateQuery3(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("Agregador global 3")
 	localAcc := make(map[keyQuery3]float64)
 
 	var last_packet packet.Packet
 
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
 
-		localReceiver.ReceivePacket(pkt)
+		localReceiver.ReceivePacket(pktMsg)
 
 		if localReceiver.ReceivedAll() {
 			last_packet = pkt
@@ -81,7 +83,7 @@ func aggregateQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- pac
 	}
 
 	// if len(localAcc) == 0 {
-	// 	localReceiver = packet.NewPacketReceiver("Agregador global 3")
+	// 	localReceiver = packet_receiver.NewPacketReceiver("Agregador global 3")
 	// 	continue
 	// }
 

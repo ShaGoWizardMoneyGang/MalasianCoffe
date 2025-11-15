@@ -8,6 +8,7 @@ import (
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
@@ -20,7 +21,7 @@ type keyQuery2a struct {
 }
 
 type aggregator2aGlobal struct {
-	inputChannel  chan packet.Packet
+	inputChannel  chan colas.PacketMessage
 	outputChannel chan packet.Packet
 
 	colaEntrada *middleware.MessageMiddlewareQueue
@@ -31,7 +32,7 @@ type aggregator2aGlobal struct {
 }
 
 func (g *aggregator2aGlobal) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
-	g.inputChannel = make(chan packet.Packet)
+	g.inputChannel = make(chan colas.PacketMessage)
 	g.outputChannel = make(chan packet.Packet)
 
 	g.colaEntrada = colas.InstanceQueueRouted("CountedItems2a", rabbitAddr, routing_key)
@@ -41,8 +42,8 @@ func (g *aggregator2aGlobal) Build(rabbitAddr string, routing_key string, outs m
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery2a, g.outputChannel)
 }
 
-func aggregateQuery2a(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	localReceiver := packet.NewPacketReceiver("Agregador global 2a")
+func aggregateQuery2a(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("Agregador global 2a")
 	localAcc := make(map[keyQuery2a]int64)
 
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
@@ -50,9 +51,10 @@ func aggregateQuery2a(inputChannel <-chan packet.Packet, outputChannel chan<- pa
 	var last_packet packet.Packet
 
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
 
-		localReceiver.ReceivePacket(pkt)
+		localReceiver.ReceivePacket(pktMsg)
 
 		if localReceiver.ReceivedAll() {
 			last_packet = pkt
@@ -89,7 +91,7 @@ func aggregateQuery2a(inputChannel <-chan packet.Packet, outputChannel chan<- pa
 
 	// QUESTION: No entiendo esto. Para que continuabamos?
 	// if len(localAcc) == 0 {
-	// 	localReceiver = packet.NewPacketReceiver("Agregador global 2a")
+	// 	localReceiver = packet_receiver.NewPacketReceiver("Agregador global 2a")
 	// 	continue
 	// }
 

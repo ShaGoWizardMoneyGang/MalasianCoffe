@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 
@@ -15,7 +16,7 @@ import (
 )
 
 type aggregator4Global struct {
-	inputChannel  chan packet.Packet
+	inputChannel  chan colas.PacketMessage
 	outputChannel chan packet.Packet
 
 	colaEntrada    *middleware.MessageMiddlewareQueue
@@ -25,7 +26,7 @@ type aggregator4Global struct {
 }
 
 func (g *aggregator4Global) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
-	g.inputChannel = make(chan packet.Packet)
+	g.inputChannel = make(chan colas.PacketMessage)
 	g.outputChannel = make(chan packet.Packet)
 
 	fmt.Printf("ROUTING KEY %s\n", routing_key)
@@ -99,16 +100,17 @@ func buildOutput(localAcc map[string]map[string]uint64) string {
 	return b.String()
 }
 
-func aggregateQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	localReceiver := packet.NewPacketReceiver("Agregador global 4")
+func aggregateQuery4(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("Agregador global 4")
 	localAcc := make(map[string]map[string]uint64)
 
 	var last_packet packet.Packet
 
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
 
-		localReceiver.ReceivePacket(pkt)
+		localReceiver.ReceivePacket(pktMsg)
 
 		if localReceiver.ReceivedAll() {
 			last_packet = pkt

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
@@ -19,7 +20,7 @@ type keyQuery2b struct {
 }
 
 type aggregator2bGlobal struct {
-	inputChannel  chan packet.Packet
+	inputChannel  chan colas.PacketMessage
 	outputChannel chan packet.Packet
 
 	colaEntrada    *middleware.MessageMiddlewareQueue
@@ -29,7 +30,7 @@ type aggregator2bGlobal struct {
 }
 
 func (g *aggregator2bGlobal) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
-	g.inputChannel = make(chan packet.Packet)
+	g.inputChannel = make(chan colas.PacketMessage)
 	g.outputChannel = make(chan packet.Packet)
 
 	g.colaEntrada = colas.InstanceQueueRouted("CountedItems2b", rabbitAddr, routing_key)
@@ -39,17 +40,18 @@ func (g *aggregator2bGlobal) Build(rabbitAddr string, routing_key string, outs m
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateSessionQuery2b, g.outputChannel)
 }
 
-func aggregateSessionQuery2b(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	localReceiver := packet.NewPacketReceiver("Agregador global 2b")
+func aggregateSessionQuery2b(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("Agregador global 2b")
 	localAcc := make(map[keyQuery2b]float64)
 
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
 	// jugosa metadata
 	var last_packet packet.Packet
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
 
-		localReceiver.ReceivePacket(pkt)
+		localReceiver.ReceivePacket(pktMsg)
 
 		if localReceiver.ReceivedAll() {
 			last_packet = pkt
@@ -85,7 +87,7 @@ func aggregateSessionQuery2b(inputChannel <-chan packet.Packet, outputChannel ch
 	}
 
 	// if len(localAcc) == 0 {
-	// 	localReceiver = packet.NewPacketReceiver("Agregador global 2b")
+	// 	localReceiver = packet_receiver.NewPacketReceiver("Agregador global 2b")
 	// 	continue
 	// }
 
@@ -126,7 +128,7 @@ func aggregateSessionQuery2b(inputChannel <-chan packet.Packet, outputChannel ch
 	// }
 
 	// localAcc = make(map[keyQuery2b]float64)
-	// localReceiver = packet.NewPacketReceiver("Agregador global 2b")
+	// localReceiver = packet_receiver.NewPacketReceiver("Agregador global 2b")
 }
 
 func (g *aggregator2bGlobal) Process() {
