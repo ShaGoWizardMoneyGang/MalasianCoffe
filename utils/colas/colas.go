@@ -3,7 +3,6 @@ package colas
 import (
 	"bytes"
 	"fmt"
-	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
@@ -12,12 +11,12 @@ import (
 )
 
 type OutBoundMessage struct {
-	Packet packet.Packet
+	Packet     packet.Packet
 	ColaSalida middleware.MessageMiddleware
 }
 
 type PacketMessage struct {
-	Packet packet.Packet
+	Packet  packet.Packet
 	Message amqp.Delivery
 }
 
@@ -64,13 +63,14 @@ func InputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- Pa
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
-		err := message.Ack(false)
+		//No tenemos que ack dos veces
+		/*err := message.Ack(false)
 		if err != nil {
 			bitacora.Error(fmt.Errorf("Could not ack, %w", err).Error())
-		}
+		}*/
 
-		packet_message := PacketMessage {
-			Packet: pkt,
+		packet_message := PacketMessage{
+			Packet:  pkt,
 			Message: message,
 		}
 
