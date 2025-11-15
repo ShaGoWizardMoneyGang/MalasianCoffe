@@ -10,7 +10,7 @@ import (
 	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
-	"malasian_coffe/system/watchdog"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
 )
@@ -131,7 +131,8 @@ func (jq4 *joinerQuery4) Process() {
 	go colas.InputQueue(jq4.colaAggTransInput, jq4.inputChannel)
 
 	watchdog := watchdog.CreateWatchdogListener()
-	go watchdog.Listen()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
 
 	for {
 		select {
@@ -139,6 +140,8 @@ func (jq4 *joinerQuery4) Process() {
 			jq4.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq4.outputChannel:
 			jq4.colaSalidaQuery4.Send(packetJoineado)
+		case <-healthcheckChannel:
+			fmt.Println("Joiner Query4 received healthcheck ping")
 		}
 	}
 }
