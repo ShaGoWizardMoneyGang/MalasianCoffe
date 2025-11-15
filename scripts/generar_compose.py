@@ -335,38 +335,38 @@ def main():
     with open(output_file, 'w') as file:
         file.write(header())
         if external == False:
-            file.write(commons())
-        file.writelines(filter_transactions_block(i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
-        file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
-        file.writelines(filter_users_block(i, configs["joiner4"]) for i in range(1, configs.get("filter-users", 0) + 1))
-        file.writelines(filter_stores_block(i, configs["joiner3"], configs["joiner4"]) for i in range(1, configs.get("filter-stores", 0) + 1))
-        file.writelines(filter_menu_items_block(i, configs["joiner2a"], configs["joiner2b"]) for i in range(1, configs.get("filter-menu-items", 0) + 1))
+            file.write(commons(sheeps))
+        file.writelines(filter_transactions_block(sheeps, i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
+        file.writelines(filter_transaction_items_block(sheeps, i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
+        file.writelines(filter_users_block(sheeps, i, configs["joiner4"]) for i in range(1, configs.get("filter-users", 0) + 1))
+        file.writelines(filter_stores_block(sheeps, i, configs["joiner3"], configs["joiner4"]) for i in range(1, configs.get("filter-stores", 0) + 1))
+        file.writelines(filter_menu_items_block(sheeps, i, configs["joiner2a"], configs["joiner2b"]) for i in range(1, configs.get("filter-menu-items", 0) + 1))
         
 
         
-        file.writelines(concat_block(i) for i in range(1, configs.get("concat1", 0) + 1))
+        file.writelines(concat_block(sheeps, i) for i in range(1, configs.get("concat1", 0) + 1))
         
-        file.writelines(sender_block(i, "1") for i in range(1, configs.get("sender1", 0) + 1))
-        file.writelines(sender_block(i, "2a") for i in range(1, configs.get("sender2a", 0) + 1))
-        file.writelines(sender_block(i, "2b") for i in range(1, configs.get("sender2b", 0) + 1))
-        file.writelines(sender_block(i, "3") for i in range(1, configs.get("sender3", 0) + 1))
-        file.writelines(sender_block(i, "4") for i in range(1, configs.get("sender4", 0) + 1))
+        file.writelines(sender_block(sheeps, i, "1") for i in range(1, configs.get("sender1", 0) + 1))
+        file.writelines(sender_block(sheeps, i, "2a") for i in range(1, configs.get("sender2a", 0) + 1))
+        file.writelines(sender_block(sheeps, i, "2b") for i in range(1, configs.get("sender2b", 0) + 1))
+        file.writelines(sender_block(sheeps, i, "3") for i in range(1, configs.get("sender3", 0) + 1))
+        file.writelines(sender_block(sheeps, i, "4") for i in range(1, configs.get("sender4", 0) + 1))
         
-        file.writelines(counter_block(i, "2a", configs["global-aggregator2a"]) for i in range(1, configs.get("counter2a", 0) + 1))
-        file.writelines(counter_block(i, "2b", configs["global-aggregator2b"]) for i in range(1, configs.get("counter2b", 0) + 1))
-        file.writelines(counter_block(i, "4", configs["global-aggregator4"]) for i in range(1, configs.get("counter4", 0) + 1))
+        file.writelines(counter_block(sheeps, i, "2a", configs["global-aggregator2a"]) for i in range(1, configs.get("counter2a", 0) + 1))
+        file.writelines(counter_block(sheeps, i, "2b", configs["global-aggregator2b"]) for i in range(1, configs.get("counter2b", 0) + 1))
+        file.writelines(counter_block(sheeps, i, "4", configs["global-aggregator4"]) for i in range(1, configs.get("counter4", 0) + 1))
 
-        file.writelines(global_aggregator_block(i, "2a", configs["joiner2a"]) for i in range(1, configs.get("global-aggregator2a", 0) + 1))
-        file.writelines(global_aggregator_block(i, "2b", configs["joiner2b"]) for i in range(1, configs.get("global-aggregator2b", 0) + 1))
-        file.writelines(global_aggregator_block(i, "3", configs["joiner3"]) for i in range(1, configs.get("global-aggregator3", 0) + 1))
-        file.writelines(global_aggregator_block(i, "4", configs["joiner4"]) for i in range(1, configs.get("global-aggregator4", 0) + 1))
+        file.writelines(global_aggregator_block(sheeps, i, "2a", configs["joiner2a"]) for i in range(1, configs.get("global-aggregator2a", 0) + 1))
+        file.writelines(global_aggregator_block(sheeps, i, "2b", configs["joiner2b"]) for i in range(1, configs.get("global-aggregator2b", 0) + 1))
+        file.writelines(global_aggregator_block(sheeps, i, "3", configs["joiner3"]) for i in range(1, configs.get("global-aggregator3", 0) + 1))
+        file.writelines(global_aggregator_block(sheeps, i, "4", configs["joiner4"]) for i in range(1, configs.get("global-aggregator4", 0) + 1))
 
-        file.writelines(joiner_block(i, "2a") for i in range(1, configs.get("joiner2a", 0) + 1))
-        file.writelines(joiner_block(i, "2b") for i in range(1, configs.get("joiner2b", 0) + 1))
-        file.writelines(joiner_block(i, "3") for i in range(1, configs.get("joiner3", 0) + 1))
-        file.writelines(joiner_block(i, "4") for i in range(1, configs.get("joiner4", 0) + 1))
+        file.writelines(joiner_block(sheeps, i, "2a") for i in range(1, configs.get("joiner2a", 0) + 1))
+        file.writelines(joiner_block(sheeps, i, "2b") for i in range(1, configs.get("joiner2b", 0) + 1))
+        file.writelines(joiner_block(sheeps, i, "3") for i in range(1, configs.get("joiner3", 0) + 1))
+        file.writelines(joiner_block(sheeps, i, "4") for i in range(1, configs.get("joiner4", 0) + 1))
 
-        file.writelines(partial_aggregator_block(i, "3", configs["global-aggregator3"]) for i in range(1, configs.get("partial-aggregator3", 0) + 1))
+        file.writelines(partial_aggregator_block(sheeps, i, "3", configs["global-aggregator3"]) for i in range(1, configs.get("partial-aggregator3", 0) + 1))
 
         for i in range(1, configs.get("cliente", 0) + 1):
             client_line = client(i, external)

@@ -16,15 +16,15 @@ import (
 )
 
 type joinerQuery4 struct {
-	inputChannel   chan colas.PacketMessage
+	inputChannel chan colas.PacketMessage
 
-	outputChannel   chan packet.Packet
+	outputChannel chan packet.Packet
 
 	colaStoresInput   *middleware.MessageMiddlewareQueue
 	colaUsersInput    *middleware.MessageMiddlewareQueue
 	colaAggTransInput *middleware.MessageMiddlewareQueue
 
-	colaSalidaQuery4  *middleware.MessageMiddlewareQueue
+	colaSalidaQuery4 *middleware.MessageMiddlewareQueue
 
 	// Tenemos una go routine por cada session
 	sessionHandler sessionhandler.SessionHandler
@@ -107,19 +107,19 @@ func joinQuery4(inputChannel <-chan colas.PacketMessage, outputChannel chan<- pa
 }
 
 func (jq4 *joinerQuery4) Build(rabbitAddr string, routingKey string) {
-	jq4.inputChannel          = make(chan colas.PacketMessage)
+	jq4.inputChannel = make(chan colas.PacketMessage)
 
-	jq4.outputChannel         = make(chan packet.Packet)
+	jq4.outputChannel = make(chan packet.Packet)
 
-	jq4.colaStoresInput       = colas.InstanceQueueRouted("FilteredStores4", rabbitAddr, routingKey)
+	jq4.colaStoresInput = colas.InstanceQueueRouted("FilteredStores4", rabbitAddr, routingKey)
 
-	jq4.colaUsersInput        = colas.InstanceQueueRouted("FilteredUsers4", rabbitAddr, routingKey)
+	jq4.colaUsersInput = colas.InstanceQueueRouted("FilteredUsers4", rabbitAddr, routingKey)
 
-	jq4.colaAggTransInput     = colas.InstanceQueueRouted("GlobalAggregation4", rabbitAddr, routingKey)
+	jq4.colaAggTransInput = colas.InstanceQueueRouted("GlobalAggregation4", rabbitAddr, routingKey)
 
-	jq4.colaSalidaQuery4      = colas.InstanceQueue("SalidaQuery4", rabbitAddr)
+	jq4.colaSalidaQuery4 = colas.InstanceQueue("SalidaQuery4", rabbitAddr)
 
-	jq4.sessionHandler        = sessionhandler.NewSessionHandler(joinQuery4, jq4.outputChannel)
+	jq4.sessionHandler = sessionhandler.NewSessionHandler(joinQuery4, jq4.outputChannel)
 
 }
 
