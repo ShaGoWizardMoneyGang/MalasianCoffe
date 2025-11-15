@@ -6,16 +6,15 @@ const (
 
 type WatchdogListener struct {
 	// Socket UDP
-// net.UDPConn
+	// net.UDPConn
 }
 
 // ============================= USED BY WORKER ================================
 func pong() {
 }
 
-
 // Aca creas el SocketUDP
-func CreateWatchdogListener() WatchdogListener  {
+func CreateWatchdogListener() WatchdogListener {
 	return WatchdogListener{}
 }
 
@@ -26,5 +25,3 @@ func (wl *WatchdogListener) Listen() {
 // ============================= WATCHDOG LOGIC ================================
 func ping() {
 }
-
-
