@@ -5,6 +5,7 @@ import (
 	watchdog "malasian_coffe/system/watchdog/src"
 	"net"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -43,4 +44,28 @@ func main() {
 		return
 	}
 	fmt.Println("Se envió 1 byte a través de la conexión UDP")
+
+	fmt.Println("Ahora reinicio el container del joiner")
+	for {
+		cmd := exec.Command("sh", "-c", "docker stop joiner4_1")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error al reiniciar el contenedor: %v\n", err)
+			continue
+		}
+		fmt.Printf("Salida del comando: %s\n", string(output))
+
+		time.Sleep(5 * time.Second) // Esperar 5 segundos antes de reiniciar
+
+		cmd = exec.Command("sh", "-c", "docker start joiner4_1")
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error al reiniciar el contenedor: %v\n", err)
+			continue
+		}
+		fmt.Printf("Salida del comando: %s\n", string(output))
+
+		time.Sleep(5 * time.Second) // Esperar 5 segundos antes de reiniciar
+
+	}
 }
