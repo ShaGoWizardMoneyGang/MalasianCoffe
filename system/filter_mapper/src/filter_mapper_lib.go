@@ -52,16 +52,16 @@ type FilterMapper interface {
 func FilterMapperBuilder(datasetName string, rabbitAddr string, queueAmounts map[string] uint64) FilterMapper {
 	var filterMapper FilterMapper
 	switch datasetName {
-	// case "transactions":
-	// 	filterMapper = &transactionFilterMapper{}
+	case "transactions":
+		filterMapper = &transactionFilterMapper{}
 	case "stores":
 		filterMapper = &storeFilterMapper{}
-	// case "users":
-	// 	filterMapper = &userFilterMapper{}
-	// case "menu_items":
-	// 	filterMapper = &menuItemFilterMapper{}
-	// case "transaction_items":
-	// 	filterMapper = &transactionItemFilterMapper{}
+	case "users":
+		filterMapper = &userFilterMapper{}
+	case "menu_items":
+		filterMapper = &menuItemFilterMapper{}
+	case "transaction_items":
+		filterMapper = &transactionItemFilterMapper{}
 	default:
 		panic(fmt.Sprintf("Unknown 'dataset' %s", datasetName))
 	}

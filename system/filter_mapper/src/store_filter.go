@@ -40,13 +40,9 @@ type storeFilterMapper struct {
 }
 
 func (sfm *storeFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
-	colaEntradaStore := colas.InstanceQueue("DataStores", rabbitAddr)
-
 	sfm.packet_channel = make(chan colas.PacketMessage)
 
-	// colaSalida3 := colas.InstanceQueue("FilteredStores3", rabbitAddr)
-
-	sfm.colaEntradaStore = colaEntradaStore
+	sfm.colaEntradaStore = colas.InstanceQueue("DataStores", rabbitAddr)
 
 	sfm.exchangeSalida3 = colas.InstanceExchange("FilteredStores3", rabbitAddr, queueAmount["queue3"])
 	sfm.exchangeSalida4 = colas.InstanceExchange("FilteredStores4", rabbitAddr, queueAmount["queue4"])
@@ -65,7 +61,6 @@ func (sfm *storeFilterMapper) Process() {
 		select {
 		case pkt_message := <-sfm.packet_channel:
 			pkt := pkt_message.Packet
-
 			message := pkt_message.Message
 
 			input := pkt.GetPayload()
