@@ -43,9 +43,32 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error al enviar datos: %v\n", err)
 		return
 	}
-	fmt.Println("Se envió 1 byte a través de la conexión UDP")
+	fmt.Println("Se envió 1 byte a través de la conexión UDP desde el Watchdog a Joiner4")
+
+	healthcheckChannel := make(chan string)
+
+	addr := net.UDPAddr{
+		Port: watchdog.HEALTHCHECK_PORT,
+		IP:   net.ParseIP("0.0.0.0"),
+	}
+	connListen, err := net.ListenUDP("udp", &addr)
+	if err != nil {
+		panic(err)
+	}
+	defer connListen.Close()
+
+	buffer := make([]byte, 1024)
+	for {
+		_, _, err := connListen.ReadFromUDP(buffer)
+		if err != nil {
+			continue
+		}
+		fmt.Printf("Watchdog recibió PONG del Joiner 4: %s\n", string(buffer))
+		healthcheckChannel <- "ping"
+	}
 
 	fmt.Println("Ahora reinicio el container del joiner")
+	// logica para reiniciar el contenedor
 	for {
 		cmd := exec.Command("sh", "-c", "docker stop joiner4_1")
 		output, err := cmd.CombinedOutput()
@@ -66,6 +89,5 @@ func main() {
 		fmt.Printf("Salida del comando: %s\n", string(output))
 
 		time.Sleep(5 * time.Second) // Esperar 5 segundos antes de reiniciar
-
 	}
 }

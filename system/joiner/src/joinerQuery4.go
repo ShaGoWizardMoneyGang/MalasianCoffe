@@ -140,8 +140,10 @@ func (jq4 *joinerQuery4) Process() {
 			jq4.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq4.outputChannel:
 			jq4.colaSalidaQuery4.Send(packetJoineado)
-		case <-healthcheckChannel:
-			fmt.Println("Joiner Query4 received healthcheck ping")
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Joiner Query4 received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 	}
 }
