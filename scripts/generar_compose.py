@@ -211,6 +211,8 @@ def global_aggregator_block(sheeps, n, query, queueAmount):
 """
 
 def joiner_block(sheeps, n, query):
+    sheeps.write(f"joiner{query}\n")
+
     routing_key = int(n) - 1
 
     return f"""
@@ -237,6 +239,21 @@ def partial_aggregator_block(sheeps, n, query, queueAmount):
     entrypoint: ./bin/partial_aggregator rabbitmq:5672 Query{query} 1 queue:{queueAmount}
     volumes:
       - ./bin/partial_aggregator:/app/bin/partial_aggregator
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
+
+def watchdog_block(n):
+    return f"""
+  watchdog_{n}:
+    container_name: watchdog_{n}
+    image: ubuntu:24.04
+    working_dir: /app
+    entrypoint: ./bin/watchdog
+    volumes:
+      - ./bin/watchdog:/app/bin/watchdog
     networks:
       - testing_net
     depends_on:
@@ -331,11 +348,12 @@ def main():
     if external:
         output_file = "docker-compose-gen-external.yml"
 
-    sheeps = open("sheeps.txt", "w")
+    sheeps = open("sheeps.txt", "a")
     with open(output_file, 'w') as file:
         file.write(header())
         if external == False:
             file.write(commons(sheeps))
+        file.writelines(watchdog_block(i) for i in range(1, configs.get("watchdog", 0) + 1))
         file.writelines(filter_transactions_block(sheeps, i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
         file.writelines(filter_transaction_items_block(sheeps, i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
         file.writelines(filter_users_block(sheeps, i, configs["joiner4"]) for i in range(1, configs.get("filter-users", 0) + 1))

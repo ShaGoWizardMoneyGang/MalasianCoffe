@@ -8,23 +8,23 @@ import (
 )
 
 type SessionHandler struct {
-	outputChannel      chan<- packet.Packet
+	outputChannel chan<- packet.Packet
 
-	sessionMap         map[string](chan colas.PacketMessage)
+	sessionMap map[string](chan colas.PacketMessage)
 
-	associatedFunction func(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) ()
+	associatedFunction func(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet)
 }
 
-func NewSessionHandler(sessionFunction func(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) (),
-				   outputChannel chan<- packet.Packet) SessionHandler {
+func NewSessionHandler(sessionFunction func(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet),
+	outputChannel chan<- packet.Packet) SessionHandler {
 
 	// Map from SessionID to session channel
 	sessionMap := make(map[string](chan colas.PacketMessage))
 
 	return SessionHandler{
-		sessionMap: sessionMap,
+		sessionMap:         sessionMap,
 		associatedFunction: sessionFunction,
-		outputChannel: outputChannel,
+		outputChannel:      outputChannel,
 	}
 }
 
@@ -50,5 +50,5 @@ func (sh *SessionHandler) PassPacketToSession(pktMsg colas.PacketMessage) {
 		channel = assigned_channel
 	}
 
-	channel <- pktMsg
+	channel <- pktMsg //pushea al output channel (inferido porque no sabemos como funca)
 }
