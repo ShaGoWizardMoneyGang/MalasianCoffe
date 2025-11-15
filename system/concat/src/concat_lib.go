@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
@@ -11,7 +12,7 @@ import (
 )
 
 type Concat struct {
-	inputChannel   chan packet.Packet
+	inputChannel   chan colas.PacketMessage
 
 	outputChannel   chan packet.Packet
 
@@ -22,16 +23,17 @@ type Concat struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func concat(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	localReceiver := packet.NewPacketReceiver("Concater")
+func concat(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("Concater")
 
 	var concatenatedPackets strings.Builder
 
 	var last_packet packet.Packet
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt    := pktMsg.Packet
 
-		localReceiver.ReceivePacket(pkt)
+		localReceiver.ReceivePacket(pktMsg)
 
 		if !localReceiver.ReceivedAll() {
 			continue
@@ -56,7 +58,7 @@ func concat(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packe
 }
 
 func (c *Concat) Build(rabbitAddr string, routing_key string) {
-	c.inputChannel          = make(chan packet.Packet)
+	c.inputChannel          = make(chan colas.PacketMessage)
 
 	c.outputChannel         = make(chan packet.Packet)
 
