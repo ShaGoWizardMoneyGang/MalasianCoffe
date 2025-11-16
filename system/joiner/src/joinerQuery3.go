@@ -32,9 +32,9 @@ type joinerQuery3 struct {
 }
 
 func joinQuery3(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	storeReceiver := packet_receiver.NewPacketReceiver("Stores")
+	storeReceiver := packet_receiver.NewPacketReceiver("stores")
 
-	transactionReceiver := packet_receiver.NewPacketReceiver("Transactions")
+	transactionReceiver := packet_receiver.NewPacketReceiver("transactions")
 
 	var joinedTransactions strings.Builder
 

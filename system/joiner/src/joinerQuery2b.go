@@ -30,9 +30,9 @@ type joinerQuery2b struct {
 }
 
 func joinQuery2b(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	menuItemReceiver := packet_receiver.NewPacketReceiver("Menu items")
+	menuItemReceiver := packet_receiver.NewPacketReceiver("menu-items")
 
-	transactionItemReceiver := packet_receiver.NewPacketReceiver("Transaction items")
+	transactionItemReceiver := packet_receiver.NewPacketReceiver("transaction-items")
 
 	var joinedTransactionItems strings.Builder
 
