@@ -39,7 +39,7 @@ func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs ma
 }
 
 func aggregateQuery3(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-3")
+	localReceiver := packet_receiver.NewSinglePacketReceiver("agregador-global-3")
 	localAcc := make(map[keyQuery3]float64)
 
 	var last_packet packet.Packet
