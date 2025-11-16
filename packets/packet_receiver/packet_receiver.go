@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+const (
+	PACKET_WINDOW uint = 50
+)
+
 type PacketReceiver struct {
 	// received_packages map[string]Packet
 	ordered_package []packet.Packet
@@ -21,18 +25,18 @@ type PacketReceiver struct {
 
 	buffer strings.Builder
 
-	humanIdentifier string
+	identifier string
 }
 
 // HumanIdentifier es el nombre que identifica al packet receiver. Esto esta
 // pensando para los logs.  Esta pensando para que sea un nombre que nos ayude a
 // la hora de leer los prints del log.
-func NewPacketReceiver(humanIdentifier string) PacketReceiver {
+func NewPacketReceiver(identifier string) PacketReceiver {
 	return PacketReceiver{
 		ordered_package: []packet.Packet{},
 		receivedEOF:     false,
 		allReceived:     false,
-		humanIdentifier: humanIdentifier,
+		identifier: identifier,
 	}
 }
 
@@ -114,7 +118,7 @@ Nuevo:
 	if pr.allReceived == false {
 		pr.buffer.Reset()
 	} else {
-		bitacora.Info(fmt.Sprintf("El packet receiver %s, recibio todos los paquetes que esperaba. El tamano es de: %d", pr.humanIdentifier, len(pr.ordered_package)))
+		bitacora.Info(fmt.Sprintf("El packet receiver %s, recibio todos los paquetes que esperaba. El tamano es de: %d", pr.identifier, len(pr.ordered_package)))
 	}
 
 	return pr.allReceived
