@@ -6,6 +6,7 @@ import (
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"strings"
 )
@@ -63,9 +64,9 @@ func filterTransactionItems(input string) []string {
 		}
 
 		transaction_id := data[1]
-		quantity       := data[2]
-		subtotal       := data[4]
-		created_at     := data[5]
+		quantity := data[2]
+		subtotal := data[4]
+		created_at := data[5]
 
 		year_condition, err := yearCondition(created_at)
 		if err != nil {
@@ -79,7 +80,6 @@ func filterTransactionItems(input string) []string {
 	}
 	return []string{final_query2a.String(), final_query2b.String()}
 }
-
 
 // =========================== TransactionItemsFilter ==============================
 
@@ -111,6 +111,9 @@ func (tifm *transactionItemFilterMapper) Process() {
 
 	go colas.InputQueue(tifm.colaEntradaTransaction, tifm.packet_channel)
 
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
 
 	for {
 		select {
@@ -123,7 +126,7 @@ func (tifm *transactionItemFilterMapper) Process() {
 			// Vienen en este orden: final_query2a, final_query2b
 			payloadResults := filterTransactionItems(input)
 
-			newPayload     := packet.ChangePayload(pkt, payloadResults)
+			newPayload := packet.ChangePayload(pkt, payloadResults)
 
 			outBoundMessages := []colas.OutBoundMessage{
 				{
@@ -141,6 +144,10 @@ func (tifm *transactionItemFilterMapper) Process() {
 				cola.Send(packet)
 			}
 			message.Ack(false)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Filter TransactionItems received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 
 	}

@@ -1,10 +1,12 @@
 package filter_mapper
 
 import (
+	"fmt"
 	"log/slog"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"strings"
 )
@@ -28,7 +30,6 @@ func filterUsers(input string) string {
 	}
 	return final
 }
-
 
 type userFilterMapper struct {
 	packet_channel chan colas.PacketMessage
@@ -55,6 +56,10 @@ func (ufm *userFilterMapper) Process() {
 
 	go colas.InputQueue(ufm.colaEntradaUsers, ufm.packet_channel)
 
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
+
 	for {
 		select {
 		case pkt_message := <-ufm.packet_channel:
@@ -80,6 +85,10 @@ func (ufm *userFilterMapper) Process() {
 			}
 
 			message.Ack(false)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Filter Users received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 	}
 }
