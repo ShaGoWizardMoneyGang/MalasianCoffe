@@ -1,19 +1,24 @@
-FROM ubuntu:24.04
+# Compilamos un binario
+FROM golang:alpine AS builder
 
-RUN apt-get update && \
-    apt-get install -y ca-certificates curl gnupg && \
-    install -m 0755 -d /etc/apt/keyrings && \
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
-    chmod a+r /etc/apt/keyrings/docker.gpg && \
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-      https://download.docker.com/linux/ubuntu \
-      $(. /etc/os-release && echo $VERSION_CODENAME) stable" \
-      > /etc/apt/sources.list.d/docker.list && \
-    apt-get update && \
-    apt-get install -y docker-ce-cli && \
-    apt-get clean
+LABEL intermediateStageToBeDeleted=true
 
-WORKDIR /app
-COPY . .
+ENV CGO_ENABLED=0 \
+    GARCH=amd64 \
+    GOOS=linux \
+    CC=musl-gcc
+
+WORKDIR /build
+
+RUN mkdir bin/
+
+COPY system/ system/
+COPY go.mod go.mod
+COPY go.sum go.sum
+
+RUN go build -C system/watchdog -o /build/bin/watchdog -ldflags="-extldflags=-static" -tags osusergo,netgo
+
+FROM docker:latest
+
+# Copiamos el binario del builder en el docker image de docker in docker
+COPY --from=builder /build/bin/watchdog /app/bin/watchdog
