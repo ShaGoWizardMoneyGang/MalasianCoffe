@@ -16,24 +16,6 @@ const (
 	TIMEOUT     = 2
 )
 
-func sendPing(address string) error {
-
-	conn, err := net.Dial("udp", address)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error al conectar con %s: %v\n", address, err)
-		return err
-	}
-	defer conn.Close()
-
-	fmt.Printf("Conexión UDP establecida con %s\n", address)
-	_, err = conn.Write([]byte{0x01})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error al enviar datos: %v\n", err)
-		return err
-	}
-	return nil
-}
-
 func restartContainer(name string) {
 	cmd := exec.Command("sh", "-c", "docker stop "+name)
 	output, err := cmd.CombinedOutput()
@@ -54,14 +36,8 @@ func restartContainer(name string) {
 }
 
 func main() {
+	fmt.Println("Esperando a que arranque el sistema...")
 	time.Sleep(10 * time.Second)
-
-	// Acá simulo que ni se pudo levantar al principio
-	/*cmd := exec.Command("sh", "-c", "docker stop joiner4_1")
-	_, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error al detener el contenedor %s: %v\n", "joiner4_1", err)
-	}*/
 
 	file, err := os.ReadFile(SHEEPS_FILE)
 	if err != nil {
@@ -101,7 +77,7 @@ func main() {
 			for attempt := 1; attempt <= MAX_RETRIES; attempt++ {
 				fmt.Printf("Intento %d de %d: enviando PING a %s\n", attempt, MAX_RETRIES, healthCheckAddress)
 				// Mando PING
-				err := sendPing(healthCheckAddress)
+				err := watchdog.Ping(healthCheckAddress)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error enviando ping a %s: %v\n", healthCheckAddress, err)
 				} else {

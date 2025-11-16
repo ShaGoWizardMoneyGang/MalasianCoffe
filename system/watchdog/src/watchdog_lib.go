@@ -15,6 +15,18 @@ type WatchdogListener struct {
 }
 
 // ============================= USED BY WORKER ================================
+func CreateWatchdogListener() WatchdogListener {
+	addr := net.UDPAddr{
+		Port: HEALTHCHECK_PORT,
+		IP:   net.ParseIP("0.0.0.0"),
+	}
+	conn, err := net.ListenUDP("udp", &addr)
+	if err != nil {
+		panic(err)
+	}
+	return WatchdogListener{conn: *conn}
+}
+
 func (wl *WatchdogListener) Pong(responseIP string) {
 	responseAddress := responseIP + ":" + fmt.Sprint(HEALTHCHECK_PORT)
 	fmt.Println(responseAddress)
@@ -33,19 +45,6 @@ func (wl *WatchdogListener) Pong(responseIP string) {
 	fmt.Printf("PONG recibido de %s\n", responseAddress)
 }
 
-// Aca creas el SocketUDP
-func CreateWatchdogListener() WatchdogListener {
-	addr := net.UDPAddr{
-		Port: HEALTHCHECK_PORT,
-		IP:   net.ParseIP("0.0.0.0"),
-	}
-	conn, err := net.ListenUDP("udp", &addr)
-	if err != nil {
-		panic(err)
-	}
-	return WatchdogListener{conn: *conn}
-}
-
 func (wl *WatchdogListener) Listen(infoChan chan<- string) {
 	defer wl.conn.Close()
 	buffer := make([]byte, 1024)
@@ -60,5 +59,19 @@ func (wl *WatchdogListener) Listen(infoChan chan<- string) {
 }
 
 // ============================= WATCHDOG LOGIC ================================
-func ping() {
+func Ping(address string) error {
+	conn, err := net.Dial("udp", address)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al conectar con %s: %v\n", address, err)
+		return err
+	}
+	defer conn.Close()
+
+	fmt.Printf("Conexión UDP establecida con %s\n", address)
+	_, err = conn.Write([]byte{0x01})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al enviar datos: %v\n", err)
+		return err
+	}
+	return nil
 }
