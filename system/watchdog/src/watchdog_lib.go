@@ -11,7 +11,7 @@ const (
 )
 
 type WatchdogListener struct {
-	Conn *net.UDPConn
+	conn net.UDPConn
 }
 
 // ============================= USED BY WORKER ================================
@@ -35,10 +35,6 @@ func (wl *WatchdogListener) Pong(responseIP string) {
 
 // Aca creas el SocketUDP
 func CreateWatchdogListener() WatchdogListener {
-	return WatchdogListener{}
-}
-
-func (wl *WatchdogListener) Listen(infoChan chan<- string) {
 	addr := net.UDPAddr{
 		Port: HEALTHCHECK_PORT,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -47,12 +43,14 @@ func (wl *WatchdogListener) Listen(infoChan chan<- string) {
 	if err != nil {
 		panic(err)
 	}
-	wl.Conn = conn
-	defer wl.Conn.Close()
+	return WatchdogListener{conn: *conn}
+}
 
+func (wl *WatchdogListener) Listen(infoChan chan<- string) {
+	defer wl.conn.Close()
 	buffer := make([]byte, 1024)
 	for {
-		_, addr, err := wl.Conn.ReadFromUDP(buffer)
+		_, addr, err := wl.conn.ReadFromUDP(buffer)
 		if err != nil {
 			continue
 		}
