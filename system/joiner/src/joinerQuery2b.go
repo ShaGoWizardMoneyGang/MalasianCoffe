@@ -11,6 +11,7 @@ import (
 	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
 )
@@ -40,7 +41,7 @@ func joinQuery2b(inputChannel <-chan colas.PacketMessage, outputChannel chan<- p
 
 	for {
 		pktMsg := <-inputChannel
-		pkt    := pktMsg.Packet
+		pkt := pktMsg.Packet
 
 		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
 		dataset_name, err := dataset.IDtoDataset(packet_id)
@@ -95,12 +96,20 @@ func (jq2b *joinerQuery2b) Process() {
 
 	go colas.InputQueue(jq2b.colaAggItemsInput, jq2b.inputChannel)
 
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
+
 	for {
 		select {
 		case inputPacket := <-jq2b.inputChannel:
 			jq2b.sessionHandler.PassPacketToSession(inputPacket)
 		case aggregatedPacket := <-jq2b.outputChannel:
 			jq2b.colaSalidaQuery2b.Send(aggregatedPacket)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Joiner Query2b received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 	}
 }
