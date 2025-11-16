@@ -68,14 +68,20 @@ func main() {
 		fmt.Fprintf(os.Stderr, "No se pudo abrir el archivo %s: %v\n", SHEEPS_FILE, err)
 	}
 
-	services := strings.Split(string(file), "\n")
-	for _, service := range services[:len(services)-1] {
-		fmt.Println("Servicio:", service)
+	listOfServices := strings.Split(string(file), "\n")
+	services := make([]string, 0, len(listOfServices))
+	for _, s := range listOfServices {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			services = append(services, s)
+			fmt.Println("Servicio:", s)
+		}
 	}
 
-	serviceName := "joiner4_1"
-	testAddress := serviceName + ":" + fmt.Sprint(watchdog.HEALTHCHECK_PORT)
-	fmt.Println("Dirección de prueba:", testAddress)
+	if len(services) == 0 {
+		fmt.Println("No hay servicios en sheeps.txt")
+		return
+	}
 
 	addr := net.UDPAddr{
 		Port: watchdog.HEALTHCHECK_PORT,
@@ -89,38 +95,41 @@ func main() {
 
 	buffer := make([]byte, 1024)
 
-	successfulHealthcheck := false
-	for attempt := 1; attempt <= MAX_RETRIES; attempt++ {
-		fmt.Printf("Intento %d de %d: enviando PING a %s\n", attempt, MAX_RETRIES, testAddress)
-		// Mando PING
-		err := sendPing(testAddress)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error enviando ping a %s: %v\n", testAddress, err)
-		} else {
-			// Acá con SetReadDeadline defino que después de la hora actual + 2 segundos vence el timeout
-			connListen.SetReadDeadline(time.Now().Add(TIMEOUT * time.Second))
-			n, _, err := connListen.ReadFromUDP(buffer)
-			// Si el Read NO devuelve error, entonces se recibió el PONG y salimos
-			if err == nil {
-				fmt.Printf("Watchdog recibió PONG del %s: %s\n", serviceName, string(buffer[:n]))
-				successfulHealthcheck = true
-				break
+	for _, serviceName := range services {
+		healthCheckAddress := serviceName + ":" + fmt.Sprint(watchdog.HEALTHCHECK_PORT)
+		successfulHealthcheck := false
+		for attempt := 1; attempt <= MAX_RETRIES; attempt++ {
+			fmt.Printf("Intento %d de %d: enviando PING a %s\n", attempt, MAX_RETRIES, healthCheckAddress)
+			// Mando PING
+			err := sendPing(healthCheckAddress)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error enviando ping a %s: %v\n", healthCheckAddress, err)
+			} else {
+				// Acá con SetReadDeadline defino que después de la hora actual + 2 segundos vence el timeout
+				connListen.SetReadDeadline(time.Now().Add(TIMEOUT * time.Second))
+				n, _, err := connListen.ReadFromUDP(buffer)
+				// Si el Read NO devuelve error, entonces se recibió el PONG y salimos
+				if err == nil {
+					fmt.Printf("Watchdog recibió PONG del %s: %s\n", serviceName, string(buffer[:n]))
+					successfulHealthcheck = true
+					break
+				}
+				// Si el error es de network y es un timeout, el PONG No llegó en el tiempo establecido (2seg)
+				netError, isNetError := err.(net.Error)
+				if isNetError == true && netError.Timeout() {
+					fmt.Printf("No se recibió PONG en %v segundos\n ", TIMEOUT)
+				}
 			}
-			// Si el error es de network y es un timeout, el PONG No llegó en el tiempo establecido (2seg)
-			netError, isNetError := err.(net.Error)
-			if isNetError == true && netError.Timeout() {
-				fmt.Printf("No se recibió PONG en %v segundos\n ", TIMEOUT)
-			}
+			// Espero un poco antes del siguiente intento
+			time.Sleep(1 * time.Second)
 		}
-		// Espero un poco antes del siguiente intento
-		time.Sleep(1 * time.Second)
-	}
 
-	if successfulHealthcheck == false {
-		fmt.Printf("No se recibió PONG tras %d intentos. Reiniciando %s\n", MAX_RETRIES, serviceName)
-		restartContainer(serviceName)
-	} else {
-		fmt.Println("El servicio respondió correctamente, no hace falta reiniciar")
+		if successfulHealthcheck == false {
+			fmt.Printf("No se recibió PONG tras %d intentos. Reiniciando %s\n", MAX_RETRIES, serviceName)
+			restartContainer(serviceName)
+		} else {
+			fmt.Println("El servicio respondió correctamente, no hace falta reiniciar")
+		}
 	}
 
 }
