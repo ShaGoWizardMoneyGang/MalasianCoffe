@@ -12,8 +12,120 @@ import (
 
 const (
 	SHEEPS_FILE = "sheeps.txt"
+	MAX_RETRIES = 3
+	TIMEOUT     = 2
 )
 
+func sendPing(address string) error {
+
+	conn, err := net.Dial("udp", address)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al conectar con %s: %v\n", address, err)
+		return err
+	}
+	defer conn.Close()
+
+	fmt.Printf("Conexión UDP establecida con %s\n", address)
+	_, err = conn.Write([]byte{0x01})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al enviar datos: %v\n", err)
+		return err
+	}
+	return nil
+}
+
+func restartContainer(name string) {
+	cmd := exec.Command("sh", "-c", "docker stop "+name)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al detener el contenedor %s: %v\n", name, err)
+	} else {
+		fmt.Printf("Se detuvo el container %s: %s\n", name, string(output))
+		time.Sleep(2 * time.Second)
+		// DEJO DOCKER RESTART
+		cmd = exec.Command("sh", "-c", "docker restart "+name)
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error al iniciar el contenedor %s: %v\n", name, err)
+		} else {
+			fmt.Printf("Se inició el contenedor %s: %s\n", name, string(output))
+		}
+	}
+}
+
+func main() {
+	time.Sleep(10 * time.Second)
+
+	// Acá simulo que ni se pudo levantar al principio
+	/*cmd := exec.Command("sh", "-c", "docker stop joiner4_1")
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al detener el contenedor %s: %v\n", "joiner4_1", err)
+	}*/
+
+	file, err := os.ReadFile(SHEEPS_FILE)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "No se pudo abrir el archivo %s: %v\n", SHEEPS_FILE, err)
+	}
+
+	services := strings.Split(string(file), "\n")
+	for _, service := range services[:len(services)-1] {
+		fmt.Println("Servicio:", service)
+	}
+
+	serviceName := "joiner4_1"
+	testAddress := serviceName + ":" + fmt.Sprint(watchdog.HEALTHCHECK_PORT)
+	fmt.Println("Dirección de prueba:", testAddress)
+
+	addr := net.UDPAddr{
+		Port: watchdog.HEALTHCHECK_PORT,
+		IP:   net.ParseIP("0.0.0.0"),
+	}
+	connListen, err := net.ListenUDP("udp", &addr)
+	if err != nil {
+		panic(err)
+	}
+	defer connListen.Close()
+
+	buffer := make([]byte, 1024)
+
+	successfulHealthcheck := false
+	for attempt := 1; attempt <= MAX_RETRIES; attempt++ {
+		fmt.Printf("Intento %d de %d: enviando PING a %s\n", attempt, MAX_RETRIES, testAddress)
+		// Mando PING
+		err := sendPing(testAddress)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error enviando ping a %s: %v\n", testAddress, err)
+		} else {
+			// Acá con SetReadDeadline defino que después de la hora actual + 2 segundos vence el timeout
+			connListen.SetReadDeadline(time.Now().Add(TIMEOUT * time.Second))
+			n, _, err := connListen.ReadFromUDP(buffer)
+			// Si el Read NO devuelve error, entonces se recibió el PONG y salimos
+			if err == nil {
+				fmt.Printf("Watchdog recibió PONG del %s: %s\n", serviceName, string(buffer[:n]))
+				successfulHealthcheck = true
+				break
+			}
+			// Si el error es de network y es un timeout, el PONG No llegó en el tiempo establecido (2seg)
+			netError, isNetError := err.(net.Error)
+			if isNetError == true && netError.Timeout() {
+				fmt.Printf("No se recibió PONG en %v segundos\n ", TIMEOUT)
+			}
+		}
+		// Espero un poco antes del siguiente intento
+		time.Sleep(1 * time.Second)
+	}
+
+	if successfulHealthcheck == false {
+		fmt.Printf("No se recibió PONG tras %d intentos. Reiniciando %s\n", MAX_RETRIES, serviceName)
+		restartContainer(serviceName)
+	} else {
+		fmt.Println("El servicio respondió correctamente, no hace falta reiniciar")
+	}
+
+}
+
+/*
 func main() {
 	time.Sleep(10 * time.Second) // Esperar a que los servicios estén activos
 	file, err := os.ReadFile(SHEEPS_FILE)
@@ -90,4 +202,4 @@ func main() {
 
 		time.Sleep(5 * time.Second) // Esperar 5 segundos antes de reiniciar
 	}
-}
+}*/
