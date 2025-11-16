@@ -7,18 +7,19 @@ import (
 	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"strings"
 )
 
 type Concat struct {
-	inputChannel   chan colas.PacketMessage
+	inputChannel chan colas.PacketMessage
 
-	outputChannel   chan packet.Packet
+	outputChannel chan packet.Packet
 
 	colaInputTransaction *middleware.MessageMiddlewareQueue
 
-	colaSalida  *middleware.MessageMiddlewareQueue
+	colaSalida *middleware.MessageMiddlewareQueue
 
 	sessionHandler sessionhandler.SessionHandler
 }
@@ -31,7 +32,7 @@ func concat(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet
 	var last_packet packet.Packet
 	for {
 		pktMsg := <-inputChannel
-		pkt    := pktMsg.Packet
+		pkt := pktMsg.Packet
 
 		localReceiver.ReceivePacket(pktMsg)
 
@@ -45,7 +46,6 @@ func concat(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet
 		break
 	}
 
-
 	pkt_joineado := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{concatenatedPackets.String()})
 
 	// Liberamos
@@ -58,19 +58,23 @@ func concat(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet
 }
 
 func (c *Concat) Build(rabbitAddr string, routing_key string) {
-	c.inputChannel          = make(chan colas.PacketMessage)
+	c.inputChannel = make(chan colas.PacketMessage)
 
-	c.outputChannel         = make(chan packet.Packet)
+	c.outputChannel = make(chan packet.Packet)
 
-	c.colaInputTransaction  = colas.InstanceQueueRouted("FilteredTransactions1", rabbitAddr, routing_key)
+	c.colaInputTransaction = colas.InstanceQueueRouted("FilteredTransactions1", rabbitAddr, routing_key)
 
-	c.colaSalida            = colas.InstanceQueue("SalidaQuery1", rabbitAddr)
+	c.colaSalida = colas.InstanceQueue("SalidaQuery1", rabbitAddr)
 
-	c.sessionHandler        = sessionhandler.NewSessionHandler(concat, c.outputChannel)
+	c.sessionHandler = sessionhandler.NewSessionHandler(concat, c.outputChannel)
 }
 
 func (c *Concat) Process() {
 	go colas.InputQueue(c.colaInputTransaction, c.inputChannel)
+
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
 
 	for {
 		select {
@@ -78,6 +82,10 @@ func (c *Concat) Process() {
 			c.sessionHandler.PassPacketToSession(inputPacket)
 		case packetConcatenado := <-c.outputChannel:
 			c.colaSalida.Send(packetConcatenado)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Concat received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 	}
 }

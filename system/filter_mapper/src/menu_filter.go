@@ -1,10 +1,12 @@
 package filter_mapper
 
 import (
+	"fmt"
 	"log/slog"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"strings"
 )
@@ -59,6 +61,10 @@ func (mifm *menuItemFilterMapper) Process() {
 
 	go colas.InputQueue(mifm.colaEntradaStore, mifm.packet_channel)
 
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
+
 	for {
 		select {
 		case pkt_message := <-mifm.packet_channel:
@@ -85,6 +91,10 @@ func (mifm *menuItemFilterMapper) Process() {
 				cola.Send(packet)
 			}
 			message.Ack(false)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Filter MenuItems received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 	}
 }
