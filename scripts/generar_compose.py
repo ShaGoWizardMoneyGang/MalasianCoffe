@@ -356,8 +356,6 @@ def main():
             file.write(commons())
 
         file.writelines(watchdog_block(i) for i in range(1, configs.get("watchdog", 0) + 1))
-        for i in range(1, configs.get("watchdog", 0) + 1):
-            sheeps_list.append(f"watchdog_{i}")
 
         file.writelines(filter_transactions_block(i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
         for i in range(1, configs.get("filter-transactions", 0) + 1):
