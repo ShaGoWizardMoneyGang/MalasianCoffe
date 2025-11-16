@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
@@ -145,7 +144,7 @@ func (jq4 *joinerQuery4) Process() {
 			IP := strings.Split(responseAddress, ":")[0]
 			fmt.Println("Joiner Query4 received healthcheck ping from", IP)
 			//PARA SIMULAR QUE NO MANDA PONG DESPUES DE REINTENTAR
-			time.Sleep(15 * time.Second)
+			//time.Sleep(15 * time.Second)
 			watchdog.Pong(IP)
 		}
 	}

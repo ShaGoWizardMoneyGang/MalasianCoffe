@@ -5,12 +5,14 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
 )
@@ -95,12 +97,22 @@ func (jq3 *joinerQuery3) Process() {
 
 	go colas.InputQueue(jq3.colaAggTransInput, jq3.inputChannel)
 
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
+
 	for {
 		select {
 		case inputPacket := <-jq3.inputChannel:
 			jq3.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq3.outputChannel:
 			jq3.colaSalidaQuery3.Send(packetJoineado)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Joiner Query3 received healthcheck ping from", IP)
+			//PARA SIMULAR QUE NO MANDA PONG DESPUES DE REINTENTAR
+			time.Sleep(5 * time.Second)
+			watchdog.Pong(IP)
 		}
 	}
 }
