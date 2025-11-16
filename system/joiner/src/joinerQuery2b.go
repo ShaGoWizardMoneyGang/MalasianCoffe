@@ -30,9 +30,9 @@ type joinerQuery2b struct {
 }
 
 func joinQuery2b(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	menuItemReceiver := packet_receiver.NewPacketReceiver("menu-items")
+	menuItemReceiver := packet_receiver.NewSinglePacketReceiver("menu-items")
 
-	transactionItemReceiver := packet_receiver.NewPacketReceiver("transaction-items")
+	transactionItemReceiver := packet_receiver.NewSinglePacketReceiver("transaction-items")
 
 	var joinedTransactionItems strings.Builder
 
@@ -105,7 +105,7 @@ func (jq2b *joinerQuery2b) Process() {
 	}
 }
 
-func joinerFunctionQuery2b(menuItemReceiver packet_receiver.PacketReceiver, transactionItemReceiver packet_receiver.PacketReceiver, joinedTransactionItems *strings.Builder) {
+func joinerFunctionQuery2b(menuItemReceiver packet_receiver.SinglePacketReceiver, transactionItemReceiver packet_receiver.SinglePacketReceiver, joinedTransactionItems *strings.Builder) {
 	menuItemMap := createMenuItemMap(menuItemReceiver)
 
 	transactionItems := transactionItemReceiver.GetPayload()

@@ -24,7 +24,7 @@ type Concat struct {
 }
 
 func concat(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := packet_receiver.NewPacketReceiver("concater")
+	localReceiver := packet_receiver.NewSinglePacketReceiver("concater")
 
 	var concatenatedPackets strings.Builder
 

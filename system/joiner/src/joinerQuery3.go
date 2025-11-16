@@ -32,9 +32,9 @@ type joinerQuery3 struct {
 }
 
 func joinQuery3(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	storeReceiver := packet_receiver.NewPacketReceiver("stores")
+	storeReceiver := packet_receiver.NewSinglePacketReceiver("stores")
 
-	transactionReceiver := packet_receiver.NewPacketReceiver("transactions")
+	transactionReceiver := packet_receiver.NewSinglePacketReceiver("transactions")
 
 	var joinedTransactions strings.Builder
 
@@ -117,7 +117,7 @@ func (jq3 *joinerQuery3) Process() {
 	}
 }
 
-func joinerFunctionQuery3(storeReceiver packet_receiver.PacketReceiver, transactionReceiver packet_receiver.PacketReceiver, joinedTransactions *strings.Builder) {
+func joinerFunctionQuery3(storeReceiver packet_receiver.SinglePacketReceiver, transactionReceiver packet_receiver.SinglePacketReceiver, joinedTransactions *strings.Builder) {
 	storeMap := createStoreMap(storeReceiver)
 
 	transactions := transactionReceiver.GetPayload()
