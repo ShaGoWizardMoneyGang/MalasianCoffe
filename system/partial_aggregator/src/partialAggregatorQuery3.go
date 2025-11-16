@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"sort"
 	"strconv"
@@ -81,16 +82,18 @@ func aggregator3BySemesterTPV(input string) string {
 type PartialAggregator interface {
 	Build(rabbitAddr string, outs map[string]uint64)
 	GetInput() *middleware.MessageMiddlewareQueue
-	Process(pkt packet.Packet) []colas.OutBoundMessage
+	Process()
 }
 
 type aggregator3Partial struct {
+	packet_channel chan colas.PacketMessage
 	colaEntrada    *middleware.MessageMiddlewareQueue
 	exchangeSalida *middleware.MessageMiddlewareExchange
 }
 
 func (a *aggregator3Partial) Build(rabbitAddr string, outs map[string]uint64) {
 	// mismas colas que las de antes
+	a.packet_channel = make(chan colas.PacketMessage)
 	a.colaEntrada = colas.InstanceQueue("FilteredTransactions3", rabbitAddr)
 	a.exchangeSalida = colas.InstanceExchange("PartialAggregations3", rabbitAddr, outs["queue"])
 }
@@ -99,7 +102,7 @@ func (a *aggregator3Partial) GetInput() *middleware.MessageMiddlewareQueue {
 	return a.colaEntrada
 }
 
-func (a *aggregator3Partial) Process(pkt packet.Packet) []colas.OutBoundMessage {
+func (a *aggregator3Partial) processPacket(pkt packet.Packet) []colas.OutBoundMessage {
 	input := pkt.GetPayload()
 	slog.Debug("Aggregator3Partial.Process: recibí payload")
 
@@ -111,5 +114,39 @@ func (a *aggregator3Partial) Process(pkt packet.Packet) []colas.OutBoundMessage 
 			Packet:     newPkts[0],
 			ColaSalida: a.exchangeSalida,
 		},
+	}
+}
+
+func (a *aggregator3Partial) Process() {
+	slog.Info("Arranca procesamiento de aggregator3Partial con watchdog")
+
+	go colas.InputQueue(a.colaEntrada, a.packet_channel)
+
+	watchdogListener := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdogListener.Listen(healthcheckChannel)
+
+	for {
+		select {
+		case pkt_message := <-a.packet_channel:
+			pkt := pkt_message.Packet
+			message := pkt_message.Message
+
+			outboundMessages := a.processPacket(pkt)
+			for _, outbound := range outboundMessages {
+				cola := outbound.ColaSalida
+				p := outbound.Packet
+				if err := cola.Send(p); err != 0 {
+					slog.Error("Error enviando a cola de salida", "err", err)
+				}
+			}
+			if err := message.Ack(false); err != nil {
+				panic(fmt.Errorf("Could not ack, %w", err))
+			}
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("PartialAggregator3 received healthcheck ping from", IP)
+			watchdogListener.Pong(IP)
+		}
 	}
 }
