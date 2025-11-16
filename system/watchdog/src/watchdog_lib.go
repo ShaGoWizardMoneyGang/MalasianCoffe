@@ -30,7 +30,7 @@ func (wl *WatchdogListener) Pong(responseIP string) {
 		fmt.Fprintf(os.Stderr, "Error al enviar datos: %v\n", err)
 		return
 	}
-	fmt.Println("Joiner 4 envió PONG al watchdog")
+	fmt.Printf("PONG recibido de %s\n", responseAddress)
 }
 
 // Aca creas el SocketUDP
@@ -56,7 +56,7 @@ func (wl *WatchdogListener) Listen(infoChan chan<- string) {
 		if err != nil {
 			continue
 		}
-		fmt.Printf("Joiner 4 recibió PING del watchdog: %s\n", string(buffer))
+		fmt.Printf("Joiner recibió PING del watchdog: %s\n", string(buffer))
 		infoChan <- addr.String()
 	}
 }
