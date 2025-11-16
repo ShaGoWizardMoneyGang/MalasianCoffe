@@ -88,7 +88,7 @@ build-partial-aggregator:
 build-global-aggregator:
 	cd system/global_aggregator; go build -o ${BINDIR}/global_aggregator
 
-build-watchdog:
+build-watchdog: docker-build-watchdog
 	cd system/watchdog; go build -o ${BINDIR}/watchdog
 
 build-test-output-query-4:
@@ -125,7 +125,7 @@ CONFIG                  ?= MuchosSinEstado
 generate-config:
 	bash scripts/generate-config.sh ${CONFIG}
 
-generate-compose:
+generate-compose: clean-out
 	python3 scripts/generar_compose.py NOEXTERNAL
 
 generate-compose-external:
@@ -153,6 +153,9 @@ docker-logs:
 
 docker-ci:
 	docker compose -f docker-compose-ci.yml up -d
+
+docker-build-watchdog:
+	docker build -t dind-dockerfile .
 
 #============================== Misc directives ===============================
 clean-out:
