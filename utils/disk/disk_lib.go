@@ -8,7 +8,29 @@ import (
 )
 
 // Atomic write [data] to [path]
-func AtomicWrite(data string, path string) error {
+func AtomicWrite(data []byte, path string) error {
+	tmp_path := path + ".tmp"
+
+	f, err := CreateFile(tmp_path)
+	if err != nil {
+		return err
+	}
+
+	length := len(data)
+	var written = 0
+	for offset := 0; offset < length; offset += written {
+		written, err = f.Write(data[offset:])
+		if err != nil {
+			return err
+		}
+	}
+
+	os.Rename(tmp_path, path)
+
+	return nil
+}
+
+func AtomicWriteString(data string, path string) error {
 	tmp_path := path + ".tmp"
 
 	f, err := CreateFile(tmp_path)
@@ -23,6 +45,34 @@ func AtomicWrite(data string, path string) error {
 	os.Rename(tmp_path, path)
 
 	return nil
+}
+
+func AtomicAppend(data string, path string) error {
+	tmp_path := path + ".tmp"
+
+	f, err := CreateFile(tmp_path)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.WriteString(f, data); err != nil {
+		return err
+	}
+
+	os.Rename(tmp_path, path)
+
+	return nil
+}
+
+
+func Read(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", nil
+	}
+
+	string_r := string(data)
+	return string_r, nil
 }
 
 // Check if file/dir exists
