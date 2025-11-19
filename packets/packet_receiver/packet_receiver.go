@@ -212,30 +212,29 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
 
-	// El nombre del archivo es su numero de secuencia
-	pkt_file := pr.path_resolver.resolve_path(Packets) + string(pkt.GetSequenceNumber())
-
-	disk.AtomicWrite(pkt.Serialize(), pkt_file)
-	if pkt.IsEOF() {
-		eof_sequence_number := string(pkt.GetSequenceNumber())
-		received_eof_file := pr.path_resolver.resolve_path(ReceivedEof)
-		disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+	// Guardo el paquete que acabo de recibir en disco
+	{
+		// NOTE: Por convencion, el nombre del archivo es su numero de secuencia
+		pkt_file := pr.path_resolver.resolve_path(Packets) + string(pkt.GetSequenceNumber())
+		disk.AtomicWrite(pkt.Serialize(), pkt_file)
+		if pkt.IsEOF() {
+			pr.EOF = pkt.GetSequenceNumber()
+			eof_sequence_number := string(pkt.GetSequenceNumber())
+			received_eof_file := pr.path_resolver.resolve_path(ReceivedEof)
+			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+		}
+		// Como ya escribimos a disco, ackeamos
 	}
-	// Como ya escribimos a disco, ackeamos
+
 	pktMsg.Message.Ack(false)
 
-	// Si el programa se cae aca, no pasa porque se escribe en disco.
-	// Cuando vuelva a iniciarse el programa, va a leerlo antes de que arranque
+	// Anado el paquete que acabo de recibir a la ventana de paquetes.
+
+	// Si el programa se cae antes de anadirlo, no pasa porque se escribe en
+	// disco. Cuando vuelva a iniciarse el programa, va a leer el archivo del
+	// directorio packets y lo va a anadir en el array.
 	pr.packets_in_window = append(pr.packets_in_window, pkt)
 
-
-	// pr.processPackets()
-	// if len(pr.packets_in_window) >= int(PACKET_WINDOW) {
-	// 	// pr.windowFull = true
-	// 	return false
-	// }
-
-	// // partial_work 
 
 	// NOTE: Me parece que no hace falta ordernarlo, pero lo hago por las dudas.
 	slices.SortFunc(pr.packets_in_window, func(i, j packet.Packet) int {
@@ -244,8 +243,8 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			return sn_i - sn_j
 		})
 
-
-	// Buffer para chequear que recibimos todos los paquetes (usados despues)
+	// En este buffer nos guardamos todos los numeros de secuencia recibido
+	// para chequear que recibimos todos los paquetes (usado despues)
 	received_packets := make([]int, len(pr.processed_sequence_number) + len(pr.packets_in_window))
 
 	var buffer strings.Builder
@@ -265,19 +264,10 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		}
 	}
 
-	// Si la cantidad de paquetes excede la ventana, tengo que procesarlos.
-	if len(pr.packets_in_window) >= int(PACKET_WINDOW) {
-		accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
-		if err != nil {
-			panic(err)
-		}
-		transformation := pr.transformer(accumulated_work, buffer.String())
-
-		disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
-	}
+	amount_packets_in_window := len(pr.packets_in_window)
 
 	// Chequeamos si recibi todos los paquetes
-	offset := len(pr.packets_in_window)
+	offset := amount_packets_in_window
 	for i, sq_n := range pr.processed_sequence_number {
 		received_packets[i + offset] = sq_n
 	}
@@ -311,6 +301,26 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			allReceived = false
 			break
 		}
+	}
+
+	// Tengo que procesar la ventana en dos casos:
+	// 1. Si la cantidad de paquetes excede la ventana, tengo que procesarlos
+	//    para liberar la ventana y dar lugar a la proxima tanda.
+	// 2. Si recibi todos los paquetes, entonces tambien tengo que procesar la
+	//    ventana. Lo que puede pasar es que la ventana este llena a medias,
+	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
+	if amount_packets_in_window >= int(PACKET_WINDOW) || allReceived {
+		accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
+		if err != nil {
+			panic(err)
+		}
+		// Aplico la funcion transformer a todo lo que recibi + lo que acaba
+		// de llegar.
+		transformation := pr.transformer(accumulated_work, buffer.String())
+
+		// Antes de escribir en disco, tengo que des-hacerme de los paquetes
+		// la ventana.
+		disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
 	}
 
 	return allReceived
