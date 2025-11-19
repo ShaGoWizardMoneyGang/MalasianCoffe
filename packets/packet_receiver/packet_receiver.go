@@ -61,7 +61,7 @@ type SinglePacketReceiver struct {
 	// windowFull bool
 
 	// Para saber si llego el EOF
-	EOF *uint
+	EOF int
 
 	identifier string
 
@@ -143,17 +143,18 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	if err != nil {
 		panic(err)
 	}
-	var received_eof *uint
+	var received_eof int
 	if received_eof_s == "" {
-		received_eof = nil
+		// -1 representa si lo recibi o no
+		received_eof = -1
 	} else {
-		received_eof_u64, err := strconv.ParseUint(received_eof_s, 10, 64)
+		received_eof_i64, err := strconv.ParseInt(received_eof_s, 10, 64)
 		if err != nil {
 			panic(err)
 		}
-		received_eof_u := uint(received_eof_u64)
+		received_eof_i := int(received_eof_i64)
 
-		received_eof = &received_eof_u
+		received_eof = received_eof_i
 	}
 
 
@@ -285,7 +286,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	slices.Sort(received_packets)
 
 	allReceived := true
-	if pr.EOF == nil {
+	if pr.EOF == -1 {
 		// Si ni me llego el EOF, entonces no hay chance de que haya
 		// llegado todo
 		allReceived = false
@@ -293,7 +294,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	for i := 0; i < len(received_packets) && allReceived == true; i++ {
 		// El ultimo paquete recibido tiene que si o si ser el ultimo
 		if i == len(received_packets) - 1 {
-			if uint(i) != *pr.EOF {
+			if i != pr.EOF {
 				allReceived = false
 			}
 
