@@ -39,6 +39,12 @@ func main() {
 	fmt.Println("Esperando a que arranque el sistema...")
 	time.Sleep(10 * time.Second)
 
+	amILeader := os.Args[1]
+	if amILeader != "LEADER" {
+		fmt.Println("No soy el líder, no hago watchdog")
+		return
+	}
+	fmt.Println("Soy el líder, comienzo watchdog")
 	file, err := os.ReadFile(SHEEPS_FILE)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "No se pudo abrir el archivo %s: %v\n", SHEEPS_FILE, err)

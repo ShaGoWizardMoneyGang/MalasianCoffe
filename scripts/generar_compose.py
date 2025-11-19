@@ -243,13 +243,13 @@ def partial_aggregator_block(n, query, queueAmount):
       - server
 """
 
-def watchdog_block(n):
+def leader_watchdog_block(n):
     return f"""
   watchdog_{n}:
     container_name: watchdog_{n}
     image: dind-dockerfile:latest
     working_dir: /app
-    entrypoint: ./bin/watchdog
+    entrypoint: ./bin/watchdog LEADER
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./sheeps.txt:/app/sheeps.txt
@@ -258,6 +258,23 @@ def watchdog_block(n):
     depends_on:
       - server
 """
+
+def replica_watchdog_block(n):
+    return f"""
+  watchdog_{n}:
+    container_name: watchdog_{n}
+    image: dind-dockerfile:latest
+    working_dir: /app
+    entrypoint: ./bin/watchdog REPLICA
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./sheeps.txt:/app/sheeps.txt
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
+
 
 def client(n, external):
     # Creo un directorio en out para que no sea creado por root
@@ -355,7 +372,9 @@ def main():
         if external == False:
             file.write(commons())
 
-        file.writelines(watchdog_block(i) for i in range(1, configs.get("watchdog", 0) + 1))
+        file.writelines(leader_watchdog_block(1))
+
+        file.writelines(replica_watchdog_block(i) for i in range(2, configs.get("watchdog", 0) + 1))
 
         file.writelines(filter_transactions_block(i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
         for i in range(1, configs.get("filter-transactions", 0) + 1):
