@@ -48,18 +48,14 @@ func AtomicWriteString(data string, path string) error {
 }
 
 func AtomicAppend(data string, path string) error {
-	tmp_path := path + ".tmp"
-
-	f, err := CreateFile(tmp_path)
+	old_data, err := Read(path)
 	if err != nil {
 		return err
 	}
 
-	if _, err := io.WriteString(f, data); err != nil {
-		return err
-	}
+	new_data := old_data + "\n" + data
 
-	os.Rename(tmp_path, path)
+	AtomicWriteString(new_data, path)
 
 	return nil
 }
