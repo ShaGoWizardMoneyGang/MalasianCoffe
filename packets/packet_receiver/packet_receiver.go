@@ -46,12 +46,11 @@ const (
 type SinglePacketReceiver struct {
 
 	// Packets que estan en la ventana actual. En cualquier momento, esto tiene
-	// que ser HASTA PACKET_WINDOW
+	// que ser HASTA PACKET_WINDOW.
 	packets_in_window []packet.Packet
 
 	// Hashset de todos los numeros de sequencia recibidos y procesados hasta el
 	// momento.
-	// processed_sequence_number map[int]struct{}
 	processed_sequence_number []int
 
 	// Funcion a aplicarle a los paquetes en la ventana. OJO, tiene que soportar ser parcial.
@@ -309,8 +308,16 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	//    ventana. Lo que puede pasar es que la ventana este llena a medias,
 	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
 	if amount_packets_in_window >= PACKET_WINDOW || allReceived {
-		// LOG De todos los archivos que voy a borrar.
+		// LOG De todos los archivos que voy a borrar: Stage 1.
+		// En la packet window: A, B, C
+		// Voy a borrar A
+		// Voy a borrar B
+		// Voy a borrar C
 
+		// NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
+		// log, no pasa nada, porque cuando se levante de vuelta va a ver que
+		// tiene en la ventana mas paquetes de los que esta anotada. Entonces,
+		// solo tiene que anadir los paquetes que le faltan en el log.
 		accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
 		if err != nil {
 			panic(err)
@@ -323,11 +330,25 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// la ventana.
 		disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
 
-		// Borro el archivo de log
+		// LOG De todos los archivos que borre: Stage 2.
+		// En la packet window: A, B, C
+		// Voy a borrar A
+		// Voy a borrar B
+		// Voy a borrar C
+		// Borre A
+		// Borre B
+		// Borre C
+
+		// NOTE: Si se muere antes de escribir todos los "borre", no pasa
+		// nada. Porque cuando reviva va a ver que tiene mas "Voy a borrar"
+		// que "Borre", entonces va a poder saber.
 	}
 
 	return allReceived
+}
 
+type log struct {
+}
 
 // 	n, exits := slices.BinarySearchFunc(pr.packets_in_window, pkt,
 // 		func(i, j packet.Packet) int {
@@ -403,7 +424,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 // 	}
 
 // 	return pr.allReceived
-}
+// }
 
 // Funcion que procesa los paquetes si lo ve necesario.
 // func (pr *SinglePacketReceiver) processPackets() error {
