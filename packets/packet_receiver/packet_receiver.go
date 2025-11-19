@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	PACKET_WINDOW uint = 50
+	PACKET_WINDOW int = 50
 )
 
 // Este Packet Receiver esta pensado para workers que solo reciben un tipo de paquete,
@@ -258,8 +258,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 		// NOTE: Esto es un healthcheck, mepa que mientras dos paquetes no
 		// compartan header y tengan distinto payload, no deberia pasar nada malo.
-		// if sq_n == pkt.GetSequenceNumber() || already_processed {
-		if already_processed {
+		if sq_n == pkt.GetSequenceNumber() || already_processed {
 			bitacora.Info(fmt.Sprintf("Duplicate packet received. UUID: %s", wind_pkt.GetUUID()))
 		}
 	}
@@ -309,7 +308,9 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// 2. Si recibi todos los paquetes, entonces tambien tengo que procesar la
 	//    ventana. Lo que puede pasar es que la ventana este llena a medias,
 	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
-	if amount_packets_in_window >= int(PACKET_WINDOW) || allReceived {
+	if amount_packets_in_window >= PACKET_WINDOW || allReceived {
+		// LOG De todos los archivos que voy a borrar.
+
 		accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
 		if err != nil {
 			panic(err)
@@ -321,6 +322,8 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// Antes de escribir en disco, tengo que des-hacerme de los paquetes
 		// la ventana.
 		disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
+
+		// Borro el archivo de log
 	}
 
 	return allReceived
@@ -489,13 +492,16 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 
 // Devuelve el packet acumulado.
-func (pr *SinglePacketReceiver) GetPayload() string {
-	if pr.windowFull != true {
-		// NOTE: No borrar este panic. Es importante que si en algun momento
-		// se rompe la invariante, que el programa explote para poder debugear
-		// mejor.
-		// Un error no lo solucionaria porque esos son ignorables.
-		panic("Invariante del Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
-	}
-	return pr.buffer.String()
+// func (pr *SinglePacketReceiver) GetPayload() string {
+// 	if pr.windowFull != true {
+// 		// NOTE: No borrar este panic. Es importante que si en algun momento
+// 		// se rompe la invariante, que el programa explote para poder debugear
+// 		// mejor.
+// 		// Un error no lo solucionaria porque esos son ignorables.
+// 		panic("Invariante del Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
+// 	}
+// 	return pr.buffer.String()
+// }
+
+func (pr *SinglePacketReceiver) processWindow() {
 }
