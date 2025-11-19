@@ -208,12 +208,18 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 // Devuelve un booleano que representa si se recivieron todos los paquetes
 // dentro de la ventana. Si este es el caso, se tienen que procesar.
 func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
+	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
 
 	// El nombre del archivo es su numero de secuencia
 	pkt_file := pr.path_resolver.resolve_path(Packets) + string(pkt.GetSequenceNumber())
 
 	disk.AtomicWrite(pkt.Serialize(), pkt_file)
+	if pkt.IsEOF() {
+		eof_sequence_number := string(pkt.GetSequenceNumber())
+		received_eof_file := pr.path_resolver.resolve_path(ReceivedEof)
+		disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+	}
 	// Como ya escribimos a disco, ackeamos
 	pktMsg.Message.Ack(false)
 
