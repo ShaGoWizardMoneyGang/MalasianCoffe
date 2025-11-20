@@ -111,3 +111,9 @@ func CreateDir(path string) error {
 
 	return nil
 }
+
+func DeleteFile(path string) error {
+	err := os.Remove(path)
+
+	return err
+}

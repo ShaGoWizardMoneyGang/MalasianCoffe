@@ -72,6 +72,8 @@ type SinglePacketReceiver struct {
 	identifier string
 
 	path_resolver pathResolver
+
+	logger logger
 }
 
 type pathResolver struct {
@@ -204,6 +206,8 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		packets_in_window = append(packets_in_window, packet)
 	}
 
+	logger := newLogger(pathResolver.resolve_path(LogFile), "BORRAR", "BORRADO")
+
 	return SinglePacketReceiver{
 		packets_in_window:         packets_in_window,
 		processed_sequence_number: processed_sequence_numbers,
@@ -212,6 +216,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		EOF:                       received_eof,
 		identifier:                identifier,
 		path_resolver:             pathResolver,
+		logger:                    logger,
 	}
 }
 
@@ -323,6 +328,10 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// Voy a borrar A
 		// Voy a borrar B
 		// Voy a borrar C
+		for _, packet := range pr.packets_in_window {
+			sq_n := string(packet.GetSequenceNumber())
+			pr.logger.write_ahead(sq_n)
+		}
 
 		// NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
 		// log, no pasa nada, porque cuando se levante de vuelta va a ver que
@@ -352,6 +361,15 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// NOTE: Si se muere antes de escribir todos los "borre", no pasa
 		// nada. Porque cuando reviva va a ver que tiene mas "Voy a borrar"
 		// que "Borre", entonces va a poder saber.
+		for _, packet := range pr.packets_in_window {
+			sq_n := string(packet.GetSequenceNumber())
+			pr.logger.delete_behind(sq_n)
+
+			// Si se muere aca no pasa nada porque cuando reviva va a leer
+			// el log y va a borrar el paquete despues al revivir.
+			associated_file := pr.path_resolver.resolve_path(Packets) + string(pkt.GetSequenceNumber())
+			disk.DeleteFile(associated_file)
+		}
 	}
 
 	return allReceived
