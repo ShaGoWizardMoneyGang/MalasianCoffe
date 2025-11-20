@@ -450,21 +450,21 @@ func newLogger(log_file_path string, write_operation string, delete_operation st
 			// Caso tipico de que se escribio "borrado" en el log de un recurso.
 			delete(logger.pending_resources, resource)
 			logger.done_resources[resource] = struct{}{}
-		} else if !is_write && is_pending && !is_done {
-			// Caso tipico de que se escribio "borrado" en el log de un recurso.
-			delete(logger.pending_resources, resource)
+		} else if !is_write && is_pending && is_done {
+			// Esto rompe una invariante. O esta en una tabla, o esta en la
+			// otra.
+			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", logger.log_file))
+		} else if !is_write && !is_pending && is_done {
+			// Es un doble WRITE, esto es un error y no deberia pasar.
+			panic(fmt.Sprintf("DOBLE DELETE DETECTED: %s", logger.log_file))
+		} else if !is_write && !is_pending && !is_done {
+			// Es un doble WRITE, esto es un error y no deberia pasar.
+			panic(fmt.Sprintf("DELETE DE RECURSO NO WRITEADO DETECTADO: %s", logger.log_file))
 		}
 	}
 
 
 	return logger
-}
-
-// Indica al logger de loggear que [resource] va a ser modificado.
-// WARNING: Por cada llamada a `write_ahead` tiene que haber una llamada a
-// `delete_behind`
-func (l *logger) write_ahead(resource string) {
-
 }
 
 // Lee un entry de un log y te dice la log_entry que encontro. Principalmente
@@ -500,11 +500,36 @@ func (l *logger) parse_log_entry(log_entry_raw string) log_entry {
 	}
 }
 
+// Indica al logger de loggear que [resource] va a ser modificado.
+// WARNING: Por cada llamada a `write_ahead` tiene que haber una llamada a
+// `delete_behind`
+func (l *logger) write_ahead(resource string) {
+	_, exists := l.pending_resources[resource]
+	if exists {
+		panic(fmt.Sprintf("DOBLE WRITE DETECTED: %s", l.log_file))
+	}
+
+	write := l.write_operation
+
+	log_entry_s := write + " " + resource
+
+	disk.AtomicAppend(log_entry_s, l.log_file)
+}
+
 // Indica al logger de loggear que [resource] fue modificado
 // WARNING: Por cada llamada a `delete_behind` tiene que haber una llamada a
 // `write_ahead`
 func (l *logger) delete_behind(resource string) {
+	_, exists := l.done_resources[resource]
+	if exists {
+		panic(fmt.Sprintf("DOBLE DELETE DETECTED: %s", l.log_file))
+	}
 
+	delete := l.delete_operation
+
+	log_entry_s := delete + " " + resource
+
+	disk.AtomicAppend(log_entry_s, l.log_file)
 }
 
 
