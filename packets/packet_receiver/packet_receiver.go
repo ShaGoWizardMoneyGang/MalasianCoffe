@@ -28,6 +28,12 @@ const (
 //       \_received_sqns
 //   \_partial_work
 //   \_packets/
+//       \_packet-1
+//       \_packet-2
+//       \_packet-3
+//       \_packet-4
+//       \_packet-5
+//   \_window_log
 //
 // Funcionamiento:
 // - En el directorio "metadata/" se va a guardar metadata del estado actual de los
@@ -43,6 +49,7 @@ const (
 //   en memoria para agregar la informacion de los nuevos paquetes.
 // - En el directorio "packets/" se guardan todos los paquetes recibidos que son
 //   parte de la ventana actual, es decir, que todavia no fueron procesados.
+// - El archivo "window_log" guarda el log de los paquetes procesados.
 type SinglePacketReceiver struct {
 
 	// Packets que estan en la ventana actual. En cualquier momento, esto tiene
@@ -85,6 +92,7 @@ const (
 	ReceivedSqns
 	PartialWork
 	Packets
+	LogFile
 )
 
 func (pr *pathResolver) resolve_path(file KnownFile) string {
@@ -102,6 +110,8 @@ func (pr *pathResolver) resolve_path(file KnownFile) string {
 		path = pr.root + "/" + "partial_work"
 	case Packets:
 		path = pr.root + "/" + "packets" + "/"
+	case LogFile:
+		path = pr.root + "/" + "window_log"
 	// default:
 	// 	panic(fmt.Sprintf("Unknown path %s", file))
 	}
@@ -347,8 +357,156 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	return allReceived
 }
 
-type log struct {
+// Estructura encargada de escribir logs para trackear operaciones que tienen un
+// par logico de "comienzo" y "fin".
+type logger struct {
+	// Path al log file.
+	log_file string
+
+	// Nombre de la operacion que marca el comienzo de la modicacion.
+	write_operation string
+
+	// Nombre de la operacion que marca el fin de la edicion.
+	delete_operation string
+
+	// Resources that are waiting to be "deleted_behind"
+	pending_resources map[string] struct{}
+
+	// Resources that are done and should not receive any modifications.
+	done_resources map[string] struct{}
 }
+
+
+type operationType int
+const (
+	Write operationType = iota
+	Delete
+)
+
+type log_entry struct {
+	operation operationType
+	resource string
+}
+
+// If it's not a write, it's a delete
+func (le *log_entry) is_write() bool {
+	return le.operation == Write
+}
+
+// Funcion que crea un logger.
+// - log_file_path: Path al log file
+// - write_operation: Nombre de la operacion que marca el comienzo de la edicion.
+// - delete_operation: Nombre de la operacion que marca el fin de la edicion.
+func newLogger(log_file_path string, write_operation string, delete_operation string) logger {
+	write_op  := strings.ToUpper(write_operation)
+	delete_op := strings.ToUpper(delete_operation)
+
+	// NOTE: No soy NADA fan de usar el struct incompleto, pero solo lo hago
+	// aca. Lo hago para poder usar la funcion read_log_entry y que no sea
+	// demasiado quilombo.
+
+	logger := logger {
+		log_file: log_file_path,
+		write_operation: write_op,
+		delete_operation: delete_op,
+	}
+
+	if !disk.Exists(log_file_path) {
+		disk.CreateFile(log_file_path)
+	}
+	log_file, err := disk.Read(log_file_path)
+	if err != nil {
+		panic(err)
+	}
+
+	// Leo todos los logs que quedaron escritos para ya saber cual es el estado
+	// actual.
+	logs := strings.Split(log_file, "\n")
+	for _, log := range logs {
+		log_entry := logger.parse_log_entry(log)
+		resource  := log_entry.resource
+
+		_, is_pending := logger.pending_resources[resource]
+		_, is_done := logger.done_resources[resource]
+		// If it's not a write, it's a delete.
+		is_write   := log_entry.is_write()
+
+		if is_write && !is_pending && !is_done {
+			// Caso "basico" alguien escribio WRITE REC en el log.
+			// Lo marco como pendiente de borrado.
+			logger.pending_resources[resource] = struct{}{}
+		} else if is_write && is_pending && !is_done {
+			// Es un doble WRITE, esto es un error y no deberia pasar.
+			panic(fmt.Sprintf("DOBLE WRITE DETECTED: %s", logger.log_file))
+		} else if is_write && is_pending && is_done {
+			// Esto rompe una invariante. O esta en una tabla, o esta en la
+			// otra.
+			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", logger.log_file))
+		} else if is_write && !is_pending && is_done {
+			// Esto es un recurso que fue logeado en el pasado, y ya termino.
+			// TECNICAMENTE valido, pero no deberia suceder.
+			bitacora.Info("Logger: Se detecto que un recurso que fue modificado y borrado en el pasado fue anadido de nuevo en el log.")
+		} else if !is_write && is_pending && !is_done {
+			// Caso tipico de que se escribio "borrado" en el log de un recurso.
+			delete(logger.pending_resources, resource)
+			logger.done_resources[resource] = struct{}{}
+		} else if !is_write && is_pending && !is_done {
+			// Caso tipico de que se escribio "borrado" en el log de un recurso.
+			delete(logger.pending_resources, resource)
+		}
+	}
+
+
+	return logger
+}
+
+// Indica al logger de loggear que [resource] va a ser modificado.
+// WARNING: Por cada llamada a `write_ahead` tiene que haber una llamada a
+// `delete_behind`
+func (l *logger) write_ahead(resource string) {
+
+}
+
+// Lee un entry de un log y te dice la log_entry que encontro. Principalmente
+// esto es util para saber si es un operationType::Write o un
+// operationType::Delete y el recurso modificado.
+//
+// NOTE: Todas los log entries son del tipo:
+// <WRITE|DELETE> <RESOURCE>
+//
+// NOTE on a NOTE: WRITE|DELETE no se leen literalmente asi, depende de lo que
+// se pase a write_operation y delete_operation en tiempo de creacion.
+func (l *logger) parse_log_entry(log_entry_raw string) log_entry {
+	log_entry_split := strings.Split(log_entry_raw, " ")
+	if len(log_entry_split) > 2 {
+		panic(fmt.Sprintf("Invalid log entry. Tried to split into 2, got split into: %d", len(log_entry_split)))
+	}
+
+	operation_s := log_entry_split[0]
+	var operation operationType
+	if operation_s == l.write_operation {
+		operation = Write
+	} else if operation_s == l.delete_operation {
+		operation = Delete
+	} else {
+		panic(fmt.Sprintf("Invalid log entry. Expected %s or %s, got: %s", l.write_operation, l.delete_operation, operation_s))
+	}
+
+	resource := log_entry_split[1]
+
+	return log_entry {
+		operation: operation,
+		resource: resource,
+	}
+}
+
+// Indica al logger de loggear que [resource] fue modificado
+// WARNING: Por cada llamada a `delete_behind` tiene que haber una llamada a
+// `write_ahead`
+func (l *logger) delete_behind(resource string) {
+
+}
+
 
 // 	n, exits := slices.BinarySearchFunc(pr.packets_in_window, pkt,
 // 		func(i, j packet.Packet) int {
