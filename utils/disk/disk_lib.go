@@ -50,7 +50,14 @@ func AtomicWriteString(data string, path string) error {
 func AtomicAppend(data string, path string) error {
 	old_data, err := Read(path)
 	if err != nil {
-		return err
+		// Si el archivo no existe, entonces hacemos de cuenta que el archivo
+		// estaba vacio.  Ligeramente mas ergonomico y recrea el ">>" de la
+		// shell
+		if err == fs.ErrNotExist {
+			old_data = ""
+		} else {
+			return err
+		}
 	}
 
 	new_data := old_data + "\n" + data
