@@ -209,11 +209,11 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// Guardo el paquete que acabo de recibir en disco
 	{
 		// NOTE: Por convencion, el nombre del archivo es su numero de secuencia
-		pkt_file := pr.path_resolver.resolve_path(Packets) + string(pkt.GetSequenceNumber())
+		pkt_file := pr.path_resolver.resolve_path(Packets) + pkt.GetSequenceNumberString()
 		disk.AtomicWrite(pkt.Serialize(), pkt_file)
 		if pkt.IsEOF() {
 			pr.EOF = pkt.GetSequenceNumber()
-			eof_sequence_number := string(pkt.GetSequenceNumber())
+			eof_sequence_number := pkt.GetSequenceNumberString()
 			received_eof_file := pr.path_resolver.resolve_path(ReceivedEof)
 			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
 		}
@@ -311,7 +311,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// Voy a borrar B
 		// Voy a borrar C
 		for _, packet := range pr.packets_in_window {
-			sq_n := string(packet.GetSequenceNumber())
+			sq_n := packet.GetSequenceNumberString()
 			pr.logger.write_ahead(sq_n)
 		}
 
@@ -344,7 +344,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// nada. Porque cuando reviva va a ver que tiene mas "Voy a borrar"
 		// que "Borre", entonces va a poder saber.
 		for _, packet := range pr.packets_in_window {
-			sq_n := string(packet.GetSequenceNumber())
+			sq_n := packet.GetSequenceNumberString()
 			// Aca tambien se borra el recurso asociado
 			pr.logger.delete_behind(sq_n)
 		}
