@@ -70,6 +70,8 @@ type SinglePacketReceiver struct {
 	path_resolver pathResolver
 
 	logger logger
+
+	windowFull bool
 }
 
 type pathResolver struct {
@@ -193,6 +195,8 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		identifier:                identifier,
 		path_resolver:             pathResolver,
 		logger:                    logger,
+		// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
+		windowFull:                false,
 	}
 }
 
@@ -344,6 +348,8 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			pr.logger.delete_behind(sq_n)
 		}
 	}
+
+	pr.windowFull = allReceived
 
 	return allReceived
 }
@@ -802,10 +808,15 @@ func (pr *SinglePacketReceiver) GetPayload() string {
 		// se rompe la invariante, que el programa explote para poder debugear
 		// mejor.
 		// Un error no lo solucionaria porque esos son ignorables.
-		panic("Invariante del Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
+		panic("Invariante del Single Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
 	}
-	return pr.buffer.String()
-}
 
-// func (pr *SinglePacketReceiver) processWindow() {
-// }
+	// TODO: Optimizacion: Si ya esta cargado en memoria, no lo vuelvo a leer
+	// del disco.
+	accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
+	if err != nil {
+		panic(err)
+	}
+
+	return accumulated_work
+}
