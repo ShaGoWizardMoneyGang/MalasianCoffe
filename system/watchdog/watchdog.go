@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	SHEEPS_FILE  = "sheeps.txt"
-	PUPPIES_FILE = "puppies.txt"
-	MAX_RETRIES  = 3
-	TIMEOUT      = 2
+	SHEEPS_FILE       = "sheeps.txt"
+	PUPPIES_FILE      = "puppies.txt"
+	RING_MEMBERS_FILE = "ring.txt"
+	MAX_RETRIES       = 3
+	TIMEOUT           = 2
 )
 
 func restartContainer(name string) {
@@ -45,12 +46,12 @@ func main() {
 	if err != nil {
 		panic("No se pudo obtener el hostname")
 	}
-	puppies, err := watchdog.ReadPuppies(PUPPIES_FILE)
+	members, err := watchdog.ReadRingMembers(RING_MEMBERS_FILE)
 	if err != nil {
 		panic(err)
 	}
-	myID := watchdog.FindID(myName, puppies)
-	neighbor := watchdog.GetNeighbor(myID, puppies)
+	myID := watchdog.FindID(myName, members)
+	neighbor := watchdog.GetNeighbor(myID, members)
 	fmt.Printf("Soy %s, mi vecino en el anillo es %s\n", myName, neighbor)
 
 	go watchdog.ListenRing(watchdog.WatchdogNode{ID: myID, Addr: myName, Neighbor: neighbor})
@@ -92,18 +93,18 @@ func main() {
 	}
 
 	listOfPuppies := strings.Split(string(file), "\n")
-	puppies = make([]string, 0, len(listOfPuppies))
+	members = make([]string, 0, len(listOfPuppies))
 	for _, p := range listOfPuppies {
 		p = strings.TrimSpace(p)
 		if p != "" {
-			puppies = append(puppies, p)
+			members = append(members, p)
 			fmt.Println("Réplicas:", p)
 		}
 	}
 
-	fmt.Println(puppies)
+	fmt.Println(members)
 
-	go watchdog.HeartbeatLoop(puppies)
+	go watchdog.HeartbeatLoop(members)
 
 	addr := net.UDPAddr{
 		Port: watchdog.HEALTHCHECK_PORT,

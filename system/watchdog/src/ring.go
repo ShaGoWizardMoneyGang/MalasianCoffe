@@ -13,20 +13,20 @@ type WatchdogNode struct {
 	Neighbor string // lista enlazada
 }
 
-func ReadPuppies(puppiesFile string) ([]string, error) {
-	data, err := os.ReadFile(puppiesFile)
+func ReadRingMembers(ringFile string) ([]string, error) {
+	data, err := os.ReadFile(ringFile)
 	if err != nil {
 		return nil, err
 	}
 	lines := strings.Split(string(data), "\n")
-	puppies := []string{}
+	members := []string{}
 	for _, l := range lines {
 		l = strings.TrimSpace(l)
 		if l != "" {
-			puppies = append(puppies, l)
+			members = append(members, l)
 		}
 	}
-	return puppies, nil
+	return members, nil
 }
 
 func FindID(myName string, puppies []string) int {
