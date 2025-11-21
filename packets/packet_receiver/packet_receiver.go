@@ -56,10 +56,6 @@ type SinglePacketReceiver struct {
 	// que ser HASTA PACKET_WINDOW.
 	packets_in_window []packet.Packet
 
-	// Hashset de todos los numeros de sequencia recibidos y procesados hasta el
-	// momento.
-	processed_sequence_number []int
-
 	// Funcion a aplicarle a los paquetes en la ventana. OJO, tiene que soportar ser parcial.
 	transformer func(accumulated_input string, new_input string) string
 
@@ -135,10 +131,6 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	if !disk.Exists(received_eof_file) {
 		disk.CreateFile(received_eof_file)
 	}
-	received_sqns_file := pathResolver.resolve_path(ReceivedSqns)
-	if !disk.Exists(received_sqns_file) {
-		disk.CreateFile(received_sqns_file)
-	}
 
 	partial_work_file := pathResolver.resolve_path(PartialWork)
 	if !disk.Exists(partial_work_file) {
@@ -169,24 +161,6 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	}
 
 
-	received_sqns_s, err := disk.Read(received_sqns_file)
-	if err != nil {
-		panic(err)
-	}
-	sqns := strings.Split(received_sqns_s, "\n")
-	processed_sequence_numbers := []int{}
-	for _, sqn := range sqns {
-		sqn_i, err := strconv.Atoi(sqn)
-		if err != nil {
-			panic(err)
-		}
-
-		already_added := slices.Contains(processed_sequence_numbers, sqn_i)
-		if already_added {
-			bitacora.Info(fmt.Sprintf("Duplicate packet received. UUID: %s", sqn))
-		}
-		processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
-	}
 
 	packets_in_window := []packet.Packet{}
 	entries, err := os.ReadDir(packets_dir)
@@ -206,13 +180,15 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		packets_in_window = append(packets_in_window, packet)
 	}
 
-	logger := newLogger(pathResolver.resolve_path(LogFile), "BORRAR", "BORRADO", pathResolver.resolve_path(Packets))
+	logger := newLogger("BORRAR", "BORRADO",
+		pathResolver.resolve_path(ReceivedSqns),
+		pathResolver.resolve_path(LogFile),
+		pathResolver.resolve_path(Packets),
+	)
 
 	return SinglePacketReceiver{
 		packets_in_window:         packets_in_window,
-		processed_sequence_number: processed_sequence_numbers,
 		transformer:               transformer,
-		// windowFull:                false,
 		EOF:                       received_eof,
 		identifier:                identifier,
 		path_resolver:             pathResolver,
@@ -257,14 +233,15 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			return sn_i - sn_j
 	})
 
+	processed_sequence_number := pr.logger.get_processed_number()
 	// En este buffer nos guardamos todos los numeros de secuencia recibido
 	// para chequear que recibimos todos los paquetes (usado despues)
-	received_packets := make([]int, len(pr.processed_sequence_number) + len(pr.packets_in_window))
+	received_packets := make([]int, len(processed_sequence_number) + len(pr.packets_in_window))
 
 	var buffer strings.Builder
 	for i, wind_pkt := range pr.packets_in_window {
 		sq_n     := wind_pkt.GetSequenceNumber()
-		already_processed := slices.Contains(pr.processed_sequence_number, sq_n)
+		already_processed := slices.Contains(processed_sequence_number, sq_n)
 
 		received_packets[i] = sq_n
 
@@ -281,7 +258,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 	// Chequeamos si recibi todos los paquetes
 	offset := amount_packets_in_window
-	for i, sq_n := range pr.processed_sequence_number {
+	for i, sq_n := range processed_sequence_number {
 		received_packets[i + offset] = sq_n
 	}
 
@@ -363,12 +340,8 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// que "Borre", entonces va a poder saber.
 		for _, packet := range pr.packets_in_window {
 			sq_n := string(packet.GetSequenceNumber())
+			// Aca tambien se borra el recurso asociado
 			pr.logger.delete_behind(sq_n)
-
-			// Si se muere aca no pasa nada porque cuando reviva va a leer
-			// el log y va a borrar el paquete despues al revivir.
-			associated_file := pr.path_resolver.resolve_path(Packets) + string(pkt.GetSequenceNumber())
-			disk.DeleteFile(associated_file)
 		}
 	}
 
@@ -381,20 +354,28 @@ type logger struct {
 	// Path al log file.
 	log_file string
 
+	// Associated resource directory
+	resource_dir string
+
 	// Nombre de la operacion que marca el comienzo de la modicacion.
 	write_operation string
 
 	// Nombre de la operacion que marca el fin de la edicion.
 	delete_operation string
 
+	// Hashset de todos los numeros de sequencia recibidos y procesados hasta el
+	// momento.
+	processed_sequence_number []int
+
+	// Log de todos los recursos procesados.
+	processed_resource_log string
+
+// ==================== CONSTRUCTED DURING INSTANTIATION =======================
 	// Resources that are waiting to be "deleted_behind"
 	pending_resources map[string] struct{}
 
 	// Resources that are done and should not receive any modifications.
 	done_resources map[string] struct{}
-
-	// Associated resource directory
-	resource_dir string
 }
 
 
@@ -418,9 +399,40 @@ func (le *log_entry) is_write() bool {
 // - log_file_path: Path al log file
 // - write_operation: Nombre de la operacion que marca el comienzo de la edicion.
 // - delete_operation: Nombre de la operacion que marca el fin de la edicion.
-func newLogger(log_file_path string, write_operation string, delete_operation string, resource_dir string) logger {
+func newLogger(write_operation string, delete_operation string,
+	received_sqns_file string,
+	log_file_path      string,
+	resouce_dir        string,
+	) logger {
+
 	write_op  := strings.ToUpper(write_operation)
 	delete_op := strings.ToUpper(delete_operation)
+
+	if !disk.Exists(received_sqns_file) {
+		disk.CreateFile(received_sqns_file)
+	}
+	if !disk.Exists(log_file_path) {
+		disk.CreateFile(log_file_path)
+	}
+
+	received_sqns_s, err := disk.Read(received_sqns_file)
+	if err != nil {
+		panic(err)
+	}
+	sqns := strings.Split(received_sqns_s, "\n")
+	processed_sequence_numbers := []int{}
+	for _, sqn := range sqns {
+		sqn_i, err := strconv.Atoi(sqn)
+		if err != nil {
+			panic(err)
+		}
+
+		already_added := slices.Contains(processed_sequence_numbers, sqn_i)
+		if already_added {
+			bitacora.Info(fmt.Sprintf("Duplicate packet received. UUID: %s", sqn))
+		}
+		processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
+	}
 
 	// NOTE: No soy NADA fan de usar el struct incompleto, pero solo lo hago
 	// aca. Lo hago para poder usar la funcion read_log_entry y que no sea
@@ -428,14 +440,13 @@ func newLogger(log_file_path string, write_operation string, delete_operation st
 
 	logger := logger {
 		log_file: log_file_path,
+		resource_dir: resouce_dir,
 		write_operation: write_op,
 		delete_operation: delete_op,
-		resource_dir: resource_dir,
+		processed_sequence_number: processed_sequence_numbers,
+		processed_resource_log: received_sqns_file,
 	}
 
-	if !disk.Exists(log_file_path) {
-		disk.CreateFile(log_file_path)
-	}
 	log_file, err := disk.Read(log_file_path)
 	if err != nil {
 		panic(err)
@@ -459,11 +470,11 @@ func newLogger(log_file_path string, write_operation string, delete_operation st
 			logger.pending_resources[resource] = struct{}{}
 		} else if is_write && is_pending && !is_done {
 			// Es un doble WRITE, esto es un error y no deberia pasar.
-			panic(fmt.Sprintf("DOBLE WRITE DETECTED: %s", logger.log_file))
+			panic(fmt.Sprintf("DOBLE WRITE DETECTED: %s", log_file_path))
 		} else if is_write && is_pending && is_done {
 			// Esto rompe una invariante. O esta en una tabla, o esta en la
 			// otra.
-			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", logger.log_file))
+			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", log_file_path))
 		} else if is_write && !is_pending && is_done {
 			// Esto es un recurso que fue logeado en el pasado, y ya termino.
 			// TECNICAMENTE valido, pero no deberia suceder.
@@ -483,18 +494,22 @@ func newLogger(log_file_path string, write_operation string, delete_operation st
 		} else if !is_write && is_pending && is_done {
 			// Esto rompe una invariante. O esta en una tabla, o esta en la
 			// otra.
-			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", logger.log_file))
+			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", log_file_path))
 		} else if !is_write && !is_pending && is_done {
 			// Es un doble WRITE, esto es un error y no deberia pasar.
-			panic(fmt.Sprintf("DOBLE DELETE DETECTED: %s", logger.log_file))
+			panic(fmt.Sprintf("DOBLE DELETE DETECTED: %s", log_file_path))
 		} else if !is_write && !is_pending && !is_done {
 			// Es un doble WRITE, esto es un error y no deberia pasar.
-			panic(fmt.Sprintf("DELETE DE RECURSO NO WRITEADO DETECTADO: %s", logger.log_file))
+			panic(fmt.Sprintf("DELETE DE RECURSO NO WRITEADO DETECTADO: %s", log_file_path))
 		}
 	}
 
 
 	return logger
+}
+
+func (l *logger) get_processed_number() []int {
+	return l.processed_sequence_number
 }
 
 // Lee un entry de un log y te dice la log_entry que encontro. Principalmente
