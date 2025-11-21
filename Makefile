@@ -163,6 +163,7 @@ docker-build-watchdog:
 #============================== Misc directives ===============================
 clean-out:
 	find out/ ! -name '.gitignore' ! -name 'out' -type d -exec rm -irf {} +
+	rm -rf packet_receiver/*
 
 download-dataset:
 	curl -C - -L https://www.kaggle.com/api/v1/datasets/download/geraldooizx/g-coffee-shop-transaction-202307-to-202506 -o dataset/dataset.zip

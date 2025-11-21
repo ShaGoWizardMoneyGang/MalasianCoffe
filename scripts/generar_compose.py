@@ -145,15 +145,22 @@ def filter_menu_items_block(n, queueAmount2a, queueAmount2b):
 """
 
 def concat_block(n):
+    name = f"concat_{n}"
     routing_key = int(n) - 1
+
+    os.mkdir(f"packet_receiver/{name}")
+    os.mkdir(f"packet_receiver/{name}/metadata")
+
     return f"""
-  concat_{n}:
-    container_name: concat_{n}
+  {name}:
+    container_name: {name}
     image: ubuntu:24.04
     working_dir: /app
     entrypoint: ./bin/concat rabbitmq:5672 {routing_key}
     volumes:
       - ./bin/concat:/app/bin/concat
+      - ./packet_receiver/{name}:/app/packet_receiver-concater/
+      - ./packet_receiver/{name}/metadata:/app/packet_receiver-concater/metadata
     networks:
       - testing_net
     depends_on:

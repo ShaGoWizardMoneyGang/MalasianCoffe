@@ -101,7 +101,7 @@ func (pr *pathResolver) resolve_path(file KnownFile) string {
 	case Root:
 		path = pr.root
 	case Metadata:
-		path = pr.root + "/" + "metada"
+		path = pr.root + "/" + "metadata"
 	case ReceivedEof:
 		path = pr.root + "/" + "metada" + "/" + "received_eof"
 	case ReceivedSqns:
