@@ -169,7 +169,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	}
 
 
-	received_sqns_s, err := disk.Read(received_eof_file)
+	received_sqns_s, err := disk.Read(received_sqns_file)
 	if err != nil {
 		panic(err)
 	}
@@ -206,7 +206,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		packets_in_window = append(packets_in_window, packet)
 	}
 
-	logger := newLogger(pathResolver.resolve_path(LogFile), "BORRAR", "BORRADO")
+	logger := newLogger(pathResolver.resolve_path(LogFile), "BORRAR", "BORRADO", pathResolver.resolve_path(Packets))
 
 	return SinglePacketReceiver{
 		packets_in_window:         packets_in_window,
@@ -255,7 +255,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			sn_i := i.GetSequenceNumber()
 			sn_j := j.GetSequenceNumber()
 			return sn_i - sn_j
-		})
+	})
 
 	// En este buffer nos guardamos todos los numeros de secuencia recibido
 	// para chequear que recibimos todos los paquetes (usado despues)
@@ -392,6 +392,9 @@ type logger struct {
 
 	// Resources that are done and should not receive any modifications.
 	done_resources map[string] struct{}
+
+	// Associated resource directory
+	resource_dir string
 }
 
 
@@ -415,7 +418,7 @@ func (le *log_entry) is_write() bool {
 // - log_file_path: Path al log file
 // - write_operation: Nombre de la operacion que marca el comienzo de la edicion.
 // - delete_operation: Nombre de la operacion que marca el fin de la edicion.
-func newLogger(log_file_path string, write_operation string, delete_operation string) logger {
+func newLogger(log_file_path string, write_operation string, delete_operation string, resource_dir string) logger {
 	write_op  := strings.ToUpper(write_operation)
 	delete_op := strings.ToUpper(delete_operation)
 
@@ -427,6 +430,7 @@ func newLogger(log_file_path string, write_operation string, delete_operation st
 		log_file: log_file_path,
 		write_operation: write_op,
 		delete_operation: delete_op,
+		resource_dir: resource_dir,
 	}
 
 	if !disk.Exists(log_file_path) {
@@ -468,6 +472,14 @@ func newLogger(log_file_path string, write_operation string, delete_operation st
 			// Caso tipico de que se escribio "borrado" en el log de un recurso.
 			delete(logger.pending_resources, resource)
 			logger.done_resources[resource] = struct{}{}
+
+			// Tengo que fijarme si se borro el archivo.
+			associated_file := logger.get_associate_file(resource)
+			if disk.Exists(associated_file) {
+				bitacora.Info(fmt.Sprintf("LOGGER: Encontre recurso que figuraba como borrado: %s. Lo borro.", associated_file))
+				disk.DeleteFile(associated_file)
+			}
+
 		} else if !is_write && is_pending && is_done {
 			// Esto rompe una invariante. O esta en una tabla, o esta en la
 			// otra.
@@ -524,7 +536,8 @@ func (l *logger) parse_log_entry(log_entry_raw string) log_entry {
 func (l *logger) write_ahead(resource string) {
 	_, exists := l.pending_resources[resource]
 	if exists {
-		panic(fmt.Sprintf("DOBLE WRITE DETECTED: %s", l.log_file))
+		bitacora.Info(fmt.Sprintf("DOBLE WRITE DETECTED: %s, skipping write.", l.log_file))
+		return
 	}
 
 	write := l.write_operation
@@ -534,20 +547,54 @@ func (l *logger) write_ahead(resource string) {
 	disk.AtomicAppend(log_entry_s, l.log_file)
 }
 
+func (l *logger) get_associate_file(resource string) string {
+	associated_file        := l.resource_dir + resource
+	return associated_file
+}
+
+
 // Indica al logger de loggear que [resource] fue modificado
 // WARNING: Por cada llamada a `delete_behind` tiene que haber una llamada a
 // `write_ahead`
 func (l *logger) delete_behind(resource string) {
-	_, exists := l.done_resources[resource]
-	if exists {
-		panic(fmt.Sprintf("DOBLE DELETE DETECTED: %s", l.log_file))
+	associated_file        := l.get_associate_file(resource)
+
+	_, marked_as_pending   := l.pending_resources[resource]
+	_, marked_as_done      := l.done_resources[resource]
+	associated_file_exists := disk.Exists(l.resource_dir + resource)
+
+
+	if        marked_as_pending  && marked_as_done {
+		// Esto no deberia suceder nunca. Ni siquiera es un error.
+		panic(fmt.Sprintf("Resource %s found in both pending and done tables", resource))
+	} else if marked_as_pending  && !marked_as_done {
+		// Este es el caso canonico.
+
+		// Si el archivo existe, significa que el programa se detuvo justo
+		// antes de borrarlo. No pasa nada, is all good, lo borramos ahora.
+		if associated_file_exists {
+			delete_op   := l.delete_operation
+
+			log_entry_s := delete_op + " " + resource
+
+			disk.AtomicAppend(log_entry_s, l.log_file)
+
+			// Si me muero aca, antes de borrarlo, no pasa nada porque va a
+			// borrar el archivo al levantar el logger despues de morir.
+
+			disk.DeleteFile(associated_file)
+		} else {
+			bitacora.Error(fmt.Sprintf("Recurso %s que figuraba como borrado existe en el filesystem", associated_file))
+		}
+
+		delete(l.pending_resources, resource)
+		l.done_resources[resource] = struct{}{}
+	} else if !marked_as_pending && marked_as_done {
+		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente."))
+	} else if !marked_as_pending && !marked_as_done {
+		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente ni como listo (WTF?)."))
 	}
 
-	delete := l.delete_operation
-
-	log_entry_s := delete + " " + resource
-
-	disk.AtomicAppend(log_entry_s, l.log_file)
 }
 
 
@@ -714,16 +761,16 @@ func (l *logger) delete_behind(resource string) {
 
 
 // Devuelve el packet acumulado.
-// func (pr *SinglePacketReceiver) GetPayload() string {
-// 	if pr.windowFull != true {
-// 		// NOTE: No borrar este panic. Es importante que si en algun momento
-// 		// se rompe la invariante, que el programa explote para poder debugear
-// 		// mejor.
-// 		// Un error no lo solucionaria porque esos son ignorables.
-// 		panic("Invariante del Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
-// 	}
-// 	return pr.buffer.String()
-// }
-
-func (pr *SinglePacketReceiver) processWindow() {
+func (pr *SinglePacketReceiver) GetPayload() string {
+	if pr.windowFull != true {
+		// NOTE: No borrar este panic. Es importante que si en algun momento
+		// se rompe la invariante, que el programa explote para poder debugear
+		// mejor.
+		// Un error no lo solucionaria porque esos son ignorables.
+		panic("Invariante del Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
+	}
+	return pr.buffer.String()
 }
+
+// func (pr *SinglePacketReceiver) processWindow() {
+// }
