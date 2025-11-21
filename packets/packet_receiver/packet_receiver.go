@@ -491,6 +491,18 @@ func newLogger(write_operation string, delete_operation string,
 				disk.DeleteFile(associated_file)
 			}
 
+			resource_i, err := strconv.Atoi(resource)
+			if err != nil {
+				panic(err)
+			}
+
+			// Si el paquete figura como borrado, pero no esta en la lista,
+			// entonces signfica que el programa se cayo antes de appendear
+			// el numero de paquete al log de paquetes procesados
+			if !slices.Contains(processed_sequence_numbers, resource_i) {
+				disk.AtomicAppend(resource, logger.processed_resource_log)
+			}
+
 		} else if !is_write && is_pending && is_done {
 			// Esto rompe una invariante. O esta en una tabla, o esta en la
 			// otra.
@@ -594,9 +606,17 @@ func (l *logger) delete_behind(resource string) {
 
 			disk.AtomicAppend(log_entry_s, l.log_file)
 
+			// Si me muero aca, no pasa nada. Lo anado al revivir.
+			disk.AtomicAppend(resource, l.processed_resource_log)
+			resource_i, err := strconv.Atoi(resource)
+			if err != nil {
+				panic(err)
+			}
+			l.processed_sequence_number = append(l.processed_sequence_number, resource_i)
+
+
 			// Si me muero aca, antes de borrarlo, no pasa nada porque va a
 			// borrar el archivo al levantar el logger despues de morir.
-
 			disk.DeleteFile(associated_file)
 		} else {
 			bitacora.Error(fmt.Sprintf("Recurso %s que figuraba como borrado existe en el filesystem", associated_file))
