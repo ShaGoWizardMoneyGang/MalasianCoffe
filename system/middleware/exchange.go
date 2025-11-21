@@ -144,15 +144,15 @@ Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareDelete
 func (e *MessageMiddlewareExchange) Delete() (error MessageMiddlewareError) {
 	// claro aca el tema es: tengo que borrar la cola tambien??? si la tengo que borrar
 	// tendria que guardarla en algun lado para poder obtener el name.
-	err := (*e.channel).ExchangeDelete(
-		e.exchangeName,
-		true,
-		false,
-	)
+	// err := (*e.channel).ExchangeDelete(
+	// 	e.exchangeName,
+	// 	true,
+	// 	false,
+	// )
 
-	if err != nil {
-		return MessageMiddlewareDeleteError
-	}
+	// if err != nil {
+	// 	return MessageMiddlewareDeleteError
+	// }
 
 	return 0
 }
