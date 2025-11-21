@@ -1,4 +1,4 @@
-package packet_receiver
+package single_packet_receiver
 
 import (
 	"fmt"
