@@ -303,7 +303,8 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// 2. Si recibi todos los paquetes, entonces tambien tengo que procesar la
 	//    ventana. Lo que puede pasar es que la ventana este llena a medias,
 	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
-	if amount_packets_in_window >= PACKET_WINDOW || allReceived {
+	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
+	if do_flush_window || allReceived {
 		// LOG De todos los archivos que voy a borrar: Stage 1.
 		// En la packet window: A, B, C
 		// Voy a borrar A
@@ -435,7 +436,7 @@ func newLogger(write_operation string, delete_operation string,
 
 		already_added := slices.Contains(processed_sequence_numbers, sqn_i)
 		if already_added {
-			bitacora.Info(fmt.Sprintf("Duplicate packet received. UUID: %s", sqn))
+			bitacora.Info(fmt.Sprintf("Duplicate packet in file. UUID: %s", sqn))
 		}
 		processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
 	}
@@ -578,6 +579,10 @@ func (l *logger) write_ahead(resource string) {
 	log_entry_s := write + " " + resource
 
 	disk.AtomicAppend(log_entry_s, l.log_file)
+	err := disk.AtomicAppend(log_entry_s, l.log_file)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (l *logger) get_associate_file(resource string) string {
