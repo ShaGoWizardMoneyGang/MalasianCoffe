@@ -29,7 +29,7 @@ func addStoreToMap(storePkt packet.Packet, storeMap map[string]string) bool {
 	}
 }
 
-func createStoreMap(storeReceiver packet_receiver.SinglePacketReceiver) map[string]string {
+func createStoreMap(storeReceiver packet_receiver.PacketReceiver) map[string]string {
 	stores := storeReceiver.GetPayload()
 	lines := strings.Split(stores, "\n")
 	lines = lines[:len(lines)-1]
@@ -47,7 +47,7 @@ func createStoreMap(storeReceiver packet_receiver.SinglePacketReceiver) map[stri
 	return storeID2Name
 }
 
-func createMenuItemMap(menuItemReceiver packet_receiver.SinglePacketReceiver) map[string]string {
+func createMenuItemMap(menuItemReceiver packet_receiver.PacketReceiver) map[string]string {
 	menuItemPkt := menuItemReceiver.GetPayload()
 	lines := strings.Split(menuItemPkt, "\n")
 	lines = lines[:len(lines)-1]
