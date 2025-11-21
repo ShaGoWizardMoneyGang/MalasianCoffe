@@ -30,7 +30,7 @@ type joinerQuery4 struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func createUserMap(userReceiver packet_receiver.SinglePacketReceiver) map[string]string {
+func createUserMap(userReceiver packet_receiver.PacketReceiver) map[string]string {
 	storePkt := userReceiver.GetPayload()
 	lines := strings.Split(storePkt, "\n")
 	lines = lines[:len(lines)-1]
@@ -49,13 +49,13 @@ func createUserMap(userReceiver packet_receiver.SinglePacketReceiver) map[string
 }
 
 func joinQuery4(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	storeReceiver := packet_receiver.NewSinglePacketReceiver("store")
+	storeReceiver := packet_receiver.NewPacketReceiver("store")
 
-	userReceiver := packet_receiver.NewSinglePacketReceiver("user")
+	userReceiver := packet_receiver.NewPacketReceiver("user")
 
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
 	// stores. Deberian ser pocos (si es que existen)
-	transactionReceiver := packet_receiver.NewSinglePacketReceiver("transactions")
+	transactionReceiver := packet_receiver.NewPacketReceiver("transactions")
 
 	// Resultado final
 	var joinedTransactions strings.Builder
@@ -150,7 +150,7 @@ func (jq4 *joinerQuery4) Process() {
 	}
 }
 
-func joinerFunctionQuery4(storeReceiver packet_receiver.SinglePacketReceiver, userReceiver packet_receiver.SinglePacketReceiver, transactionReceiver packet_receiver.SinglePacketReceiver, joinedTransactions *strings.Builder) {
+func joinerFunctionQuery4(storeReceiver packet_receiver.PacketReceiver, userReceiver packet_receiver.PacketReceiver, transactionReceiver packet_receiver.PacketReceiver, joinedTransactions *strings.Builder) {
 	userMap := createUserMap(userReceiver)
 	storeMap := createStoreMap(storeReceiver)
 

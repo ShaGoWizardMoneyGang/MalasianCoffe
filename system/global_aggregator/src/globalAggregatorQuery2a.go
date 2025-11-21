@@ -43,7 +43,7 @@ func (g *aggregator2aGlobal) Build(rabbitAddr string, routing_key string, outs m
 }
 
 func aggregateQuery2a(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := packet_receiver.NewSinglePacketReceiver("agregador-global-2a")
+	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-2a")
 	localAcc := make(map[keyQuery2a]int64)
 
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
