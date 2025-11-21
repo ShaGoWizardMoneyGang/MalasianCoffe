@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_receiver"
+	"malasian_coffe/packets/single_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	"malasian_coffe/utils/colas"
-	"strings"
 )
 
 type Concat struct {
@@ -23,33 +22,33 @@ type Concat struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
+func concat_func(accumulated_input string, new_input string) string {
+	concatenated := accumulated_input + new_input
+	return concatenated
+}
+
 func concat(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := packet_receiver.NewPacketReceiver("concater")
+	localReceiver := single_packet_receiver.NewSinglePacketReceiver("concater", concat_func)
 
-	var concatenatedPackets strings.Builder
-
+	var concatenated_packets string
 	var last_packet packet.Packet
 	for {
 		pktMsg := <-inputChannel
 		pkt    := pktMsg.Packet
 
-		localReceiver.ReceivePacket(pktMsg)
+		received_all := localReceiver.ReceivePacket(pktMsg)
 
-		if !localReceiver.ReceivedAll() {
+		if !received_all {
 			continue
 		}
 
-		concatenatedInput := localReceiver.GetPayload()
-		concatenatedPackets.WriteString(concatenatedInput)
+		concatenated_packets = localReceiver.GetPayload()
 		last_packet = pkt
 		break
 	}
 
 
-	pkt_joineado := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{concatenatedPackets.String()})
-
-	// Liberamos
-	concatenatedPackets.Reset()
+	pkt_joineado := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{concatenated_packets})
 
 	for _, pkt := range pkt_joineado {
 		bitacora.Info(fmt.Sprintf("Envio pkt concatenado al sender, session: %s", pkt.GetSessionID()))
