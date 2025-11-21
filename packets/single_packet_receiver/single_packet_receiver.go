@@ -348,6 +348,9 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			// Aca tambien se borra el recurso asociado
 			pr.logger.delete_behind(sq_n)
 		}
+		// Ahora que la ventana esta procesada, y el cambio esta en disco,
+		// actualizamos la memoria.
+		pr.packets_in_window = nil
 	}
 
 	pr.windowFull = allReceived
@@ -429,6 +432,9 @@ func newLogger(write_operation string, delete_operation string,
 	sqns := strings.Split(received_sqns_s, "\n")
 	processed_sequence_numbers := []int{}
 	for _, sqn := range sqns {
+		if sqn == "" {
+			continue
+		}
 		sqn_i, err := strconv.Atoi(sqn)
 		if err != nil {
 			panic(err)
@@ -441,9 +447,6 @@ func newLogger(write_operation string, delete_operation string,
 		processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
 	}
 
-	// NOTE: No soy NADA fan de usar el struct incompleto, pero solo lo hago
-	// aca. Lo hago para poder usar la funcion read_log_entry y que no sea
-	// demasiado quilombo.
 
 	logger := logger {
 		log_file: log_file_path,
@@ -452,6 +455,8 @@ func newLogger(write_operation string, delete_operation string,
 		delete_operation: delete_op,
 		processed_sequence_number: processed_sequence_numbers,
 		processed_resource_log: received_sqns_file,
+		pending_resources: make(map[string]struct{}),
+		done_resources: make(map[string]struct{}),
 	}
 
 	log_file, err := disk.Read(log_file_path)
@@ -463,6 +468,9 @@ func newLogger(write_operation string, delete_operation string,
 	// actual.
 	logs := strings.Split(log_file, "\n")
 	for _, log := range logs {
+		if log == "" {
+			continue
+		}
 		log_entry := logger.parse_log_entry(log)
 		resource  := log_entry.resource
 
@@ -578,11 +586,12 @@ func (l *logger) write_ahead(resource string) {
 
 	log_entry_s := write + " " + resource
 
-	disk.AtomicAppend(log_entry_s, l.log_file)
+
 	err := disk.AtomicAppend(log_entry_s, l.log_file)
 	if err != nil {
 		panic(err)
 	}
+	l.pending_resources[resource] = struct{}{}
 }
 
 func (l *logger) get_associate_file(resource string) string {
