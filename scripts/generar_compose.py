@@ -253,6 +253,7 @@ def leader_watchdog_block(n):
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./sheeps.txt:/app/sheeps.txt
+      - ./puppies.txt:/app/puppies.txt
     networks:
       - testing_net
     depends_on:
@@ -269,6 +270,7 @@ def replica_watchdog_block(n):
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./sheeps.txt:/app/sheeps.txt
+      - ./puppies.txt:/app/puppies.txt
     networks:
       - testing_net
     depends_on:
@@ -366,6 +368,7 @@ def main():
 
     #Guardo los servicios en una lista y después escribo todo juntito
     sheeps_list = []
+    puppies_list = []
 
     with open(output_file, 'w') as file:
         file.write(header())
@@ -375,6 +378,8 @@ def main():
         file.writelines(leader_watchdog_block(1))
 
         file.writelines(replica_watchdog_block(i) for i in range(2, configs.get("watchdog", 0) + 1))
+        for i in range(2, configs.get("watchdog", 0) + 1):
+            puppies_list.append(f"watchdog_{i}")
 
         file.writelines(filter_transactions_block(i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
         for i in range(1, configs.get("filter-transactions", 0) + 1):
@@ -465,6 +470,9 @@ def main():
 
     with open("sheeps.txt", "w") as sf:
         sf.write("\n".join(sheeps_list) + "\n")
+
+    with open("puppies.txt", "w") as sf:
+        sf.write("\n".join(puppies_list) + "\n")
 
 if __name__ == "__main__":
     main()
