@@ -247,6 +247,7 @@ def leader_watchdog_block(n):
     return f"""
   watchdog_{n}:
     container_name: watchdog_{n}
+    hostname: watchdog_{n}
     image: dind-dockerfile:latest
     working_dir: /app
     entrypoint: ./bin/watchdog LEADER
@@ -264,6 +265,7 @@ def replica_watchdog_block(n):
     return f"""
   watchdog_{n}:
     container_name: watchdog_{n}
+    hostname: watchdog_{n}
     image: dind-dockerfile:latest
     working_dir: /app
     entrypoint: ./bin/watchdog REPLICA
@@ -378,7 +380,7 @@ def main():
         file.writelines(leader_watchdog_block(1))
 
         file.writelines(replica_watchdog_block(i) for i in range(2, configs.get("watchdog", 0) + 1))
-        for i in range(2, configs.get("watchdog", 0) + 1):
+        for i in range(1, configs.get("watchdog", 0) + 1):
             puppies_list.append(f"watchdog_{i}")
 
         file.writelines(filter_transactions_block(i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
