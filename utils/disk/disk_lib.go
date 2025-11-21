@@ -38,11 +38,15 @@ func AtomicWriteString(data string, path string) error {
 		return err
 	}
 
-	if _, err := io.WriteString(f, data); err != nil {
+	_, err = io.WriteString(f, data)
+	if err != nil {
 		return err
 	}
 
-	os.Rename(tmp_path, path)
+	err = os.Rename(tmp_path, path)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -62,9 +66,9 @@ func AtomicAppend(data string, path string) error {
 
 	new_data := old_data + "\n" + data
 
-	AtomicWriteString(new_data, path)
+	err = AtomicWriteString(new_data, path)
 
-	return nil
+	return err
 }
 
 
@@ -103,7 +107,7 @@ func CreateFile(path string) (*os.File, error) {
 }
 
 func CreateDir(path string) error {
-	err := os.Mkdir("testdir", 0750)
+	err := os.Mkdir(path, 0750)
 
 	if err != nil && !os.IsExist(err) {
 		return err
