@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	SHEEPS_FILE = "sheeps.txt"
-	MAX_RETRIES = 3
-	TIMEOUT     = 2
+	SHEEPS_FILE  = "sheeps.txt"
+	PUPPIES_FILE = "puppies.txt"
+	MAX_RETRIES  = 3
+	TIMEOUT      = 2
 )
 
 func restartContainer(name string) {
@@ -64,9 +65,26 @@ func main() {
 
 	// Lista de réplicas harcodeada con 2
 	// TODO: parametrizar
-	replicaList := []string{"watchdog_2", "watchdog_3"}
+	// replicaList := []string{"watchdog_2", "watchdog_3"}
 
-	go watchdog.HeartbeatLoop(replicaList)
+	file, err = os.ReadFile(PUPPIES_FILE)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "No se pudo abrir el archivo %s: %v\n", PUPPIES_FILE, err)
+	}
+
+	listOfPuppies := strings.Split(string(file), "\n")
+	puppies := make([]string, 0, len(listOfPuppies))
+	for _, p := range listOfPuppies {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			puppies = append(puppies, p)
+			fmt.Println("Réplicas:", p)
+		}
+	}
+
+	fmt.Println(puppies)
+
+	go watchdog.HeartbeatLoop(puppies)
 
 	addr := net.UDPAddr{
 		Port: watchdog.HEALTHCHECK_PORT,
