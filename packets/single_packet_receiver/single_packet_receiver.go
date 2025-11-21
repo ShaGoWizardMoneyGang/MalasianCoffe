@@ -72,6 +72,8 @@ type SinglePacketReceiver struct {
 	logger logger
 
 	windowFull bool
+
+	checkpointer checkpointer
 }
 
 type pathResolver struct {
@@ -93,6 +95,7 @@ const (
 	PartialWork
 	Packets
 	LogFile
+	Checkpoint
 )
 
 func (pr *pathResolver) resolve_path(file KnownFile) string {
@@ -112,10 +115,65 @@ func (pr *pathResolver) resolve_path(file KnownFile) string {
 		path = pr.root + "/" + "packets" + "/"
 	case LogFile:
 		path = pr.root + "/" + "window_log"
+	case Checkpoint:
+		path = pr.root + "/" + "checkpoint"
 	// default:
 	// 	panic(fmt.Sprintf("Unknown path %s", file))
 	}
 	return path
+}
+
+
+// Estructura para debugear mejor el Momento en el tiempo en el que se murio la
+// instancia.
+type checkpointer struct {
+	// Root de la CORRIENTE CORRIDA para marcar los checkpoints.
+	checkpoint_root_current string
+}
+
+func newCheckpointer(checkpoint_root string) checkpointer {
+
+	// Creo el directorio donde van a estar todos los directorios con los
+	// checkpoints.
+	if !disk.Exists(checkpoint_root) {
+		disk.CreateDir(checkpoint_root)
+	}
+
+	entries, err := os.ReadDir(checkpoint_root)
+	if err != nil {
+		panic(err)
+	}
+
+	var amount_runs int
+	for _ = range entries {
+		amount_runs += 1
+	}
+	amount_runs_s := strconv.FormatInt(int64(amount_runs), 10)
+	checkpoint_root_current := checkpoint_root + "/" + amount_runs_s
+
+	disk.CreateDir(checkpoint_root_current)
+
+	return checkpointer{
+		checkpoint_root_current: checkpoint_root_current,
+	}
+}
+
+func (c *checkpointer) clean() {
+	entries, err := os.ReadDir(c.checkpoint_root_current)
+	if err != nil {
+		panic(err)
+	}
+	for _, file := range entries {
+		disk.DeleteFile(file.Name())
+	}
+
+	file_name_cleaned := c.checkpoint_root_current + "/" + "0cleaned"
+	disk.CreateFile(file_name_cleaned)
+}
+
+func (c *checkpointer) checkpoint(checkpoint_name string) {
+	file_name := c.checkpoint_root_current + "/" + checkpoint_name
+	disk.CreateFile(file_name)
 }
 
 func NewSinglePacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) SinglePacketReceiver {
@@ -188,6 +246,9 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		pathResolver.resolve_path(Packets),
 	)
 
+	checkpointer_root := pathResolver.resolve_path(Checkpoint)
+	checkpointer := newCheckpointer(checkpointer_root)
+
 	return SinglePacketReceiver{
 		packets_in_window:         packets_in_window,
 		transformer:               transformer,
@@ -197,14 +258,19 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		logger:                    logger,
 		// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 		windowFull:                false,
+		checkpointer:              checkpointer,
 	}
 }
 
 // Devuelve un booleano que representa si se recivieron todos los paquetes
 // dentro de la ventana. Si este es el caso, se tienen que procesar.
 func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
+	defer pr.checkpointer.clean()
 	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
+	pr.checkpointer.checkpoint("Llego paquete")
+
+	// fmt.Printf("Recibi %s\n", pkt.GetSequenceNumberString())
 
 	// Guardo el paquete que acabo de recibir en disco
 	{
@@ -220,7 +286,9 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// Como ya escribimos a disco, ackeamos
 	}
 
+	pr.checkpointer.checkpoint("Pre ACK")
 	pktMsg.Message.Ack(false)
+	pr.checkpointer.checkpoint("Hice ACK")
 
 	// Anado el paquete que acabo de recibir a la ventana de paquetes.
 
@@ -245,7 +313,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	var buffer strings.Builder
 	for i, wind_pkt := range pr.packets_in_window {
 		sq_n     := wind_pkt.GetSequenceNumber()
-		already_processed := slices.Contains(processed_sequence_number, sq_n)
+		// already_processed := slices.Contains(processed_sequence_number, sq_n)
 
 		received_packets[i] = sq_n
 
@@ -253,9 +321,9 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 		// NOTE: Esto es un healthcheck, mepa que mientras dos paquetes no
 		// compartan header y tengan distinto payload, no deberia pasar nada malo.
-		if sq_n == pkt.GetSequenceNumber() || already_processed {
-			bitacora.Info(fmt.Sprintf("Duplicate packet received. UUID: %s", wind_pkt.GetUUID()))
-		}
+		// if sq_n == pkt.GetSequenceNumber() || already_processed {
+		// 	bitacora.Info(fmt.Sprintf("Duplicate packet received. UUID: %s", wind_pkt.GetUUID()))
+		// }
 	}
 
 	amount_packets_in_window := len(pr.packets_in_window)
@@ -305,6 +373,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
 	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
 	if do_flush_window || allReceived {
+		pr.checkpointer.checkpoint("Pre flushear ventana")
 		// LOG De todos los archivos que voy a borrar: Stage 1.
 		// En la packet window: A, B, C
 		// Voy a borrar A
@@ -315,6 +384,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			pr.logger.write_ahead(sq_n)
 		}
 
+		pr.checkpointer.checkpoint("Todo el log ahead")
 		// NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
 		// log, no pasa nada, porque cuando se levante de vuelta va a ver que
 		// tiene en la ventana mas paquetes de los que esta anotada. Entonces,
@@ -330,6 +400,8 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// Antes de escribir en disco, tengo que des-hacerme de los paquetes
 		// la ventana.
 		disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
+
+		pr.checkpointer.checkpoint("Laburo parcial")
 
 		// LOG De todos los archivos que borre: Stage 2.
 		// En la packet window: A, B, C
@@ -348,6 +420,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			// Aca tambien se borra el recurso asociado
 			pr.logger.delete_behind(sq_n)
 		}
+		pr.checkpointer.checkpoint("Todo el log behind")
 		// Ahora que la ventana esta procesada, y el cambio esta en disco,
 		// actualizamos la memoria.
 		pr.packets_in_window = nil

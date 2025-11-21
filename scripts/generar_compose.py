@@ -150,6 +150,7 @@ def concat_block(n):
 
     os.mkdir(f"packet_receiver/{name}")
     os.mkdir(f"packet_receiver/{name}/metadata")
+    os.mkdir(f"packet_receiver/{name}/checkpoint")
 
     return f"""
   {name}:
@@ -161,6 +162,7 @@ def concat_block(n):
       - ./bin/concat:/app/bin/concat
       - ./packet_receiver/{name}:/app/packet_receiver-concater/
       - ./packet_receiver/{name}/metadata:/app/packet_receiver-concater/metadata
+      - ./packet_receiver/{name}/checkpoint:/app/packet_receiver-concater/checkpoint
     networks:
       - testing_net
     depends_on:
