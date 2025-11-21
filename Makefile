@@ -154,8 +154,11 @@ docker-logs:
 docker-ci:
 	docker compose -f docker-compose-ci.yml up -d
 
+BUILD_DOCKER ?= ON
 docker-build-watchdog:
+     ifeq ($(BUILD_DOCKER),ON)
 	docker build -t dind-dockerfile .
+     endif
 
 #============================== Misc directives ===============================
 clean-out:
