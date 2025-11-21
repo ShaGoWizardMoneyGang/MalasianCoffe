@@ -40,6 +40,25 @@ func main() {
 	fmt.Println("Esperando a que arranque el sistema...")
 	time.Sleep(10 * time.Second)
 
+	// PRUEBA DE ANILLO
+	myName, err := os.Hostname()
+	if err != nil {
+		panic("No se pudo obtener el hostname")
+	}
+	puppies, err := watchdog.ReadPuppies(PUPPIES_FILE)
+	if err != nil {
+		panic(err)
+	}
+	myID := watchdog.FindID(myName, puppies)
+	neighbor := watchdog.GetNeighbor(myID, puppies)
+	fmt.Printf("Soy %s, mi vecino en el anillo es %s\n", myName, neighbor)
+
+	go watchdog.ListenRing(watchdog.WatchdogNode{ID: myID, Addr: myName, Neighbor: neighbor})
+	time.Sleep(2 * time.Second)
+	watchdog.SendHello(watchdog.WatchdogNode{ID: myID, Addr: myName, Neighbor: neighbor})
+	// PARA PRUEBA LOS SLEEPS E
+	time.Sleep(10 * time.Second)
+
 	amILeader := os.Args[1]
 	if amILeader != "LEADER" {
 		// Es réplica
@@ -73,7 +92,7 @@ func main() {
 	}
 
 	listOfPuppies := strings.Split(string(file), "\n")
-	puppies := make([]string, 0, len(listOfPuppies))
+	puppies = make([]string, 0, len(listOfPuppies))
 	for _, p := range listOfPuppies {
 		p = strings.TrimSpace(p)
 		if p != "" {
