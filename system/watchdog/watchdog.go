@@ -41,7 +41,9 @@ func main() {
 
 	amILeader := os.Args[1]
 	if amILeader != "LEADER" {
-		fmt.Println("No soy el líder, no hago watchdog")
+		// Es réplica
+		fmt.Println("Hola soy una réplica, escucho heartbeats del líder")
+		watchdog.ReplicaHeartbeatLoop() // loop para escuchar heartbeats
 		return
 	}
 	fmt.Println("Soy el líder, comienzo watchdog")
@@ -60,10 +62,11 @@ func main() {
 		}
 	}
 
-	if len(services) == 0 {
-		fmt.Println("No hay servicios en sheeps.txt")
-		return
-	}
+	// Lista de réplicas harcodeada con 2
+	// TODO: parametrizar
+	replicaList := []string{"watchdog_2", "watchdog_3"}
+
+	go watchdog.HeartbeatLoop(replicaList)
 
 	addr := net.UDPAddr{
 		Port: watchdog.HEALTHCHECK_PORT,
@@ -113,6 +116,6 @@ func main() {
 				fmt.Println("El servicio respondió correctamente, no hace falta reiniciar")
 			}
 		}
+		time.Sleep(watchdog.HEARTBEAT_PERIOD * time.Second)
 	}
-
 }
