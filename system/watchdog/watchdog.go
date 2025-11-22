@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	watchdog "malasian_coffe/system/watchdog/src"
+	"malasian_coffe/utils/ring"
 	"net"
 	"os"
 	"os/exec"
@@ -46,17 +47,17 @@ func main() {
 	if err != nil {
 		panic("No se pudo obtener el hostname")
 	}
-	members, err := watchdog.ReadRingMembers(RING_MEMBERS_FILE)
+	members, err := ring.ReadRingMembers(RING_MEMBERS_FILE)
 	if err != nil {
 		panic(err)
 	}
-	myID := watchdog.FindID(myName, members)
-	neighbor := watchdog.GetNeighbor(myID, members)
+	myID := ring.FindID(myName, members)
+	neighbor := ring.GetNeighbor(myID, members)
 	fmt.Printf("Soy %s, mi vecino en el anillo es %s\n", myName, neighbor)
 
-	go watchdog.ListenRing(watchdog.WatchdogNode{ID: myID, Addr: myName, Neighbor: neighbor})
+	go ring.ListenRing(ring.WatchdogNode{ID: myID, Addr: myName, Neighbor: neighbor})
 	time.Sleep(2 * time.Second)
-	watchdog.SendHello(watchdog.WatchdogNode{ID: myID, Addr: myName, Neighbor: neighbor})
+	ring.SendHello(ring.WatchdogNode{ID: myID, Addr: myName, Neighbor: neighbor})
 	// PARA PRUEBA LOS SLEEPS E
 	time.Sleep(10 * time.Second)
 
