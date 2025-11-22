@@ -154,10 +154,15 @@ docker-logs:
 docker-ci:
 	docker compose -f docker-compose-ci.yml up -d
 
+
 BUILD_DOCKER ?= ON
-docker-build-watchdog:
+# Cada imagen tiene su propio directorio. Si queres anadir una nueva imagen, solo
+# hace falta anadir un directorio.
+# IMAGES := $(addprefix docker-build-, $(sort $(basename $(wildcard docker_images/*/))))
+
+docker-build-all:
      ifeq ($(BUILD_DOCKER),ON)
-	docker build -t dind-dockerfile .
+	$(MAKE) -C docker_images/
      endif
 
 #============================== Misc directives ===============================
