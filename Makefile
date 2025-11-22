@@ -57,7 +57,10 @@ run-global-aggregator: build-global-aggregator
 
 #============================== Build directives ===============================
 # Poner en order
-build: docker-build-all build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4 build-watchdog
+build: docker-build-all build-go-all
+
+build-go-all: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4 build-watchdog
+
 build-server:
 	cd system; go build -o ${BINDIR}/server
 
