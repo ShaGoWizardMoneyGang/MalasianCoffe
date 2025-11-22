@@ -123,6 +123,40 @@ func (pr *pathResolver) resolve_path(file KnownFile) string {
 	return path
 }
 
+type checkpointMoment int
+const (
+	Cleaned checkpointMoment = iota
+	LlegoElPaquete
+	PreACK
+	HiceACK
+	PreFlushear
+	LogAhead
+	LaburoParcial
+	LogBehind
+)
+
+func (c *checkpointMoment) toString() string {
+	var repr string
+	switch *c {
+	case Cleaned:
+		repr = "0CLEANED"
+	case LlegoElPaquete:
+		repr = "1LLEGOPAQUETE"
+	case PreACK:
+		repr = "2PRE-ACK"
+	case HiceACK:
+		repr = "3ACK"
+	case PreFlushear:
+		repr = "4PRE-FLUSH"
+	case LogAhead:
+		repr = "5LOGAHEAD"
+	case LaburoParcial:
+		repr = "6LABUROPARCIAL"
+	case LogBehind:
+		repr = "7LOGBEHIND"
+	}
+	return repr
+}
 
 // Estructura para debugear mejor el Momento en el tiempo en el que se murio la
 // instancia.
@@ -145,7 +179,7 @@ func newCheckpointer(checkpoint_root string) checkpointer {
 	}
 
 	var amount_runs int
-	for _ = range entries {
+	for range entries {
 		amount_runs += 1
 	}
 	amount_runs_s := strconv.FormatInt(int64(amount_runs), 10)
@@ -167,13 +201,13 @@ func (c *checkpointer) clean() {
 		disk.DeleteFile(file.Name())
 	}
 
-	file_name_cleaned := c.checkpoint_root_current + "/" + "0cleaned"
-	disk.CreateFile(file_name_cleaned)
+	c.checkpoint(Cleaned)
 }
 
-func (c *checkpointer) checkpoint(checkpoint_name string) {
-	file_name := c.checkpoint_root_current + "/" + checkpoint_name
-	disk.CreateFile(file_name)
+func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
+	file_name := checkpoint.toString()
+	full_path := c.checkpoint_root_current + "/" + file_name
+	disk.CreateFile(full_path)
 }
 
 func NewSinglePacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) SinglePacketReceiver {
@@ -268,7 +302,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	defer pr.checkpointer.clean()
 	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
-	pr.checkpointer.checkpoint("Llego paquete")
+	pr.checkpointer.checkpoint(LlegoElPaquete)
 
 	// fmt.Printf("Recibi %s\n", pkt.GetSequenceNumberString())
 
@@ -286,9 +320,9 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// Como ya escribimos a disco, ackeamos
 	}
 
-	pr.checkpointer.checkpoint("Pre ACK")
+	pr.checkpointer.checkpoint(PreACK)
 	pktMsg.Message.Ack(false)
-	pr.checkpointer.checkpoint("Hice ACK")
+	pr.checkpointer.checkpoint(HiceACK)
 
 	// Anado el paquete que acabo de recibir a la ventana de paquetes.
 
@@ -373,7 +407,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
 	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
 	if do_flush_window || allReceived {
-		pr.checkpointer.checkpoint("Pre flushear ventana")
+		pr.checkpointer.checkpoint(PreFlushear)
 		// LOG De todos los archivos que voy a borrar: Stage 1.
 		// En la packet window: A, B, C
 		// Voy a borrar A
@@ -384,7 +418,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			pr.logger.write_ahead(sq_n)
 		}
 
-		pr.checkpointer.checkpoint("Todo el log ahead")
+		pr.checkpointer.checkpoint(LogAhead)
 		// NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
 		// log, no pasa nada, porque cuando se levante de vuelta va a ver que
 		// tiene en la ventana mas paquetes de los que esta anotada. Entonces,
@@ -401,7 +435,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		// la ventana.
 		disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
 
-		pr.checkpointer.checkpoint("Laburo parcial")
+		pr.checkpointer.checkpoint(LaburoParcial)
 
 		// LOG De todos los archivos que borre: Stage 2.
 		// En la packet window: A, B, C
@@ -420,7 +454,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			// Aca tambien se borra el recurso asociado
 			pr.logger.delete_behind(sq_n)
 		}
-		pr.checkpointer.checkpoint("Todo el log behind")
+		pr.checkpointer.checkpoint(LogBehind)
 		// Ahora que la ventana esta procesada, y el cambio esta en disco,
 		// actualizamos la memoria.
 		pr.packets_in_window = nil
