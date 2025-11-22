@@ -545,7 +545,7 @@ func newLogger(write_operation string, delete_operation string,
 			logger.pending_resources[resource] = struct{}{}
 		} else if is_write && is_pending && !is_done {
 			// Es un doble WRITE, esto es un error y no deberia pasar.
-			panic(fmt.Sprintf("DOBLE WRITE DETECTED: %s", log_file_path))
+			panic(fmt.Sprintf("DOBLE WRITE DETECTED %s in file %s", resource, log_file_path))
 		} else if is_write && is_pending && is_done {
 			// Esto rompe una invariante. O esta en una tabla, o esta en la
 			// otra.
@@ -638,7 +638,7 @@ func (l *logger) parse_log_entry(log_entry_raw string) log_entry {
 func (l *logger) write_ahead(resource string) {
 	_, exists := l.pending_resources[resource]
 	if exists {
-		bitacora.Info(fmt.Sprintf("DOBLE WRITE DETECTED: %s, skipping write.", l.log_file))
+		bitacora.Info(fmt.Sprintf("DOBLE WRITE DETECTED of resource %s in file %s, skipping write.", resource, l.log_file))
 		return
 	}
 
@@ -711,9 +711,9 @@ func (l *logger) delete_behind(resource string) {
 		delete(l.pending_resources, resource)
 		l.done_resources[resource] = struct{}{}
 	} else if !marked_as_pending && marked_as_done {
-		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente."))
+		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente.: %s", resource))
 	} else if !marked_as_pending && !marked_as_done {
-		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente ni como listo (WTF?)."))
+		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente ni como listo (WTF?).: %s", resource))
 	}
 
 }
