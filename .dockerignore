@@ -1,0 +1,6 @@
+*
+
+# Archivos a copiar
+!/system
+!go.mod
+!go.sum
