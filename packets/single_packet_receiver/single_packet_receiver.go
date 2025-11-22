@@ -106,9 +106,9 @@ func (pr *pathResolver) resolve_path(file KnownFile) string {
 	case Metadata:
 		path = pr.root + "/" + "metadata"
 	case ReceivedEof:
-		path = pr.root + "/" + "metada" + "/" + "received_eof"
+		path = pr.resolve_path(Metadata) + "/" + "received_eof"
 	case ReceivedSqns:
-		path = pr.root + "/" + "metada" + "/" + "received_sqns"
+		path = pr.resolve_path(Metadata) + "/" + "received_sqns"
 	case PartialWork:
 		path = pr.root + "/" + "partial_work"
 	case Packets:
@@ -731,10 +731,16 @@ func (l *logger) delete_behind(resource string) {
 
 			log_entry_s := delete_op + " " + resource
 
-			disk.AtomicAppend(log_entry_s, l.log_file)
+			err := disk.AtomicAppend(log_entry_s, l.log_file)
+			if err != nil {
+				panic(err)
+			}
 
 			// Si me muero aca, no pasa nada. Lo anado al revivir.
-			disk.AtomicAppend(resource, l.processed_resource_log)
+			err = disk.AtomicAppend(resource, l.processed_resource_log)
+			if err != nil {
+				panic(err)
+			}
 			resource_i, err := strconv.Atoi(resource)
 			if err != nil {
 				panic(err)
