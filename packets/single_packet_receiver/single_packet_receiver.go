@@ -283,7 +283,8 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	checkpointer_root := pathResolver.resolve_path(Checkpoint)
 	checkpointer := newCheckpointer(checkpointer_root)
 
-	return SinglePacketReceiver{
+
+	single_packet_receiver := SinglePacketReceiver{
 		packets_in_window:         packets_in_window,
 		transformer:               transformer,
 		EOF:                       received_eof,
@@ -294,6 +295,19 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		windowFull:                false,
 		checkpointer:              checkpointer,
 	}
+
+	// Chequeo si me quedo pendiente un flush
+	allReceived := single_packet_receiver.checkIfReceivedAll()
+
+	amount_packets_in_window := len(single_packet_receiver.packets_in_window)
+	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
+	if do_flush_window || allReceived {
+		fmt.Printf("Do flush: %t \n", do_flush_window)
+		fmt.Printf("All received: %t \n", allReceived)
+		single_packet_receiver.flushWindow()
+	}
+
+	return single_packet_receiver
 }
 
 // Devuelve un booleano que representa si se recivieron todos los paquetes
