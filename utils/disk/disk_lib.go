@@ -102,12 +102,16 @@ func CreateFile(path string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = os.Chmod(f.Name(), 0666)
+	if err != nil {
+		return nil, err
+	}
 
 	return f, nil
 }
 
 func CreateDir(path string) error {
-	err := os.Mkdir(path, 0750)
+	err := os.Mkdir(path, 0777)
 
 	if err != nil && !os.IsExist(err) {
 		return err

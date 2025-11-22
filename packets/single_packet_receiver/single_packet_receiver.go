@@ -211,7 +211,7 @@ func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
 }
 
 func NewSinglePacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) SinglePacketReceiver {
-	pathResolver := newPathResolver("packet_receiver" + "-" + identifier)
+	pathResolver := newPathResolver("packet_receiver")
 	packet_receiver_dir := pathResolver.resolve_path(Root)
 	if !disk.Exists(packet_receiver_dir) {
 		disk.CreateDir(packet_receiver_dir)
