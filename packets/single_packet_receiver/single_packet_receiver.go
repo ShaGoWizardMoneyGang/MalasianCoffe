@@ -407,57 +407,10 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
 	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
 	if do_flush_window || allReceived {
-		pr.checkpointer.checkpoint(PreFlushear)
-		// LOG De todos los archivos que voy a borrar: Stage 1.
-		// En la packet window: A, B, C
-		// Voy a borrar A
-		// Voy a borrar B
-		// Voy a borrar C
-		for _, packet := range pr.packets_in_window {
-			sq_n := packet.GetSequenceNumberString()
-			pr.logger.write_ahead(sq_n)
-		}
-
-		pr.checkpointer.checkpoint(LogAhead)
-		// NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
-		// log, no pasa nada, porque cuando se levante de vuelta va a ver que
-		// tiene en la ventana mas paquetes de los que esta anotada. Entonces,
-		// solo tiene que anadir los paquetes que le faltan en el log.
-		accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
-		if err != nil {
-			panic(err)
-		}
-		// Aplico la funcion transformer a todo lo que recibi + lo que acaba
-		// de llegar.
-		transformation := pr.transformer(accumulated_work, buffer.String())
-
-		// Antes de escribir en disco, tengo que des-hacerme de los paquetes
-		// la ventana.
-		disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
-
-		pr.checkpointer.checkpoint(LaburoParcial)
-
-		// LOG De todos los archivos que borre: Stage 2.
-		// En la packet window: A, B, C
-		// Voy a borrar A
-		// Voy a borrar B
-		// Voy a borrar C
-		// Borre A
-		// Borre B
-		// Borre C
-
-		// NOTE: Si se muere antes de escribir todos los "borre", no pasa
-		// nada. Porque cuando reviva va a ver que tiene mas "Voy a borrar"
-		// que "Borre", entonces va a poder saber.
-		for _, packet := range pr.packets_in_window {
-			sq_n := packet.GetSequenceNumberString()
-			// Aca tambien se borra el recurso asociado
-			pr.logger.delete_behind(sq_n)
-		}
-		pr.checkpointer.checkpoint(LogBehind)
-		// Ahora que la ventana esta procesada, y el cambio esta en disco,
-		// actualizamos la memoria.
-		pr.packets_in_window = nil
+		fmt.Printf("Do flush: %t \n", do_flush_window)
+		fmt.Printf("All received: %t \n", allReceived)
+		pr.flushWindow(buffer.String())
+		buffer.Reset()
 	}
 
 	pr.windowFull = allReceived
@@ -946,4 +899,68 @@ func (pr *SinglePacketReceiver) GetPayload() string {
 	}
 
 	return accumulated_work
+}
+
+// windowContent contiente el contenido de la ventana. Esto normalmente se obtiene
+// con un strings.Builder y el metodo WriteString
+func (pr *SinglePacketReceiver) flushWindow(windowContent string) {
+		pr.checkpointer.checkpoint(PreFlushear)
+		// LOG De todos los archivos que voy a borrar: Stage 1.
+		// En la packet window: A, B, C
+		// Voy a borrar A
+		// Voy a borrar B
+		// Voy a borrar C
+		for _, packet := range pr.packets_in_window {
+			fmt.Printf("Paquete en ventana: %s\n", packet.GetSequenceNumberString())
+			sq_n := packet.GetSequenceNumberString()
+		// 	if packet.GetSequenceNumber() == 25 {
+		// panic("Trigger")
+		// 	}
+			pr.logger.write_ahead(sq_n)
+		}
+		// panic("Trigger")
+
+		pr.checkpointer.checkpoint(LogAhead)
+		// NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
+		// log, no pasa nada, porque cuando se levante de vuelta va a ver que
+		// tiene en la ventana mas paquetes de los que esta anotada. Entonces,
+		// solo tiene que anadir los paquetes que le faltan en el log.
+		accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
+		if err != nil {
+			panic(err)
+		}
+		// Aplico la funcion transformer a todo lo que recibi + lo que acaba
+		// de llegar.
+		transformation := pr.transformer(accumulated_work, windowContent)
+
+		// Antes de escribir en disco, tengo que des-hacerme de los paquetes
+		// la ventana.
+		disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
+		// Si me muero aca, no pasa nada, porque cuando reviva simplemente voy
+		// re-escribir lo que tenia con los mismo datos + 1 nuevo paquete.
+		// panic("Trigger")
+
+		pr.checkpointer.checkpoint(LaburoParcial)
+
+		// LOG De todos los archivos que borre: Stage 2.
+		// En la packet window: A, B, C
+		// Voy a borrar A
+		// Voy a borrar B
+		// Voy a borrar C
+		// Borre A
+		// Borre B
+		// Borre C
+
+		// NOTE: Si se muere antes de escribir todos los "borre", no pasa
+		// nada. Porque cuando reviva va a ver que tiene mas "Voy a borrar"
+		// que "Borre", entonces va a poder saber.
+		for _, packet := range pr.packets_in_window {
+			sq_n := packet.GetSequenceNumberString()
+			// Aca tambien se borra el recurso asociado
+			pr.logger.delete_behind(sq_n)
+		}
+		pr.checkpointer.checkpoint(LogBehind)
+		// Ahora que la ventana esta procesada, y el cambio esta en disco,
+		// actualizamos la memoria.
+		pr.packets_in_window = nil
 }
