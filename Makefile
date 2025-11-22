@@ -155,13 +155,10 @@ docker-ci:
 	docker compose -f docker-compose-ci.yml up -d
 
 
-BUILD_DOCKER ?= ON
 # Cada imagen tiene su propio directorio. Si queres anadir una nueva imagen, solo
 # hace falta anadir un directorio.
 docker-build-all:
-     ifeq ($(BUILD_DOCKER),ON)
 	$(MAKE) -C docker_images/
-     endif
 
 #============================== Misc directives ===============================
 clean-out:
