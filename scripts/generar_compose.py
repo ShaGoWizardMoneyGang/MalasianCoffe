@@ -149,20 +149,18 @@ def concat_block(n):
     routing_key = int(n) - 1
 
     os.mkdir(f"packet_receiver/{name}")
-    os.mkdir(f"packet_receiver/{name}/metadata")
-    os.mkdir(f"packet_receiver/{name}/checkpoint")
+    # os.mkdir(f"packet_receiver/{name}/metadata")
+    # os.mkdir(f"packet_receiver/{name}/checkpoint")
 
     return f"""
   {name}:
     container_name: {name}
-    image: ubuntu:24.04
+    image: worker:latest
     working_dir: /app
-    entrypoint: ./bin/concat rabbitmq:5672 {routing_key}
+    entrypoint: bash -c "../entrypoint.sh && su user -c '/app/bin/concat rabbitmq:5672 {routing_key}'"
     volumes:
       - ./bin/concat:/app/bin/concat
-      - ./packet_receiver/{name}:/app/packet_receiver-concater/
-      - ./packet_receiver/{name}/metadata:/app/packet_receiver-concater/metadata
-      - ./packet_receiver/{name}/checkpoint:/app/packet_receiver-concater/checkpoint
+      - ./packet_receiver/{name}:/app/packet_receiver/
     networks:
       - testing_net
     depends_on:
@@ -256,7 +254,7 @@ def watchdog_block(n):
     return f"""
   watchdog_{n}:
     container_name: watchdog_{n}
-    image: dind-dockerfile:latest
+    image: watchdog:latest
     working_dir: /app
     entrypoint: ./bin/watchdog
     volumes:

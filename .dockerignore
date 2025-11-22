@@ -4,3 +4,4 @@
 !/system
 !go.mod
 !go.sum
+!/entrypoint.sh

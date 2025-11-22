@@ -57,7 +57,7 @@ run-global-aggregator: build-global-aggregator
 
 #============================== Build directives ===============================
 # Poner en order
-build: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4 build-watchdog
+build: docker-build-all build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4 build-watchdog
 build-server:
 	cd system; go build -o ${BINDIR}/server
 
@@ -88,7 +88,7 @@ build-partial-aggregator:
 build-global-aggregator:
 	cd system/global_aggregator; go build -o ${BINDIR}/global_aggregator
 
-build-watchdog: docker-build-watchdog
+build-watchdog:
 	cd system/watchdog; go build -o ${BINDIR}/watchdog
 
 build-test-output-query-4:
@@ -158,8 +158,6 @@ docker-ci:
 BUILD_DOCKER ?= ON
 # Cada imagen tiene su propio directorio. Si queres anadir una nueva imagen, solo
 # hace falta anadir un directorio.
-# IMAGES := $(addprefix docker-build-, $(sort $(basename $(wildcard docker_images/*/))))
-
 docker-build-all:
      ifeq ($(BUILD_DOCKER),ON)
 	$(MAKE) -C docker_images/
