@@ -250,7 +250,7 @@ def leader_watchdog_block(n):
     hostname: watchdog_{n}
     image: dind-dockerfile:latest
     working_dir: /app
-    entrypoint: ./bin/watchdog LEADER
+    entrypoint: ./bin/watchdog STARTER
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./sheeps.txt:/app/sheeps.txt
@@ -278,7 +278,7 @@ def replica_watchdog_block(n):
     networks:
       - testing_net
     depends_on:
-      - server
+      - watchdog_{n-1}
 """
 
 
