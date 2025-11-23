@@ -22,6 +22,16 @@ type WatchdogNode struct {
 	Neighbor string // lista enlazada
 }
 
+func JoinToTheRing(id int, addr string, neighbor string) WatchdogNode {
+	node :=
+		WatchdogNode{
+			ID:       id,
+			Addr:     addr,
+			Neighbor: neighbor,
+		}
+	return node
+}
+
 func ReadRingMembers(ringFile string) ([]string, error) {
 	data, err := os.ReadFile(ringFile)
 	if err != nil {
@@ -52,7 +62,7 @@ func GetNeighbor(myID int, puppies []string) string {
 	return puppies[(myID+1)%len(puppies)]
 }
 
-func ListenRing(node WatchdogNode) {
+func (node WatchdogNode) ListenRing() {
 	addr := net.UDPAddr{
 		Port: HEARTBEAT_PORT,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -88,13 +98,13 @@ func ListenRing(node WatchdogNode) {
 					fmt.Printf("[%s] El mensaje volvió a mí, no lo reenvío\n", node.Addr)
 					continue
 				}
-				forwardToNeighbor(node, starterID)
+				node.forwardToNeighbor(starterID)
 			}
 		}
 	}
 }
 
-func forwardToNeighbor(node WatchdogNode, starterID int) {
+func (node WatchdogNode) forwardToNeighbor(starterID int) {
 	neighborAddr := node.Neighbor + ":" + fmt.Sprint(HEARTBEAT_PORT)
 	conn, err := net.Dial("udp", neighborAddr)
 	if err != nil {
@@ -107,7 +117,7 @@ func forwardToNeighbor(node WatchdogNode, starterID int) {
 	fmt.Printf("[%s] Envié mensaje a %s\n", node.Addr, neighborAddr)
 }
 
-func SendHello(node WatchdogNode) {
+func (node WatchdogNode) SendHello() {
 	neighborAddr := node.Neighbor + ":" + fmt.Sprint(HEARTBEAT_PORT)
 	conn, err := net.Dial("udp", neighborAddr)
 	if err != nil {
@@ -136,7 +146,7 @@ Después todo sigue practicamente igual a lo que ya teníamos
 // ============================= HEARTBEAT ================================
 
 // Envía heartbeat
-func SendHeartbeat(node WatchdogNode, neighborAddr string) {
+func (node WatchdogNode) SendHeartbeat(neighborAddr string) {
 	conn, err := net.Dial("udp", neighborAddr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error al conectar con replica %s: %v\n", neighborAddr, err)
@@ -148,7 +158,7 @@ func SendHeartbeat(node WatchdogNode, neighborAddr string) {
 }
 
 // Envía heartbeats periódicos a su vecino que va a propagar el mensaje
-func HeartbeatLoop(node WatchdogNode, replicaList []string) {
+func (node WatchdogNode) HeartbeatLoop(replicaList []string) {
 	// LOCURA LO QUE ES ESTE TICKER
 	// El ticker es un objeto que genera eventos cada cierto intervalo
 	ticker := time.NewTicker(HEARTBEAT_PERIOD * time.Second)
@@ -159,14 +169,14 @@ func HeartbeatLoop(node WatchdogNode, replicaList []string) {
 		<-ticker.C
 		addr := node.Neighbor + ":" + fmt.Sprint(HEARTBEAT_PORT)
 		fmt.Printf("Enviando heartbeat a %s\n", addr)
-		SendHeartbeat(node, addr)
+		node.SendHeartbeat(addr)
 	}
 }
 
 // ============================= REPLICA ================================
 
 // Espera los heartbeats del lider, si no llegan avisa
-func ReplicaHeartbeatLoop() {
+func (node WatchdogNode) ReplicaHeartbeatLoop() {
 	addr := net.UDPAddr{
 		Port: HEARTBEAT_PORT,
 		IP:   net.ParseIP("0.0.0.0"),
