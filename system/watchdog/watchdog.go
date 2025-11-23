@@ -52,15 +52,15 @@ func main() {
 	neighbor := ring.GetNeighbor(myID, members)
 	fmt.Printf("Soy %s, mi vecino en el anillo es %s\n", myName, neighbor)
 
-	ringNode := ring.WatchdogNode{ID: myID, Addr: myName, Neighbor: neighbor}
+	ringNode := ring.JoinToTheRing(myID, myName, neighbor)
 
-	go ring.ListenRing(ringNode)
+	go ringNode.ListenRing()
 	amIStarter := os.Args[1]
 	if amIStarter != "STARTER" {
 		select {}
 	}
 
-	ring.HeartbeatLoop(ringNode, members)
+	ringNode.HeartbeatLoop(members)
 
 	fmt.Println("Soy el líder, comienzo watchdog")
 	// file, err := os.ReadFile(SHEEPS_FILE)
