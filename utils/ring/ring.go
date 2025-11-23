@@ -74,11 +74,15 @@ func (node WatchdogNode) ListenRing() {
 	defer conn.Close()
 	buffer := make([]byte, 1024)
 	for {
+		lastHeartbeat := time.Time{}
+		conn.SetDeadline(time.Now().Add(HEARTBEAT_TIMEOUT * time.Second))
 		n, remote, err := conn.ReadFromUDP(buffer)
 		if err == nil {
 			payload := string(buffer[:n])
+
 			switch payload {
 			case "ACK":
+				lastHeartbeat = time.Now()
 				fmt.Printf("[%s] Recibí ACK de %s\n", node.Addr, remote.String())
 			default:
 				//si no es ACK es el heartbeat
@@ -99,6 +103,15 @@ func (node WatchdogNode) ListenRing() {
 					continue
 				}
 				node.forwardToNeighbor(starterID)
+			}
+		} else {
+			netErr, ok := err.(net.Error)
+			if ok && netErr.Timeout() {
+				if time.Since(lastHeartbeat) > HEARTBEAT_TIMEOUT*time.Second {
+					fmt.Printf("[%s] No recibí mensajes de mi vecino en %d segundos. Está caído.\n", node.Addr, HEARTBEAT_TIMEOUT)
+				}
+			} else {
+				fmt.Printf("[%s] Error en ReadFromUDP: %v\n", node.Addr, err)
 			}
 		}
 	}
