@@ -53,27 +53,14 @@ func main() {
 	fmt.Printf("Soy %s, mi vecino en el anillo es %s\n", myName, neighbor)
 
 	ringNode := ring.WatchdogNode{ID: myID, Addr: myName, Neighbor: neighbor}
-	go ring.ListenRing(ringNode)
 
+	go ring.ListenRing(ringNode)
 	amIStarter := os.Args[1]
 	if amIStarter != "STARTER" {
-		// Es réplica
-		// fmt.Println("Hola soy una réplica, escucho heartbeats del líder")
-		// ring.ReplicaHeartbeatLoop() // loop para escuchar heartbeats
-		//si esto retorna es porque algo se rompió
 		select {}
-		return
 	}
-	i := 0
-	for {
-		time.Sleep(2 * time.Second)
-		ring.SendHello(ringNode)
-		i++
-		if i > 2 {
-			return
-		}
-	}
-	// go ring.HeartbeatLoop(members)
+
+	ring.HeartbeatLoop(ringNode, members)
 
 	fmt.Println("Soy el líder, comienzo watchdog")
 	// file, err := os.ReadFile(SHEEPS_FILE)
