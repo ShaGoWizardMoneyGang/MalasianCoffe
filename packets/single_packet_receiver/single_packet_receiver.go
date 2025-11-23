@@ -303,8 +303,6 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	amount_packets_in_window := len(single_packet_receiver.packets_in_window)
 	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
 	if do_flush_window || allReceived {
-		fmt.Printf("Do flush: %t \n", do_flush_window)
-		fmt.Printf("All received: %t \n", allReceived)
 		single_packet_receiver.flushWindow()
 	}
 
@@ -365,8 +363,6 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	amount_packets_in_window := len(pr.packets_in_window)
 	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
 	if do_flush_window || allReceived {
-		fmt.Printf("Do flush: %t \n", do_flush_window)
-		fmt.Printf("All received: %t \n", allReceived)
 		pr.flushWindow()
 	}
 
@@ -850,21 +846,23 @@ func (pr *SinglePacketReceiver) GetPayload() string {
 
 	// TODO: Optimizacion: Si ya esta cargado en memoria, no lo vuelvo a leer
 	// del disco.
-	accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
-	if err != nil {
-		panic(err)
-	}
+	partial_work := pr.read_partial_work()
+	finished_work := partial_work.accumulated_work
 
-	return accumulated_work
+	return finished_work
 }
 
 // windowContent contiente el contenido de la ventana. Esto normalmente se obtiene
 // con un strings.Builder y el metodo WriteString
 func (pr *SinglePacketReceiver) flushWindow() {
 	var buffer strings.Builder
+	defer buffer.Reset()
+	var pkt_sqn_number []int
 	for _, wind_pkt := range pr.packets_in_window {
 		buffer.WriteString(wind_pkt.GetPayload())
+		pkt_sqn_number = append(pkt_sqn_number, wind_pkt.GetSequenceNumber())
 	}
+
 	pr.checkpointer.checkpoint(PreFlushear)
 	// LOG De todos los archivos que voy a borrar: Stage 1.
 	// En la packet window: A, B, C
@@ -872,7 +870,6 @@ func (pr *SinglePacketReceiver) flushWindow() {
 	// Voy a borrar B
 	// Voy a borrar C
 	for _, packet := range pr.packets_in_window {
-		fmt.Printf("Paquete en ventana: %s\n", packet.GetSequenceNumberString())
 		sq_n := packet.GetSequenceNumberString()
 		// if packet.GetSequenceNumber() == 25 {
 		// 	panic("Trigger")
@@ -900,9 +897,7 @@ func (pr *SinglePacketReceiver) flushWindow() {
 	// disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
 	// // Si me muero aca, no pasa nada, porque cuando reviva simplemente voy
 	// // re-escribir lo que tenia con los mismo datos + 1 nuevo paquete.
-	pr.writePartialWork(buffer.String(), pr.packets_in_window)
-
-	panic("Trigger")
+	pr.writePartialWork(buffer.String(), pkt_sqn_number)
 
 	pr.checkpointer.checkpoint(LaburoParcial)
 
@@ -982,27 +977,18 @@ func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
 	return allReceived
 }
 
-func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []packet.Packet) {
+func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []int) {
 	partial_work := pr.read_partial_work()
 	same_length := len(partial_work.ventana) == len(ventana)
 
 	all_equal := true
-	ventana_i := make([]int, len(ventana))
-	if !same_length {
-		for i := 0; i < len(ventana); i++ {
-			pkt_in_window  := ventana[i]
-			ventana_i[i] = pkt_in_window.GetSequenceNumber()
-		}
-	} else {
-		for i := 0; i < len(ventana); i++ {
-			pkt_in_window  := ventana[i]
-			sqn_in_partial := partial_work.ventana[i]
+	slices.Sort(ventana)
+	for i := 0; i < len(ventana) && same_length == true && all_equal == true; i++ {
+		pkt_in_window  := ventana[i]
+		sqn_in_partial := partial_work.ventana[i]
 
-			if sqn_in_partial != pkt_in_window.GetSequenceNumber() {
-				all_equal = false
-			}
-
-			ventana_i[i] = pkt_in_window.GetSequenceNumber()
+		if sqn_in_partial != pkt_in_window {
+			all_equal = false
 		}
 	}
 
@@ -1018,7 +1004,7 @@ func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []packet.
 		// de llegar.
 		transformation := pr.transformer(accumulated_work, input)
 
-		new_partial_work := newPartialWork(ventana_i, transformation)
+		new_partial_work := newPartialWork(ventana, transformation)
 
 		partial_work_s := pr.serialize_partial_work(new_partial_work)
 
@@ -1053,9 +1039,6 @@ func (pr *SinglePacketReceiver) serialize_partial_work(partial_work partialWork)
 		number_buffer := [8]byte{}
 		binary.BigEndian.PutUint64(number_buffer[:], uint64(number))
 		number_buffer_s := string(number_buffer[:])
-		println("number_buffer_s")
-		println(number)
-		println(number_buffer_s)
 
 		partial_work_buffer.WriteString(number_buffer_s)
 	}
@@ -1076,8 +1059,6 @@ func (pr *SinglePacketReceiver) read_partial_work() partialWork {
 	if partial_work == "" {
 		return newPartialWork([]int{}, "")
 	}
-	println("Partial work file:")
-	println(partial_work)
 
 	accumulated_work_reader := strings.NewReader(partial_work)
 
@@ -1092,27 +1073,18 @@ func (pr *SinglePacketReceiver) read_partial_work() partialWork {
 	accumulated_work_reader.Read(ventana_tamano_b[:])
 	long_ventana := binary.BigEndian.Uint64(ventana_tamano_b[:])
 
-	println("long_ventana")
-	println(long_ventana)
-
 	var ventana []int
 	for i := 0; i < int(long_ventana) ; i++ {
 		var current_number_b [8]byte
-		fmt.Printf("%+v\n", current_number_b)
 		accumulated_work_reader.Read(current_number_b[:])
 		current_number_u := binary.BigEndian.Uint64(current_number_b[:])
 		current_number := int(current_number_u)
-
-	   println(current_number)
 		ventana = append(ventana, current_number)
 	}
 
 	var ventana_indicator_end_b [7]byte
 	accumulated_work_reader.Read(ventana_indicator_end_b[:])
 	ventana_indicator_end := string(ventana_indicator_end_b[:])
-	println("ventana_indicator_end")
-	println(ventana_indicator_end)
-	println("VENTANA")
 	if ventana_indicator_end != "VENTANA" {
 		panic("ERROR: El archivo de trabajo parcial esta mal formateado. No tiene indicador de fin de ventana.")
 	}
