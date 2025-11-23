@@ -140,21 +140,21 @@ func (c *checkpointMoment) toString() string {
 	var repr string
 	switch *c {
 	case Cleaned:
-		repr = "0CLEANED"
+		repr = "CLEANED"
 	case LlegoElPaquete:
-		repr = "1LLEGOPAQUETE"
+		repr = "LLEGOPAQUETE"
 	case PreACK:
-		repr = "2PRE-ACK"
+		repr = "PRE-ACK"
 	case HiceACK:
-		repr = "3ACK"
+		repr = "ACK"
 	case PreFlushear:
-		repr = "4PRE-FLUSH"
+		repr = "PRE-FLUSH"
 	case LogAhead:
-		repr = "5LOGAHEAD"
+		repr = "LOGAHEAD"
 	case LaburoParcial:
-		repr = "6LABUROPARCIAL"
+		repr = "LABUROPARCIAL"
 	case LogBehind:
-		repr = "7LOGBEHIND"
+		repr = "LOGBEHIND"
 	}
 	return repr
 }
@@ -164,6 +164,9 @@ func (c *checkpointMoment) toString() string {
 type checkpointer struct {
 	// Root de la CORRIENTE CORRIDA para marcar los checkpoints.
 	checkpoint_root_current string
+
+	// Llamda. Usado para indicar el orden de las operaciones
+	uses int
 }
 
 func newCheckpointer(checkpoint_root string) checkpointer {
@@ -190,6 +193,7 @@ func newCheckpointer(checkpoint_root string) checkpointer {
 
 	return checkpointer{
 		checkpoint_root_current: checkpoint_root_current,
+		uses: 0,
 	}
 }
 
@@ -207,7 +211,9 @@ func (c *checkpointer) clean() {
 
 func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
 	file_name := checkpoint.toString()
-	full_path := c.checkpoint_root_current + "/" + file_name
+	uses := strconv.FormatInt(int64(c.uses), 10)
+	full_path := c.checkpoint_root_current + "/" + string(uses) + file_name
+	c.uses += 1
 	disk.CreateFile(full_path)
 }
 
