@@ -874,32 +874,35 @@ func (pr *SinglePacketReceiver) flushWindow() {
 	for _, packet := range pr.packets_in_window {
 		fmt.Printf("Paquete en ventana: %s\n", packet.GetSequenceNumberString())
 		sq_n := packet.GetSequenceNumberString()
-		// 	if packet.GetSequenceNumber() == 25 {
-		// panic("Trigger")
-		// 	}
+		// if packet.GetSequenceNumber() == 25 {
+		// 	panic("Trigger")
+		// }
 		pr.logger.write_ahead(sq_n)
 	}
 	// panic("Trigger")
 
 	pr.checkpointer.checkpoint(LogAhead)
-	// NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
-	// log, no pasa nada, porque cuando se levante de vuelta va a ver que
-	// tiene en la ventana mas paquetes de los que esta anotada. Entonces,
-	// solo tiene que anadir los paquetes que le faltan en el log.
-	accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
-	if err != nil {
-		panic(err)
-	}
-	// Aplico la funcion transformer a todo lo que recibi + lo que acaba
-	// de llegar.
-	transformation := pr.transformer(accumulated_work, buffer.String())
 
-	// Antes de escribir en disco, tengo que des-hacerme de los paquetes
-	// la ventana.
-	disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
-	// Si me muero aca, no pasa nada, porque cuando reviva simplemente voy
-	// re-escribir lo que tenia con los mismo datos + 1 nuevo paquete.
-	// panic("Trigger")
+	// // NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
+	// // log, no pasa nada, porque cuando se levante de vuelta va a ver que
+	// // tiene en la ventana mas paquetes de los que esta anotada. Entonces,
+	// // solo tiene que anadir los paquetes que le faltan en el log.
+	// accumulated_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// // Aplico la funcion transformer a todo lo que recibi + lo que acaba
+	// // de llegar.
+	// transformation := pr.transformer(accumulated_work, buffer.String())
+
+	// // Antes de escribir en disco, tengo que des-hacerme de los paquetes
+	// // la ventana.
+	// disk.AtomicWriteString(transformation, pr.path_resolver.resolve_path(PartialWork))
+	// // Si me muero aca, no pasa nada, porque cuando reviva simplemente voy
+	// // re-escribir lo que tenia con los mismo datos + 1 nuevo paquete.
+	pr.writePartialWork(buffer.String(), pr.packets_in_window)
+
+	panic("Trigger")
 
 	pr.checkpointer.checkpoint(LaburoParcial)
 
@@ -979,6 +982,49 @@ func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
 	return allReceived
 }
 
+func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []packet.Packet) {
+	partial_work := pr.read_partial_work()
+	same_length := len(partial_work.ventana) == len(ventana)
+
+	all_equal := true
+	ventana_i := make([]int, len(ventana))
+	if !same_length {
+		for i := 0; i < len(ventana); i++ {
+			pkt_in_window  := ventana[i]
+			ventana_i[i] = pkt_in_window.GetSequenceNumber()
+		}
+	} else {
+		for i := 0; i < len(ventana); i++ {
+			pkt_in_window  := ventana[i]
+			sqn_in_partial := partial_work.ventana[i]
+
+			if sqn_in_partial != pkt_in_window.GetSequenceNumber() {
+				all_equal = false
+			}
+
+			ventana_i[i] = pkt_in_window.GetSequenceNumber()
+		}
+	}
+
+
+	// Yo quiero aplicar la transformacion si o las ventanas son de distinto
+	// tamano, o difieren en algun numero (si diferen en alguno DEBERIAN
+	// diferir en todos
+	applyTransform := !same_length || !all_equal
+
+	if applyTransform {
+		accumulated_work := partial_work.accumulated_work
+		// Aplico la funcion transformer a todo lo que recibi + lo que acaba
+		// de llegar.
+		transformation := pr.transformer(accumulated_work, input)
+
+		new_partial_work := newPartialWork(ventana_i, transformation)
+
+		partial_work_s := pr.serialize_partial_work(new_partial_work)
+
+		disk.AtomicWriteString(partial_work_s, pr.path_resolver.resolve_path(PartialWork))
+	}
+}
 
 type partialWork struct {
 	ventana []int
