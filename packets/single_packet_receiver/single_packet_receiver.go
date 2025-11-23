@@ -2,14 +2,15 @@ package single_packet_receiver
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/colas"
-	"os"
-	"strconv"
-	"slices"
 	"malasian_coffe/utils/disk"
+	"os"
+	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -976,4 +977,111 @@ func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
 	}
 
 	return allReceived
+}
+
+
+type partialWork struct {
+	ventana []int
+	accumulated_work string
+}
+
+func newPartialWork(ventana []int, accumulated_work string) partialWork {
+	return partialWork{
+		ventana: ventana,
+		accumulated_work: accumulated_work,
+	}
+}
+
+// Construye el formato de partial work
+func (pr *SinglePacketReceiver) serialize_partial_work(partial_work partialWork) string {
+	var partial_work_buffer strings.Builder
+	partial_work_buffer.WriteString("VENTANA")
+
+	window_len := len(partial_work.ventana)
+	window_len_buf := [8]byte{}
+	binary.BigEndian.PutUint64(window_len_buf[:], uint64(window_len))
+	window_len_s := string(window_len_buf[:])
+	partial_work_buffer.WriteString(window_len_s)
+
+	for _, number := range partial_work.ventana {
+		number_buffer := [8]byte{}
+		binary.BigEndian.PutUint64(number_buffer[:], uint64(number))
+		number_buffer_s := string(number_buffer[:])
+		println("number_buffer_s")
+		println(number)
+		println(number_buffer_s)
+
+		partial_work_buffer.WriteString(number_buffer_s)
+	}
+
+	partial_work_buffer.WriteString("VENTANA")
+
+	partial_work_buffer.WriteString(partial_work.accumulated_work)
+
+	return partial_work_buffer.String()
+}
+
+// Parsea el archivo de partial work
+func (pr *SinglePacketReceiver) read_partial_work() partialWork {
+	partial_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
+	if err != nil {
+		panic(err)
+	}
+	if partial_work == "" {
+		return newPartialWork([]int{}, "")
+	}
+	println("Partial work file:")
+	println(partial_work)
+
+	accumulated_work_reader := strings.NewReader(partial_work)
+
+	var ventana_indicator_b [7]byte
+	accumulated_work_reader.Read(ventana_indicator_b[:])
+	ventana_indicator := string(ventana_indicator_b[:])
+	if ventana_indicator != "VENTANA" {
+		panic("ERROR: El archivo de trabajo parcial esta mal formateado. No tiene indicador de ventana.")
+	}
+
+	var ventana_tamano_b [8]byte
+	accumulated_work_reader.Read(ventana_tamano_b[:])
+	long_ventana := binary.BigEndian.Uint64(ventana_tamano_b[:])
+
+	println("long_ventana")
+	println(long_ventana)
+
+	var ventana []int
+	for i := 0; i < int(long_ventana) ; i++ {
+		var current_number_b [8]byte
+		fmt.Printf("%+v\n", current_number_b)
+		accumulated_work_reader.Read(current_number_b[:])
+		current_number_u := binary.BigEndian.Uint64(current_number_b[:])
+		current_number := int(current_number_u)
+
+	   println(current_number)
+		ventana = append(ventana, current_number)
+	}
+
+	var ventana_indicator_end_b [7]byte
+	accumulated_work_reader.Read(ventana_indicator_end_b[:])
+	ventana_indicator_end := string(ventana_indicator_end_b[:])
+	println("ventana_indicator_end")
+	println(ventana_indicator_end)
+	println("VENTANA")
+	if ventana_indicator_end != "VENTANA" {
+		panic("ERROR: El archivo de trabajo parcial esta mal formateado. No tiene indicador de fin de ventana.")
+	}
+
+	// NOTE: Ordeno por las dudas
+	slices.Sort(ventana)
+
+	remaining := accumulated_work_reader.Len()
+
+	partial_work_b := make([]byte, remaining)
+	accumulated_work_reader.Read(partial_work_b)
+	partial_work_s := string(partial_work_b[:])
+
+	return partialWork {
+		ventana: ventana,
+		accumulated_work: partial_work_s,
+	}
 }
