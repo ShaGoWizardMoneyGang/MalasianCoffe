@@ -66,8 +66,6 @@ type SinglePacketReceiver struct {
 	// Para saber si llego el EOF
 	EOF int
 
-	identifier string
-
 	path_resolver pathResolver
 
 	logger logger
@@ -81,7 +79,10 @@ type pathResolver struct {
 	root string
 }
 
-func newPathResolver(root string) pathResolver {
+// root es el directorio que todos los packet_receiver usan en comun.
+// identifier es el identificador de ESTA INSTANCIA de packet receiver
+func newPathResolver(identifier string) pathResolver {
+	root := "packet_receiver" + "/" + identifier
 	return pathResolver {
 		root: root,
 	}
@@ -217,7 +218,7 @@ func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
 }
 
 func NewSinglePacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) SinglePacketReceiver {
-	pathResolver := newPathResolver("packet_receiver")
+	pathResolver := newPathResolver(identifier)
 	packet_receiver_dir := pathResolver.resolve_path(Root)
 	if !disk.Exists(packet_receiver_dir) {
 		disk.CreateDir(packet_receiver_dir)
@@ -296,7 +297,6 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		packets_in_window:         packets_in_window,
 		transformer:               transformer,
 		EOF:                       received_eof,
-		identifier:                identifier,
 		path_resolver:             pathResolver,
 		logger:                    logger,
 		// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
