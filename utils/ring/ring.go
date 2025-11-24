@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -12,22 +11,27 @@ import (
 const (
 	HEALTHCHECK_PORT  int = 1958
 	HEARTBEAT_PORT        = 1960
-	HEARTBEAT_PERIOD      = 3
-	HEARTBEAT_TIMEOUT     = 7
+	ACK_PORT              = 1959
+	HEARTBEAT_PERIOD      = 1
+	HEARTBEAT_TIMEOUT     = 10
 )
 
 type WatchdogNode struct {
-	ID       int
-	Addr     string
-	Neighbor string // lista enlazada
+	ID         int
+	Addr       string
+	Neighbor   string // lista enlazada
+	NeighborID int
+	RingFile   string
 }
 
-func JoinToTheRing(id int, addr string, neighbor string) WatchdogNode {
+func JoinToTheRing(id int, addr string, neighbor string, neighborID int, ringFile string) WatchdogNode {
 	node :=
 		WatchdogNode{
-			ID:       id,
-			Addr:     addr,
-			Neighbor: neighbor,
+			ID:         id,
+			Addr:       addr,
+			Neighbor:   neighbor,
+			NeighborID: neighborID,
+			RingFile:   ringFile,
 		}
 	return node
 }
@@ -51,18 +55,76 @@ func ReadRingMembers(ringFile string) ([]string, error) {
 func FindID(myName string, puppies []string) int {
 	for i, name := range puppies {
 		if name == myName {
-			return i
+			return i + 1
 		}
 	}
 	return -1
 }
 
 // OMG LISTA CIRCULAR SISOP MEMORIES
-func GetNeighbor(myID int, puppies []string) string {
-	return puppies[(myID+1)%len(puppies)]
+func GetNeighbor(myID int, puppies []string) (string, int) {
+	neighborID := (myID + 1) % len(puppies)
+	return puppies[neighborID], neighborID
 }
 
-func (node WatchdogNode) ListenRing() {
+func (node *WatchdogNode) connectToNextNeighbor() {
+	members, err := ReadRingMembers(node.RingFile)
+	if err != nil {
+		fmt.Printf("[%s] Error leyendo miembros del anillo: %v\n", node.Addr, err)
+		return
+	}
+	node.NeighborID = (node.NeighborID + 1) % len(members)
+	node.Neighbor = members[node.NeighborID]
+	fmt.Printf("[%s] Nuevo vecino: %v\n", node.Addr, node.Neighbor)
+
+}
+
+func (node *WatchdogNode) WaitForACK() {
+	addr := net.UDPAddr{
+		Port: ACK_PORT,
+		IP:   net.ParseIP("0.0.0.0"),
+	}
+	conn, err := net.ListenUDP("udp", &addr)
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+	buffer := make([]byte, 1024)
+	reconnectAttempts := 0
+	for {
+		fmt.Printf("[%s] Esperando ACK...\n", node.Addr)
+		lastHeartbeat := time.Time{}
+		conn.SetDeadline(time.Now().Add(HEARTBEAT_TIMEOUT * time.Second))
+		//solo escucho paquetes
+		n, remote, err := conn.ReadFromUDP(buffer)
+		if err == nil {
+			payload := string(buffer[:n])
+			if payload == "ACK" {
+				fmt.Printf("[%s] Recibí ACK de %s\n", node.Addr, remote.String())
+				return
+			}
+		} else {
+			fmt.Printf("[%s] Error leyendo desde UDP: %v\n", node.Addr, err)
+			netErr, ok := err.(net.Error)
+			if ok && netErr.Timeout() {
+				if time.Since(lastHeartbeat) > HEARTBEAT_TIMEOUT*time.Second {
+					fmt.Printf("[%s] No recibí mensajes de mi vecino en %d segundos. Reintento...\n", node.Addr, HEARTBEAT_TIMEOUT)
+					reconnectAttempts++
+					if reconnectAttempts >= 3 {
+						fmt.Printf("[%s] No pude reconectar con mi vecino después de %d intentos. Asumo que cayó.\n", node.Addr, reconnectAttempts)
+						node.connectToNextNeighbor()
+						reconnectAttempts = 0 // resetear contador
+						return
+					}
+				}
+			} else {
+				fmt.Printf("[%s] Error en ReadFromUDP: %v\n", node.Addr, err)
+			}
+		}
+	}
+}
+
+func (node *WatchdogNode) ListenHeartbeats(forwardingChannel chan string) {
 	addr := net.UDPAddr{
 		Port: HEARTBEAT_PORT,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -74,50 +136,27 @@ func (node WatchdogNode) ListenRing() {
 	defer conn.Close()
 	buffer := make([]byte, 1024)
 	for {
-		lastHeartbeat := time.Time{}
-		conn.SetDeadline(time.Now().Add(HEARTBEAT_TIMEOUT * time.Second))
 		n, remote, err := conn.ReadFromUDP(buffer)
 		if err == nil {
 			payload := string(buffer[:n])
-
-			switch payload {
-			case "ACK":
-				lastHeartbeat = time.Now()
-				fmt.Printf("[%s] Recibí ACK de %s\n", node.Addr, remote.String())
-			default:
-				//si no es ACK es el heartbeat
-				fmt.Printf("[%s] Recibí: %s de %s\n", node.Addr, string(buffer[:n]), remote.String())
-				// Responde al vecino
-				prevNodeIP := strings.Split(remote.String(), ":")[0]
-				prevNodeAddr := net.UDPAddr{
-					Port: HEALTHCHECK_PORT,
-					IP:   net.ParseIP(prevNodeIP),
-				}
-				conn.WriteToUDP([]byte("ACK"), &prevNodeAddr)
-				fmt.Printf("[%s] Mandé ACK a %s\n", node.Addr, &prevNodeAddr)
-
-				fmt.Printf("[%s] Forwardeo a mi vecino %s\n", node.Addr, node.Neighbor)
-				starterID, _ := strconv.Atoi(strings.Split(payload, ",")[0])
-				if starterID == node.ID {
-					fmt.Printf("[%s] El mensaje volvió a mí, no lo reenvío\n", node.Addr)
-					continue
-				}
-				node.forwardToNeighbor(starterID)
+			// si no es ACK es el heartbeat
+			fmt.Printf("[%s] Recibí: %s de %s\n", node.Addr, payload, remote.String())
+			// Responde al vecino
+			forwardingChannel <- payload
+			prevNodeIP := strings.Split(remote.String(), ":")[0]
+			prevNodeAddr := net.UDPAddr{
+				Port: ACK_PORT,
+				IP:   net.ParseIP(prevNodeIP),
 			}
+			conn.WriteToUDP([]byte("ACK"), &prevNodeAddr)
+			fmt.Printf("[%s] Mandé ACK a %s\n", node.Addr, &prevNodeAddr)
 		} else {
-			netErr, ok := err.(net.Error)
-			if ok && netErr.Timeout() {
-				if time.Since(lastHeartbeat) > HEARTBEAT_TIMEOUT*time.Second {
-					fmt.Printf("[%s] No recibí mensajes de mi vecino en %d segundos. Está caído.\n", node.Addr, HEARTBEAT_TIMEOUT)
-				}
-			} else {
-				fmt.Printf("[%s] Error en ReadFromUDP: %v\n", node.Addr, err)
-			}
+			panic(err)
 		}
 	}
 }
 
-func (node WatchdogNode) forwardToNeighbor(starterID int) {
+func (node WatchdogNode) ForwardToNeighbor(starterID int) {
 	neighborAddr := node.Neighbor + ":" + fmt.Sprint(HEARTBEAT_PORT)
 	conn, err := net.Dial("udp", neighborAddr)
 	if err != nil {
@@ -126,19 +165,6 @@ func (node WatchdogNode) forwardToNeighbor(starterID int) {
 	}
 	defer conn.Close()
 	msg := fmt.Sprintf("%d,%s", starterID, node.Addr)
-	conn.Write([]byte(msg))
-	fmt.Printf("[%s] Envié mensaje a %s\n", node.Addr, neighborAddr)
-}
-
-func (node WatchdogNode) SendHello() {
-	neighborAddr := node.Neighbor + ":" + fmt.Sprint(HEARTBEAT_PORT)
-	conn, err := net.Dial("udp", neighborAddr)
-	if err != nil {
-		fmt.Printf("[%s] Error enviando a %s: %v\n", node.Addr, neighborAddr, err)
-		return
-	}
-	defer conn.Close()
-	msg := fmt.Sprintf("%d,%s", node.ID, node.Addr)
 	conn.Write([]byte(msg))
 	fmt.Printf("[%s] Envié mensaje a %s\n", node.Addr, neighborAddr)
 }
@@ -171,7 +197,7 @@ func (node WatchdogNode) SendHeartbeat(neighborAddr string) {
 }
 
 // Envía heartbeats periódicos a su vecino que va a propagar el mensaje
-func (node WatchdogNode) HeartbeatLoop(replicaList []string) {
+func (node *WatchdogNode) HeartbeatLoop() {
 	// LOCURA LO QUE ES ESTE TICKER
 	// El ticker es un objeto que genera eventos cada cierto intervalo
 	ticker := time.NewTicker(HEARTBEAT_PERIOD * time.Second)
@@ -183,37 +209,5 @@ func (node WatchdogNode) HeartbeatLoop(replicaList []string) {
 		addr := node.Neighbor + ":" + fmt.Sprint(HEARTBEAT_PORT)
 		fmt.Printf("Enviando heartbeat a %s\n", addr)
 		node.SendHeartbeat(addr)
-	}
-}
-
-// ============================= REPLICA ================================
-
-// Espera los heartbeats del lider, si no llegan avisa
-func (node WatchdogNode) ReplicaHeartbeatLoop() {
-	addr := net.UDPAddr{
-		Port: HEARTBEAT_PORT,
-		IP:   net.ParseIP("0.0.0.0"),
-	}
-	// Abro socket
-	conn, err := net.ListenUDP("udp", &addr)
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-	buffer := make([]byte, 1024)
-	// Guardo cuándo llegó el último heartbeat
-	lastHeartbeat := time.Now()
-	for {
-		// Timeout para la lectura, si nada llega en HEARTBEAT_TIMEOUT falla
-		conn.SetReadDeadline(time.Now().Add(HEARTBEAT_TIMEOUT * time.Second))
-		n, _, err := conn.ReadFromUDP(buffer)
-		// si recibi mensjae y es "HEARTBEAT", actualizo el tiempo del último heartbeat
-		if err == nil && string(buffer[:n]) == "HEARTBEAT" {
-			lastHeartbeat = time.Now()
-			fmt.Println("Heartbeat recibido del líder")
-			// si no recibe nada en ese tiempo, avisa que no llegó
-		} else if time.Since(lastHeartbeat) > HEARTBEAT_TIMEOUT*time.Second {
-			fmt.Println("No recibí heartbeat del líder en el tiempo esperado")
-		}
 	}
 }

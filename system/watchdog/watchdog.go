@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	bully "malasian_coffe/utils/coordination"
 	"malasian_coffe/utils/ring"
 	"os"
 	"os/exec"
@@ -39,7 +40,6 @@ func main() {
 	fmt.Println("Esperando a que arranque el sistema...")
 	time.Sleep(5 * time.Second)
 
-	// PRUEBA DE ANILLO
 	myName, err := os.Hostname() //watchdog_1, watchdog_2, ...
 	if err != nil {
 		panic("No se pudo obtener el hostname")
@@ -49,18 +49,55 @@ func main() {
 		panic(err)
 	}
 	myID := ring.FindID(myName, members)
-	neighbor := ring.GetNeighbor(myID, members)
-	fmt.Printf("Soy %s, mi vecino en el anillo es %s\n", myName, neighbor)
 
-	ringNode := ring.JoinToTheRing(myID, myName, neighbor)
-
-	go ringNode.ListenRing()
 	amIStarter := os.Args[1]
-	if amIStarter != "STARTER" {
-		select {}
+	masterID := -1
+	if amIStarter == "STARTER" {
+		masterID = myID
 	}
 
-	ringNode.HeartbeatLoop(members)
+	node := bully.WatchdogNode{
+		ID:           myID,
+		Addr:         myName,
+		MasterID:     masterID, //el primer master es el starter (por ahora)
+		Nodes:        members,
+		Coordinating: false,
+	}
+
+	for {
+		if node.AmIMaster() {
+			fmt.Println("Soy el iniciador, comienzo el bucle de latidos")
+			node.MasterID = node.ID
+			node.BroadcastHeartbeat() //loop infinito por ahora
+		} else {
+			node.ListenHeartbeats()
+		}
+	}
+
+	// forwardingChannel := make(chan string)
+
+	// amIStarter := os.Args[1]
+	// if amIStarter == "STARTER" {
+	// 	fmt.Println("Soy el iniciador, comienzo el bucle de latidos")
+	// 	go ringNode.HeartbeatLoop()
+	// }
+	// go ringNode.ListenHeartbeats(forwardingChannel)
+
+	// for payload := range forwardingChannel {
+	// 	fmt.Printf("[%s] ESTOY DESPUES DEL CHANNEL\n", ringNode.Addr)
+	// 	starterID, err := strconv.Atoi(strings.Split(payload, ",")[0])
+	// 	if err != nil {
+	// 		fmt.Printf("[%s] Error parsing starterID: %v\n", ringNode.Addr, err)
+	// 		panic(err)
+	// 	}
+	// 	if starterID == ringNode.ID {
+	// 		fmt.Printf("[%s] El mensaje volvió a mí, no lo reenvío\n", ringNode.Addr)
+	// 		ringNode.WaitForACK() //bloqueante hasta ACK o timeout
+	// 		continue
+	// 	}
+	// 	ringNode.ForwardToNeighbor(starterID)
+	// 	ringNode.WaitForACK() //bloqueante hasta ACK o timeout
+	// }
 
 	fmt.Println("Soy el líder, comienzo watchdog")
 	// file, err := os.ReadFile(SHEEPS_FILE)
@@ -68,7 +105,7 @@ func main() {
 	// 	fmt.Fprintf(os.Stderr, "No se pudo abrir el archivo %s: %v\n", SHEEPS_FILE, err)
 	// }
 
-	// listOfServices := strings.Split(string(file), "\n")
+	// listOfServiFces := strings.Split(string(file), "\n")
 	// services := make([]string, 0, len(listOfServices))
 	// for _, s := range listOfServices {
 	// 	s = strings.TrimSpace(s)
