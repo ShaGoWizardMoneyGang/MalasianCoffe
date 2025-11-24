@@ -319,7 +319,6 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 // Devuelve un booleano que representa si se recivieron todos los paquetes
 // dentro de la ventana. Si este es el caso, se tienen que procesar.
 func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
-	defer pr.checkpointer.reset_window()
 	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
 	pr.checkpointer.checkpoint(LlegoElPaquete)
@@ -372,6 +371,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	if do_flush_window || allReceived {
 		pr.flushWindow()
 	}
+	pr.checkpointer.reset_window()
 
 	pr.windowFull = allReceived
 
