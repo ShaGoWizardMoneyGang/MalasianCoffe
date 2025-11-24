@@ -125,3 +125,7 @@ func DeleteFile(path string) error {
 
 	return err
 }
+
+func DeleteDirRecursively(path string) {
+	os.RemoveAll(path)
+}

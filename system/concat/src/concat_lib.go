@@ -54,6 +54,8 @@ func concat(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet
 		bitacora.Info(fmt.Sprintf("Envio pkt concatenado al sender, session: %s", pkt.GetSessionID()))
 		outputChannel <- pkt
 	}
+
+	localReceiver.Clean()
 }
 
 func (c *Concat) Build(rabbitAddr string, routing_key string) {
