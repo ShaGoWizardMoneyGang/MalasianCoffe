@@ -856,11 +856,20 @@ func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []int) {
 
 	all_equal := true
 	slices.Sort(ventana)
-	for i := 0; i < len(ventana) && same_length == true && all_equal == true; i++ {
+	for i := 0; i < len(ventana) && same_length == true; i++ {
 		pkt_in_window  := ventana[i]
 		sqn_in_partial := partial_work.ventana[i]
 
-		if sqn_in_partial != pkt_in_window {
+		same_index := sqn_in_partial == pkt_in_window
+
+		// SANITY CHECK: si en algun momento se detecto que diferian en
+		// alguno, pero despues encontramos que hay dos que son iguales,
+		// entonces tenemos un error.
+		if !all_equal && same_index {
+			panic("ERROR: Se encontro que dos ventanas distintas comparten ALGUNOS paquetes y otros no.")
+		}
+
+		if !same_index {
 			all_equal = false
 		}
 	}
