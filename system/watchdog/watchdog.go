@@ -145,16 +145,16 @@ func main() {
 	}
 	myID := GetID(myName, members)
 
-	amIStarter := os.Args[1]
-	masterID := -1
-	if amIStarter == "STARTER" {
-		masterID = myID
-	}
+	// amIStarter := os.Args[1]
+	// masterID := -1
+	// if amIStarter == "STARTER" {
+	// 	masterID = myID
+	// }
 
 	node := bully.WatchdogNode{
 		ID:           myID,
 		Addr:         myName,
-		MasterID:     masterID, //el primer master es el starter (por ahora)
+		MasterID:     -1, //el primer master es el starter (por ahora)
 		Nodes:        members,
 		Coordinating: false,
 	}
