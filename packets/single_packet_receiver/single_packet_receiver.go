@@ -549,6 +549,17 @@ func newLogger(write_operation string, delete_operation string,
 			panic(fmt.Sprintf("DELETE DE RECURSO NO WRITEADO DETECTADO: %s", log_file_path))
 		}
 	}
+	// Si al final de todo esto tengo cosas pendientes y borradas, signfica que
+	// el programa se murio mientras estaba borrando. En ese caso, tengo que
+	// borrar las cosas que me quedaron pendientes.
+	cut_in_the_middle_of_deleting := len(logger.pending_resources) > 0 && len(logger.done_resources) > 0
+	if cut_in_the_middle_of_deleting {
+		for resource, _ := range logger.pending_resources {
+			println(resource)
+			logger.delete_behind(resource)
+		}
+		logger.clear()
+	}
 
 
 	return logger
@@ -675,6 +686,17 @@ func (l *logger) delete_behind(resource string) {
 		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente ni como listo (WTF?).: %s", resource))
 	}
 
+}
+
+// Clears all the resources in its table, since it finished processing the window.
+func (l *logger) clear() {
+	l.pending_resources = make(map[string]struct{})
+	l.done_resources = make(map[string]struct{})
+
+	err := disk.DeleteFile(l.log_file)
+	if err != nil {
+		panic(err)
+	}
 }
 
 
@@ -929,6 +951,7 @@ func (pr *SinglePacketReceiver) flushWindow() {
 	// actualizamos la memoria.
 	pr.packets_in_window = nil
 	buffer.Reset()
+	pr.logger.clear()
 }
 
 func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
