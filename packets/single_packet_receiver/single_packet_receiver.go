@@ -195,7 +195,7 @@ func newCheckpointer(checkpoint_root string) checkpointer {
 	}
 }
 
-func (c *checkpointer) clean() {
+func (c *checkpointer) reset_window() {
 	entries, err := os.ReadDir(c.checkpoint_root_current)
 	if err != nil {
 		panic(err)
@@ -319,7 +319,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 // Devuelve un booleano que representa si se recivieron todos los paquetes
 // dentro de la ventana. Si este es el caso, se tienen que procesar.
 func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
-	defer pr.checkpointer.clean()
+	defer pr.checkpointer.reset_window()
 	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
 	pr.checkpointer.checkpoint(LlegoElPaquete)
@@ -376,6 +376,13 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	pr.windowFull = allReceived
 
 	return allReceived
+}
+
+
+// Funcion que destruye todos los archivos creados por el SinglePacketReceiver
+func (pr *SinglePacketReceiver) Clean() {
+	path := pr.path_resolver.resolve_path(Root)
+	disk.DeleteDirRecursively(path)
 }
 
 // Estructura encargada de escribir logs para trackear operaciones que tienen un
