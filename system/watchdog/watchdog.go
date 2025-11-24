@@ -13,7 +13,6 @@ import (
 
 const (
 	SHEEPS_FILE  = "sheeps.txt"
-	PUPPIES_FILE = "puppies.txt"
 	MEMBERS_FILE = "members.txt"
 	MAX_RETRIES  = 3
 	TIMEOUT      = 2
@@ -167,7 +166,21 @@ func main() {
 			node.MasterID = node.ID   //TODO sacar esto creo que no jode
 			node.BroadcastHeartbeat() //loop infinito por ahora
 		} else {
+			watchdogListener := watchdog.CreateWatchdogListener()
+			healthcheckChannel := make(chan string)
+			go watchdogListener.Listen(healthcheckChannel)
+			go func() {
+				for serviceName := range healthcheckChannel {
+					IP := strings.Split(serviceName, ":")[0]
+					fmt.Println("Replica received healthcheck ping from", IP)
+					watchdogListener.Pong(IP)
+				}
+				fmt.Println("exited go routine")
+			}()
 			node.ListenHeartbeats()
+			watchdogListener.KeepRunning = false
+			watchdogListener.Conn.Close()
+			fmt.Printf("----------------------------------------Valor de KeepRunning: %v\n", watchdogListener.KeepRunning)
 		}
 	}
 }
