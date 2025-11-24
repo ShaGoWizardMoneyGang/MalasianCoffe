@@ -334,10 +334,13 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	allReceived := pr.checkIfReceivedAll()
 
 	// fmt.Printf("Recibi %s\n", pkt.GetSequenceNumberString())
+	allreadyProcessed := pr.logger.checkIfAlreadyProcessed(pkt.GetSequenceNumber())
+
+	alreadyInWindow := pr.checkIfInWindow(pkt)
 
 	// Guardo el paquete que acabo de recibir en disco si y solo si no lo recibi antes.
 	// Esto quiere decir que ni esta en la ventana ni esta ya procesado.
-	if !pr.checkIfInWindow(pkt) && !pr.logger.checkIfAlreadyProcessed(pkt.GetSequenceNumber()){
+	if !alreadyInWindow && !allreadyProcessed && !allReceived {
 		// NOTE: Por convencion, el nombre del archivo es su numero de secuencia
 		pkt_file := pr.path_resolver.resolve_path(Packets) + pkt.GetSequenceNumberString()
 		disk.AtomicWrite(pkt.Serialize(), pkt_file)
@@ -356,7 +359,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// la ventana.
 	// Ahora, si ya recibi todo, no necesito anadirlo, incluso si no esta en
 	// la ventana porque ya tengo que enviarlo todo
-	if !pr.checkIfInWindow(pkt) && !allReceived {
+	if !alreadyInWindow && !allreadyProcessed && !allReceived {
 		pr.packets_in_window = append(pr.packets_in_window, pkt)
 	}
 
