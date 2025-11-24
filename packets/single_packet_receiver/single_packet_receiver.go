@@ -205,6 +205,7 @@ func (c *checkpointer) clean() {
 	for _, file := range entries {
 		disk.DeleteFile(file.Name())
 	}
+	c.uses = 0
 
 	c.checkpoint(Cleaned)
 }
