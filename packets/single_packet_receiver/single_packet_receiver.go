@@ -328,6 +328,11 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// Guardo el paquete que acabo de recibir en disco
 	{
 		// NOTE: Por convencion, el nombre del archivo es su numero de secuencia
+		// NOTE: Que pasa si el paquete ya lo habia recibido antes? No deberia
+		// pasar, simplemente se va a sobre escribir el archivo. Podriamos
+		// hacer un sanity check antes de escribirlo que consista de fijarme
+		// si ya lo recibi y ver si tiene diferencias con lo que tenia en
+		// disco. Pero es algo que podemos suponer con cierta seguridad.
 		pkt_file := pr.path_resolver.resolve_path(Packets) + pkt.GetSequenceNumberString()
 		disk.AtomicWrite(pkt.Serialize(), pkt_file)
 		if pkt.IsEOF() {
@@ -347,8 +352,12 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 	// Si el programa se cae antes de anadirlo, no pasa porque se escribe en
 	// disco. Cuando vuelva a iniciarse el programa, va a leer el archivo del
-	// directorio packets y lo va a anadir en el array.
-	pr.packets_in_window = append(pr.packets_in_window, pkt)
+	// directorio packets y lo va a anadir en el array. Eso si, puede ser que
+	// lo vuelvan a enviar, en ese caso, no lo tengo que anadir dos veces en
+	// la ventana.
+	if !pr.checkIfInWindow(pkt) {
+		pr.packets_in_window = append(pr.packets_in_window, pkt)
+	}
 
 
 	// NOTE: Me parece que no hace falta ordernarlo, pero lo hago por las dudas.
@@ -803,6 +812,19 @@ func (pr *SinglePacketReceiver) flushWindow() {
 	pr.packets_in_window = nil
 	buffer.Reset()
 	pr.logger.clear()
+}
+
+func (pr *SinglePacketReceiver) checkIfInWindow(pkt packet.Packet) bool {
+	is_in := false
+
+	for i := 0; i < len(pr.packets_in_window) && is_in == false ; i++ {
+		curr_pkt := pr.packets_in_window[i]
+		curr_pkt_sqn := curr_pkt.GetSequenceNumber()
+
+		is_in =  curr_pkt_sqn == pkt.GetSequenceNumber()
+	}
+
+	return is_in
 }
 
 func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
