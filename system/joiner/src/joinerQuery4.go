@@ -48,7 +48,7 @@ func createUserMap(userReceiver packet_receiver.PacketReceiver) map[string]strin
 	return storeID2Name
 }
 
-func joinQuery4(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
 	storeReceiver := packet_receiver.NewPacketReceiver("store")
 
 	userReceiver := packet_receiver.NewPacketReceiver("user")

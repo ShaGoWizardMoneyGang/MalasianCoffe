@@ -31,7 +31,7 @@ type joinerQuery3 struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func joinQuery3(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+func joinQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
 	storeReceiver := packet_receiver.NewPacketReceiver("stores")
 
 	transactionReceiver := packet_receiver.NewPacketReceiver("transactions")

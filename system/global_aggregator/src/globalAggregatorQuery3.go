@@ -38,7 +38,7 @@ func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs ma
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery3, g.outputChannel)
 }
 
-func aggregateQuery3(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+func aggregateQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
 	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-3")
 	localAcc := make(map[keyQuery3]float64)
 
