@@ -2,6 +2,7 @@ package bully
 
 import (
 	"fmt"
+	"malasian_coffe/utils/network"
 	"net"
 	"os"
 	"strconv"
@@ -34,12 +35,12 @@ func (node *WatchdogNode) BroadcastHeartbeat() {
 	defer ticker.Stop()
 	for range ticker.C {
 		for _, member := range node.Nodes {
-			node.sendHearbeatToMember(member)
+			node.sendHeartbeatToMember(member)
 		}
 	}
 }
 
-func (node *WatchdogNode) sendHearbeatToMember(member string) {
+func (node *WatchdogNode) sendHeartbeatToMember(member string) {
 	if member == node.Addr {
 		return //no me envío a mí mismo
 	}
@@ -56,11 +57,7 @@ func (node *WatchdogNode) sendHearbeatToMember(member string) {
 }
 
 func (node *WatchdogNode) ListenHeartbeats() {
-	addr := net.UDPAddr{
-		Port: HEARTBEAT_PORT,
-		IP:   net.ParseIP("0.0.0.0"),
-	}
-	conn, err := net.ListenUDP("udp", &addr)
+	conn, err := network.CreateUDPListener(HEARTBEAT_PORT)
 	if err != nil {
 		panic(err)
 	}
@@ -77,7 +74,7 @@ func (node *WatchdogNode) ListenHeartbeats() {
 			//TODO revisar que os.IsTimeout esté bien usado acá
 			if os.IsTimeout(err) && !node.Coordinating { //si no estan coordinando, lo tiro
 				fmt.Fprintf(os.Stderr, "Error: nothing received in 3 seconds, assuming leader died\n")
-				node.StartNewElection()
+				node.startNewElection()
 			} else {
 				fmt.Fprintf(os.Stderr, "Error al recibir heartbeat: %v\n", err)
 			}
@@ -87,19 +84,19 @@ func (node *WatchdogNode) ListenHeartbeats() {
 		switch {
 		case strings.HasPrefix(payload, "ELECTION"):
 			fmt.Printf("[%s] Election message received: %s\n", node.Addr, payload)
-			node.HandleElectionMessage(payload, remote.IP.String())
+			node.handleElectionMessage(payload, remote.IP.String())
 		case payload == "OK":
 			fmt.Printf("[%s] Recibí mensaje OK, sé que hay un líder más alto\n", node.Addr)
 		case strings.HasPrefix(payload, "COORDINATOR"):
 			fmt.Printf("[%s] Coordinator message received: %s\n", node.Addr, payload)
-			node.HandleCoordinatorMessage(payload)
+			node.handleCoordinatorMessage(payload)
 		default:
 			fmt.Printf("[%s] Heartbeat received: %s\n", node.Addr, payload)
 		}
 	}
 }
 
-func (node *WatchdogNode) StartNewElection() {
+func (node *WatchdogNode) startNewElection() {
 	node.Coordinating = true
 	fmt.Printf("[%s] Starting new election...\n", node.Addr)
 	higherIDFound := false
@@ -118,11 +115,11 @@ func (node *WatchdogNode) StartNewElection() {
 		}
 	}
 	if !higherIDFound {
-		node.SendCoordinationMessage()
+		node.sendCoordinationMessage()
 	}
 }
 
-func (node *WatchdogNode) SendCoordinationMessage() {
+func (node *WatchdogNode) sendCoordinationMessage() {
 	fmt.Printf("[%s] No se encontraron miembros con ID más alto, soy el nuevo líder\n", node.Addr)
 	for _, member := range node.Nodes {
 		if member == node.Addr {
@@ -157,7 +154,7 @@ func (node *WatchdogNode) sendElectionMessage(member string) bool {
 	return true
 }
 
-func (node *WatchdogNode) HandleElectionMessage(payload string, senderAddr string) {
+func (node *WatchdogNode) handleElectionMessage(payload string, senderAddr string) {
 	senderIDStr := strings.TrimSuffix(strings.TrimPrefix(payload, "ELECTION["), "]")
 	senderID, err := strconv.Atoi(senderIDStr)
 	if err != nil {
@@ -170,7 +167,7 @@ func (node *WatchdogNode) HandleElectionMessage(payload string, senderAddr strin
 	}
 }
 
-func (node *WatchdogNode) HandleCoordinatorMessage(payload string) {
+func (node *WatchdogNode) handleCoordinatorMessage(payload string) {
 	newMasterIDStr := strings.TrimSuffix(strings.TrimPrefix(payload, "COORDINATOR["), "]")
 	newMasterID, err := strconv.Atoi(newMasterIDStr)
 	if err != nil {

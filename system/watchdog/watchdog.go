@@ -4,7 +4,6 @@ import (
 	"fmt"
 	watchdog "malasian_coffe/system/watchdog/src"
 	bully "malasian_coffe/utils/coordination"
-	"malasian_coffe/utils/ring"
 	"net"
 	"os"
 	"os/exec"
@@ -13,11 +12,11 @@ import (
 )
 
 const (
-	SHEEPS_FILE       = "sheeps.txt"
-	PUPPIES_FILE      = "puppies.txt"
-	RING_MEMBERS_FILE = "ring.txt"
-	MAX_RETRIES       = 3
-	TIMEOUT           = 2
+	SHEEPS_FILE  = "sheeps.txt"
+	PUPPIES_FILE = "puppies.txt"
+	MEMBERS_FILE = "members.txt"
+	MAX_RETRIES  = 3
+	TIMEOUT      = 2
 )
 
 func restartContainer(name string) {
@@ -57,7 +56,7 @@ func watchSheeps() {
 	}
 
 	addr := net.UDPAddr{
-		Port: ring.HEALTHCHECK_PORT,
+		Port: bully.HEALTHCHECK_PORT,
 		IP:   net.ParseIP("0.0.0.0"),
 	}
 	connListen, err := net.ListenUDP("udp", &addr)
@@ -108,6 +107,31 @@ func watchSheeps() {
 	}
 }
 
+func ReadMembers(membersFile string) ([]string, error) {
+	data, err := os.ReadFile(membersFile)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(data), "\n")
+	members := []string{}
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			members = append(members, l)
+		}
+	}
+	return members, nil
+}
+
+func GetID(myName string, members []string) int {
+	for i, name := range members {
+		if name == myName {
+			return i + 1
+		}
+	}
+	return -1
+}
+
 func main() {
 	fmt.Println("Esperando a que arranque el sistema...")
 	time.Sleep(5 * time.Second)
@@ -116,11 +140,11 @@ func main() {
 	if err != nil {
 		panic("No se pudo obtener el hostname")
 	}
-	members, err := ring.ReadRingMembers(RING_MEMBERS_FILE)
+	members, err := ReadMembers(MEMBERS_FILE)
 	if err != nil {
 		panic(err)
 	}
-	myID := ring.FindID(myName, members)
+	myID := GetID(myName, members)
 
 	amIStarter := os.Args[1]
 	masterID := -1
