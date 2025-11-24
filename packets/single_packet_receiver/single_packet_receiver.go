@@ -73,6 +73,11 @@ type SinglePacketReceiver struct {
 	windowFull bool
 
 	checkpointer checkpointer
+
+	// Ultimo paquete de la session. Este lo guardamos porque damos el ultimo
+	// ACK con la funcion de clean.
+	// OJO AL PIOJO: Arranca como basura hasta que se obtiene el ultimo paquete.
+	last_packet colas.PacketMessage
 }
 
 type pathResolver struct {
@@ -323,16 +328,16 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	pkt := pktMsg.Packet
 	pr.checkpointer.checkpoint(LlegoElPaquete)
 
+	// Tengo que chequear si ya recibi todo antes de empezar, puede ser que me
+	// haya muerto justo antes de procesar el ultimo paquete.
+	allReceived := pr.checkIfReceivedAll()
+
 	// fmt.Printf("Recibi %s\n", pkt.GetSequenceNumberString())
 
-	// Guardo el paquete que acabo de recibir en disco
-	{
+	// Guardo el paquete que acabo de recibir en disco si y solo si no lo recibi antes.
+	// Esto quiere decir que ni esta en la ventana ni esta ya procesado.
+	if !pr.checkIfInWindow(pkt) && !pr.logger.checkIfAlreadyProcessed(pkt.GetSequenceNumber()){
 		// NOTE: Por convencion, el nombre del archivo es su numero de secuencia
-		// NOTE: Que pasa si el paquete ya lo habia recibido antes? No deberia
-		// pasar, simplemente se va a sobre escribir el archivo. Podriamos
-		// hacer un sanity check antes de escribirlo que consista de fijarme
-		// si ya lo recibi y ver si tiene diferencias con lo que tenia en
-		// disco. Pero es algo que podemos suponer con cierta seguridad.
 		pkt_file := pr.path_resolver.resolve_path(Packets) + pkt.GetSequenceNumberString()
 		disk.AtomicWrite(pkt.Serialize(), pkt_file)
 		if pkt.IsEOF() {
@@ -341,21 +346,16 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			received_eof_file := pr.path_resolver.resolve_path(ReceivedEof)
 			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
 		}
-		// Como ya escribimos a disco, ackeamos
 	}
-
-	pr.checkpointer.checkpoint(PreACK)
-	pktMsg.Message.Ack(false)
-	pr.checkpointer.checkpoint(HiceACK)
-
-	// Anado el paquete que acabo de recibir a la ventana de paquetes.
 
 	// Si el programa se cae antes de anadirlo, no pasa porque se escribe en
 	// disco. Cuando vuelva a iniciarse el programa, va a leer el archivo del
 	// directorio packets y lo va a anadir en el array. Eso si, puede ser que
 	// lo vuelvan a enviar, en ese caso, no lo tengo que anadir dos veces en
 	// la ventana.
-	if !pr.checkIfInWindow(pkt) {
+	// Ahora, si ya recibi todo, no necesito anadirlo, incluso si no esta en
+	// la ventana porque ya tengo que enviarlo todo
+	if !pr.checkIfInWindow(pkt) && !allReceived {
 		pr.packets_in_window = append(pr.packets_in_window, pkt)
 	}
 
@@ -367,7 +367,11 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 			return sn_i - sn_j
 	})
 
-	allReceived := pr.checkIfReceivedAll()
+	allReceivedNow := pr.checkIfReceivedAll()
+	if allReceived == true && allReceivedNow == false {
+		panic("Antes de empezar pense que tenia todo, y ahora que lo re-calculo me figura que no.")
+	}
+	allReceived = allReceivedNow
 
 	// Tengo que procesar la ventana en dos casos:
 	// 1. Si la cantidad de paquetes excede la ventana, tengo que procesarlos
@@ -384,6 +388,26 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 	pr.windowFull = allReceived
 
+	pr.checkpointer.checkpoint(PreACK)
+	// Hacemos ACK recien al final. Antes lo haciamos apenas guardabamos el paquete en disco.
+	// Pero, haciendolo al final nos aseguramos que el flujo sea mas
+	// consistente. Esto es especialmente util en el caso borde del ultimo
+	// paquete. Si hacemos ACK del ultimo paquete antes de hacer todo el
+	// pipeline de procesamiento, cagamos. Esto pasa porque el SessionHandler
+	// solo instacia un PacketReceiver si recibe un paquete. Entonces, si no
+	// hay paquetes para enviar, no va a instanciarlo nunca y el ultimo cachito
+	// de procesamiento de simplemente enviar lo que tengo nunca se va a
+	// llamar.  Esto tambien implica que el ACK final lo tenemos que hacer
+	// DESPUES de enviar los datos, igual que con los otros nodos. Al final,
+	// terminan siendo mas parecidos de lo que pensamos inicialmente.
+	if allReceived {
+		pr.last_packet = pktMsg
+	} else {
+		pktMsg.Message.Ack(false)
+	}
+	pr.checkpointer.checkpoint(HiceACK)
+
+
 	return allReceived
 }
 
@@ -392,6 +416,9 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 func (pr *SinglePacketReceiver) Clean() {
 	path := pr.path_resolver.resolve_path(Root)
 	disk.DeleteDirRecursively(path)
+
+	// Ahora que ya borramos todo los archivos, podemos ACKear el ultimo mensaje.
+	pr.last_packet.Message.Ack(false)
 }
 
 // Estructura encargada de escribir logs para trackear operaciones que tienen un
@@ -722,14 +749,28 @@ func (l *logger) delete_behind(resource string) {
 
 }
 
+func (l *logger) checkIfAlreadyProcessed(resourceId int) bool {
+	alreadyProcessed := false
+	for i := 0; i < len(l.processed_sequence_number) && alreadyProcessed == false ; i++ {
+		curr_id := l.processed_sequence_number[i]
+		alreadyProcessed = curr_id == resourceId
+	}
+
+	return alreadyProcessed
+}
+
 // Clears all the resources in its table, since it finished processing the window.
 func (l *logger) clear() {
 	l.pending_resources = make(map[string]struct{})
 	l.done_resources = make(map[string]struct{})
 
-	err := disk.DeleteFile(l.log_file)
-	if err != nil {
-		panic(err)
+	// Si por algun motivo el archivo no existia, no pasa nada.
+	// Es "idempotente", lo unico que nos interesa es que el archivo no este.
+	if disk.Exists(l.log_file) {
+		err := disk.DeleteFile(l.log_file)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -880,6 +921,16 @@ func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
 }
 
 func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []int) {
+	received_window_empty := len(ventana) == 0
+	// Si la venta que obtuve es vacia, eso quiere decir que se perdio EL ULTIMO
+	// paquete, en estos casos no quiero realizar trabajo. POTENCIALMENTE, no
+	// cambia nada, ya que tal vez la funcion que lo recibe se podria dar
+	// cuenta que el input es vacio, pero, de todas formas es mas seguro (y
+	// hasta mas eficiente) retornar antes.
+	if received_window_empty {
+		return
+	}
+
 	partial_work := pr.read_partial_work()
 	same_length := len(partial_work.ventana) == len(ventana)
 
