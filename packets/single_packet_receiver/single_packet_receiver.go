@@ -735,8 +735,6 @@ func (l *logger) delete_behind(resource string) {
 			// Si me muero aca, antes de borrarlo, no pasa nada porque va a
 			// borrar el archivo al levantar el logger despues de morir.
 			disk.DeleteFile(associated_file)
-		} else {
-			bitacora.Error(fmt.Sprintf("Recurso %s que figuraba como borrado existe en el filesystem", associated_file))
 		}
 
 		delete(l.pending_resources, resource)
