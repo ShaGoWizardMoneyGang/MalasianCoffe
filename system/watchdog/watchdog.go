@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	watchdog "malasian_coffe/system/watchdog/src"
 	bully "malasian_coffe/utils/coordination"
 	"malasian_coffe/utils/ring"
+	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -33,6 +36,75 @@ func restartContainer(name string) {
 		} else {
 			fmt.Printf("Se inició el contenedor %s: %s\n", name, string(output))
 		}
+	}
+}
+
+func watchSheeps() {
+	fmt.Println("[WATCHDOG]: comenzando a vigilar las ovejas...")
+	file, err := os.ReadFile(SHEEPS_FILE)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "No se pudo abrir el archivo %s: %v\n", SHEEPS_FILE, err)
+	}
+
+	listOfServices := strings.Split(string(file), "\n")
+	services := make([]string, 0, len(listOfServices))
+	for _, s := range listOfServices {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			services = append(services, s)
+			fmt.Println("Servicio:", s)
+		}
+	}
+
+	addr := net.UDPAddr{
+		Port: ring.HEALTHCHECK_PORT,
+		IP:   net.ParseIP("0.0.0.0"),
+	}
+	connListen, err := net.ListenUDP("udp", &addr)
+	if err != nil {
+		panic(err)
+	}
+	defer connListen.Close()
+
+	buffer := make([]byte, 1024)
+	for {
+		for _, serviceName := range services {
+			healthCheckAddress := serviceName + ":" + fmt.Sprint(watchdog.HEALTHCHECK_PORT)
+			successfulHealthcheck := false
+			for attempt := 1; attempt <= MAX_RETRIES; attempt++ {
+				fmt.Printf("Intento %d de %d: enviando PING a %s\n", attempt, MAX_RETRIES, healthCheckAddress)
+				// Mando PING
+				err := watchdog.Ping(healthCheckAddress)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error enviando ping a %s: %v\n", healthCheckAddress, err)
+				} else {
+					// Acá con SetReadDeadline defino que después de la hora actual + 2 segundos vence el timeout
+					connListen.SetReadDeadline(time.Now().Add(TIMEOUT * time.Second))
+					n, _, err := connListen.ReadFromUDP(buffer)
+					// Si el Read NO devuelve error, entonces se recibió el PONG y salimos
+					if err == nil {
+						fmt.Printf("Watchdog recibió PONG del %s: %s\n", serviceName, string(buffer[:n]))
+						successfulHealthcheck = true
+						break
+					}
+					// Si el error es de network y es un timeout, el PONG No llegó en el tiempo establecido (2seg)
+					netError, isNetError := err.(net.Error)
+					if isNetError && netError.Timeout() {
+						fmt.Printf("No se recibió PONG en %v segundos\n ", TIMEOUT)
+					}
+				}
+				// Espero un poco antes del siguiente intento
+				time.Sleep(1 * time.Second)
+			}
+
+			if !successfulHealthcheck {
+				fmt.Printf("No se recibió PONG tras %d intentos. Reiniciando %s\n", MAX_RETRIES, serviceName)
+				restartContainer(serviceName)
+			} else {
+				fmt.Println("El servicio respondió correctamente, no hace falta reiniciar")
+			}
+		}
+		time.Sleep(watchdog.HEARTBEAT_PERIOD * time.Second)
 	}
 }
 
@@ -67,7 +139,8 @@ func main() {
 	for {
 		if node.AmIMaster() {
 			fmt.Println("Soy el iniciador, comienzo el bucle de latidos")
-			node.MasterID = node.ID
+			go watchSheeps()
+			node.MasterID = node.ID   //TODO sacar esto creo que no jode
 			node.BroadcastHeartbeat() //loop infinito por ahora
 		} else {
 			node.ListenHeartbeats()
