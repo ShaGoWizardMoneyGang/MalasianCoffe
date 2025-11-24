@@ -50,6 +50,7 @@ func concat(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet
 
 	pkt_joineado := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{concatenated_packets})
 
+
 	for _, pkt := range pkt_joineado {
 		bitacora.Info(fmt.Sprintf("Envio pkt concatenado al sender, session: %s", pkt.GetSessionID()))
 		outputChannel <- pkt
