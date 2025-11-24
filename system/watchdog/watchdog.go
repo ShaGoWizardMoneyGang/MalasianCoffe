@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	watchdog "malasian_coffe/system/watchdog/src"
+	bully "malasian_coffe/utils/coordination"
 	"net"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 const (
 	SHEEPS_FILE  = "sheeps.txt"
 	PUPPIES_FILE = "puppies.txt"
+	MEMBERS_FILE = "members.txt"
 	MAX_RETRIES  = 3
 	TIMEOUT      = 2
 )
@@ -36,18 +38,8 @@ func restartContainer(name string) {
 	}
 }
 
-func main() {
-	fmt.Println("Esperando a que arranque el sistema...")
-	time.Sleep(10 * time.Second)
-
-	amILeader := os.Args[1]
-	if amILeader != "LEADER" {
-		// Es réplica
-		fmt.Println("Hola soy una réplica, escucho heartbeats del líder")
-		watchdog.ReplicaHeartbeatLoop() // loop para escuchar heartbeats
-		return
-	}
-	fmt.Println("Soy el líder, comienzo watchdog")
+func watchSheeps() {
+	fmt.Println("[WATCHDOG]: comenzando a vigilar las ovejas...")
 	file, err := os.ReadFile(SHEEPS_FILE)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "No se pudo abrir el archivo %s: %v\n", SHEEPS_FILE, err)
@@ -63,31 +55,8 @@ func main() {
 		}
 	}
 
-	// Lista de réplicas harcodeada con 2
-	// TODO: parametrizar
-	// replicaList := []string{"watchdog_2", "watchdog_3"}
-
-	file, err = os.ReadFile(PUPPIES_FILE)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "No se pudo abrir el archivo %s: %v\n", PUPPIES_FILE, err)
-	}
-
-	listOfPuppies := strings.Split(string(file), "\n")
-	puppies := make([]string, 0, len(listOfPuppies))
-	for _, p := range listOfPuppies {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			puppies = append(puppies, p)
-			fmt.Println("Réplicas:", p)
-		}
-	}
-
-	fmt.Println(puppies)
-
-	go watchdog.HeartbeatLoop(puppies)
-
 	addr := net.UDPAddr{
-		Port: watchdog.HEALTHCHECK_PORT,
+		Port: bully.HEALTHCHECK_PORT,
 		IP:   net.ParseIP("0.0.0.0"),
 	}
 	connListen, err := net.ListenUDP("udp", &addr)
@@ -119,7 +88,7 @@ func main() {
 					}
 					// Si el error es de network y es un timeout, el PONG No llegó en el tiempo establecido (2seg)
 					netError, isNetError := err.(net.Error)
-					if isNetError == true && netError.Timeout() {
+					if isNetError && netError.Timeout() {
 						fmt.Printf("No se recibió PONG en %v segundos\n ", TIMEOUT)
 					}
 				}
@@ -127,7 +96,7 @@ func main() {
 				time.Sleep(1 * time.Second)
 			}
 
-			if successfulHealthcheck == false {
+			if !successfulHealthcheck {
 				fmt.Printf("No se recibió PONG tras %d intentos. Reiniciando %s\n", MAX_RETRIES, serviceName)
 				restartContainer(serviceName)
 			} else {
@@ -135,5 +104,70 @@ func main() {
 			}
 		}
 		time.Sleep(watchdog.HEARTBEAT_PERIOD * time.Second)
+	}
+}
+
+func ReadMembers(membersFile string) ([]string, error) {
+	data, err := os.ReadFile(membersFile)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(data), "\n")
+	members := []string{}
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			members = append(members, l)
+		}
+	}
+	return members, nil
+}
+
+func GetID(myName string, members []string) int {
+	for i, name := range members {
+		if name == myName {
+			return i + 1
+		}
+	}
+	return -1
+}
+
+func main() {
+	fmt.Println("Esperando a que arranque el sistema...")
+	time.Sleep(5 * time.Second)
+
+	myName, err := os.Hostname() //watchdog_1, watchdog_2, ...
+	if err != nil {
+		panic("No se pudo obtener el hostname")
+	}
+	members, err := ReadMembers(MEMBERS_FILE)
+	if err != nil {
+		panic(err)
+	}
+	myID := GetID(myName, members)
+
+	amIStarter := os.Args[1]
+	masterID := -1
+	if amIStarter == "STARTER" {
+		masterID = myID
+	}
+
+	node := bully.WatchdogNode{
+		ID:           myID,
+		Addr:         myName,
+		MasterID:     masterID, //el primer master es el starter (por ahora)
+		Nodes:        members,
+		Coordinating: false,
+	}
+
+	for {
+		if node.AmIMaster() {
+			fmt.Println("Soy el iniciador, comienzo el bucle de latidos")
+			go watchSheeps()
+			node.MasterID = node.ID   //TODO sacar esto creo que no jode
+			node.BroadcastHeartbeat() //loop infinito por ahora
+		} else {
+			node.ListenHeartbeats()
+		}
 	}
 }
