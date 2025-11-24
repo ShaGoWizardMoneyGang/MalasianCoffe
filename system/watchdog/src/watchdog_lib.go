@@ -14,7 +14,8 @@ const (
 )
 
 type WatchdogListener struct {
-	conn net.UDPConn
+	Conn        *net.UDPConn
+	KeepRunning bool
 }
 
 // ============================= USED BY WORKER ================================
@@ -27,7 +28,7 @@ func CreateWatchdogListener() WatchdogListener {
 	if err != nil {
 		panic(err)
 	}
-	return WatchdogListener{conn: *conn}
+	return WatchdogListener{Conn: conn, KeepRunning: true}
 }
 
 func (wl *WatchdogListener) Pong(responseIP string) {
@@ -49,15 +50,27 @@ func (wl *WatchdogListener) Pong(responseIP string) {
 }
 
 func (wl *WatchdogListener) Listen(infoChan chan<- string) {
-	defer wl.conn.Close()
+	fmt.Print("-----------------------------------HOLAAAAA ENTRE PAPI")
+
+	//defer wl.conn.Close()
 	buffer := make([]byte, 1024)
+	fmt.Println("-----------------------------------HOLA ESTOY ANTES DEL FOR DEL LISTEN")
 	for {
-		_, addr, err := wl.conn.ReadFromUDP(buffer)
+		fmt.Println("-----------------------------------HOLA ESTOY DESPUES DEL FOR DEL LISTEN")
+		fmt.Printf("------------------------------------KeepRunning value: %v\n", wl.KeepRunning)
+
+		if !wl.KeepRunning {
+			fmt.Println("@@@@ WatchdogListener: cerrando la conexión UDP")
+			//wl.Conn.Close()
+			return
+		}
+		_, addr, err := wl.Conn.ReadFromUDP(buffer)
 		if err != nil {
 			continue
 		}
-		fmt.Printf("Joiner recibió PING del watchdog: %s\n", string(buffer))
+		fmt.Printf("Réplica recibió PING del watchdog: %s\n", string(buffer))
 		infoChan <- addr.String()
+
 	}
 }
 

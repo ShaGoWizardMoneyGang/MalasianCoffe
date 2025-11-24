@@ -66,6 +66,7 @@ func (node *WatchdogNode) ListenHeartbeats() {
 	for {
 		if node.AmIMaster() {
 			fmt.Printf("[%s] Soy el líder, no escucho latidos\n", node.Addr)
+			conn.Close()
 			return
 		}
 		conn.SetReadDeadline(time.Now().Add(HEARTBEAT_TIMEOUT * time.Second))
