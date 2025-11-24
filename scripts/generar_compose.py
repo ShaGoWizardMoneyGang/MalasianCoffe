@@ -157,7 +157,7 @@ def concat_block(n):
     container_name: {name}
     image: worker:latest
     working_dir: /app
-    entrypoint: bash -c "../entrypoint.sh && su user -c '/app/bin/concat rabbitmq:5672 {routing_key}'"
+    entrypoint: bash -c "entrypoint.sh && su user -c '/app/bin/concat rabbitmq:5672 {routing_key}'"
     volumes:
       - ./bin/concat:/app/bin/concat
       - ./packet_receiver/{name}:/app/packet_receiver/
