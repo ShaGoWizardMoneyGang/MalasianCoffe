@@ -261,6 +261,13 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		received_eof = received_eof_i
 	}
 
+	// Tenemos que llamar al logger antes de calcular la ventana, porque este lo
+	// va a modificar.
+	logger := newLogger("BORRAR", "BORRADO",
+		pathResolver.resolve_path(ReceivedSqns),
+		pathResolver.resolve_path(LogFile),
+		pathResolver.resolve_path(Packets),
+	)
 
 
 	packets_in_window := []packet.Packet{}
@@ -281,11 +288,6 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		packets_in_window = append(packets_in_window, packet)
 	}
 
-	logger := newLogger("BORRAR", "BORRADO",
-		pathResolver.resolve_path(ReceivedSqns),
-		pathResolver.resolve_path(LogFile),
-		pathResolver.resolve_path(Packets),
-	)
 
 	checkpointer_root := pathResolver.resolve_path(Checkpoint)
 	checkpointer := newCheckpointer(checkpointer_root)
