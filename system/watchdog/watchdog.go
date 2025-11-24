@@ -148,7 +148,7 @@ func main() {
 	node := bully.WatchdogNode{
 		ID:           myID,
 		Addr:         myName,
-		MasterID:     -1,
+		MasterID:     -1, //el primer master es el starter (por ahora)
 		Nodes:        members,
 		Coordinating: false,
 	}
