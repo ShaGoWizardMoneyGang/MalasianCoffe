@@ -74,6 +74,7 @@ func (node *WatchdogNode) ListenHeartbeats() {
 		conn.SetReadDeadline(time.Now().Add(HEARTBEAT_TIMEOUT * time.Second))
 		n, remote, err := conn.ReadFromUDP(buffer)
 		if err != nil {
+			//TODO revisar que os.IsTimeout esté bien usado acá
 			if os.IsTimeout(err) && !node.Coordinating { //si no estan coordinando, lo tiro
 				fmt.Fprintf(os.Stderr, "Error: nothing received in 3 seconds, assuming leader died\n")
 				node.StartNewElection()
