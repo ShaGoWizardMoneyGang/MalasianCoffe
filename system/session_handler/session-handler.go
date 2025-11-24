@@ -12,10 +12,10 @@ type SessionHandler struct {
 
 	sessionMap map[string](chan colas.PacketMessage)
 
-	associatedFunction func(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet)
+	associatedFunction func(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet)
 }
 
-func NewSessionHandler(sessionFunction func(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet),
+func NewSessionHandler(sessionFunction func(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet),
 	outputChannel chan<- packet.Packet) SessionHandler {
 
 	// Map from SessionID to session channel
@@ -40,7 +40,7 @@ func (sh *SessionHandler) PassPacketToSession(pktMsg colas.PacketMessage) {
 		bitacora.Info(fmt.Sprintf("Nueva session detectada: %s", sessionID))
 		// Canal de input asignado a esta session
 		assigned_channel := make(chan colas.PacketMessage)
-		go sh.associatedFunction(assigned_channel, sh.outputChannel)
+		go sh.associatedFunction(sessionID, assigned_channel, sh.outputChannel)
 
 		// No hace falta un mutex porque este diccionario se accede de forma
 		// secuencial

@@ -100,7 +100,7 @@ func buildOutput(localAcc map[string]map[string]uint64) string {
 	return b.String()
 }
 
-func aggregateQuery4(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+func aggregateQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
 	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-4")
 	localAcc := make(map[string]map[string]uint64)
 

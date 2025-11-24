@@ -600,7 +600,6 @@ func newLogger(write_operation string, delete_operation string,
 	cut_in_the_middle_of_deleting := has_pending && len(logger.done_resources) > 0
 	if cut_in_the_middle_of_deleting {
 		for resource, _ := range logger.pending_resources {
-			println(resource)
 			logger.delete_behind(resource)
 		}
 
