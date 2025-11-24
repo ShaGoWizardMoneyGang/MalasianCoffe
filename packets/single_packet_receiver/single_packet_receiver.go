@@ -552,15 +552,32 @@ func newLogger(write_operation string, delete_operation string,
 			panic(fmt.Sprintf("DELETE DE RECURSO NO WRITEADO DETECTADO: %s", log_file_path))
 		}
 	}
+	has_pending := len(logger.pending_resources) > 0
 	// Si al final de todo esto tengo cosas pendientes y borradas, signfica que
 	// el programa se murio mientras estaba borrando. En ese caso, tengo que
 	// borrar las cosas que me quedaron pendientes.
-	cut_in_the_middle_of_deleting := len(logger.pending_resources) > 0 && len(logger.done_resources) > 0
+	cut_in_the_middle_of_deleting := has_pending && len(logger.done_resources) > 0
 	if cut_in_the_middle_of_deleting {
 		for resource, _ := range logger.pending_resources {
 			println(resource)
 			logger.delete_behind(resource)
 		}
+
+		// Despues de borrar todo esto, no deberiamos tener nada pendiente
+		has_pending = len(logger.pending_resources) > 0
+		if has_pending != false {
+			panic("Despues de borrar los paquetes pendientes, sigue figurando como que me quedan.")
+		}
+
+	}
+
+	// Motivos por los cuales puede no tener nada pendiente:
+	//    1. No tenia nada pendiente al inicializar. Esto puede pasar si al
+	//    programa lo mataron despues de borrar todos los paquetes de la
+	//    ventana, pero antes de llamar a clear().
+	//    2. Porque lo mataron en el medio de los llamados a delete_behind y
+	//    acabamos de terminar el proceso con el startup.
+	if !has_pending {
 		logger.clear()
 	}
 
