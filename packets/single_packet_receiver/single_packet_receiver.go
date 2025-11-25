@@ -119,7 +119,8 @@ func (pr *pathResolver) resolve_path(file KnownFile) string {
 	case PartialWork:
 		path = pr.root + "/" + "partial_work"
 	case Packets:
-		path = pr.root + "/" + "packets" + "/"
+		// Le pongo un 0 para que sea lo primero que aparece
+		path = pr.root + "/" + "0packets" + "/"
 	case LogFile:
 		path = pr.root + "/" + "window_log"
 	case Checkpoint:
