@@ -273,7 +273,7 @@ def replica_watchdog_block(n):
   watchdog_{n}:
     container_name: watchdog_{n}
     hostname: watchdog_{n}
-    image: dind-dockerfile:latest
+    image: watchdog:latest
     working_dir: /app
     entrypoint: ./bin/watchdog REPLICA
     volumes:
