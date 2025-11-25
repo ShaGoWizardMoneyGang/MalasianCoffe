@@ -211,13 +211,13 @@ func (c *checkpointer) reset_window() {
 	}
 	c.uses = 0
 
-	c.checkpoint(Cleaned, "")
+	c.checkpoint(Cleaned)
 }
 
-func (c *checkpointer) checkpoint(checkpoint checkpointMoment, resourceID string) {
+func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
 	file_name := checkpoint.toString()
 	uses := strconv.FormatInt(int64(c.uses), 10)
-	full_path := c.checkpoint_root_current + "/" + string(uses) + file_name + "-" + resourceID
+	full_path := c.checkpoint_root_current + "/" + string(uses) + file_name
 	c.uses += 1
 	disk.CreateFile(full_path)
 }
@@ -327,7 +327,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	pr.checkpointer.reset_window()
 	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
-	pr.checkpointer.checkpoint(LlegoElPaquete, pkt.GetSequenceNumberString())
+	pr.checkpointer.checkpoint(LlegoElPaquete)
 
 	// Tengo que chequear si ya recibi todo antes de empezar, puede ser que me
 	// haya muerto justo antes de procesar el ultimo paquete.
@@ -391,7 +391,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 	pr.windowFull = allReceived
 
-	pr.checkpointer.checkpoint(PreACK, pkt.GetSequenceNumberString())
+	pr.checkpointer.checkpoint(PreACK)
 	// Hacemos ACK recien al final. Antes lo haciamos apenas guardabamos el paquete en disco.
 	// Pero, haciendolo al final nos aseguramos que el flujo sea mas
 	// consistente. Esto es especialmente util en el caso borde del ultimo
@@ -408,7 +408,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	} else {
 		pktMsg.Message.Ack(false)
 	}
-	pr.checkpointer.checkpoint(HiceACK, pkt.GetSequenceNumberString())
+	pr.checkpointer.checkpoint(HiceACK)
 
 
 	return allReceived
@@ -803,7 +803,7 @@ func (pr *SinglePacketReceiver) flushWindow() {
 		pkt_sqn_number = append(pkt_sqn_number, wind_pkt.GetSequenceNumber())
 	}
 
-	pr.checkpointer.checkpoint(PreFlushear, "")
+	pr.checkpointer.checkpoint(PreFlushear)
 
 
 
@@ -822,11 +822,11 @@ func (pr *SinglePacketReceiver) flushWindow() {
 		pr.logger.write_ahead(sq_n)
 	}
 
-	pr.checkpointer.checkpoint(LogAhead, "")
+	pr.checkpointer.checkpoint(LogAhead)
 
 	pr.writePartialWork(buffer.String(), pkt_sqn_number)
 
-	pr.checkpointer.checkpoint(LaburoParcial, "")
+	pr.checkpointer.checkpoint(LaburoParcial)
 
 	// LOG De todos los archivos que borre: Stage 2.
 	// En la packet window: A, B, C
@@ -846,7 +846,7 @@ func (pr *SinglePacketReceiver) flushWindow() {
 		// Aca tambien se borra el recurso asociado
 		pr.logger.delete_behind(sq_n)
 	}
-	pr.checkpointer.checkpoint(LogBehind, "")
+	pr.checkpointer.checkpoint(LogBehind)
 
 	// Ahora que la ventana esta procesada, y el cambio esta en disco,
 	// actualizamos la memoria.
