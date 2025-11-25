@@ -13,6 +13,7 @@ WORKDIR /build
 RUN mkdir bin/
 
 COPY system/watchdog system/watchdog
+COPY utils/ utils/
 COPY go.mod go.mod
 COPY go.sum go.sum
 

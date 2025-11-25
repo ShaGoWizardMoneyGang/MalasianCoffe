@@ -11,6 +11,7 @@ import (
 	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 )
 
@@ -134,12 +135,20 @@ func aggregateQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage,
 func (g *aggregator2aGlobal) Process() {
 	go colas.InputQueue(g.colaEntrada, g.inputChannel)
 
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
+
 	for {
 		select {
 		case inputPacket := <-g.inputChannel:
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
 			g.exchangeSalida.Send(packetAgregado)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("GlobalAggregator 2a received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 	}
 }

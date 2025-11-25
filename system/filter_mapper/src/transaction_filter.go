@@ -6,6 +6,7 @@ import (
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"strings"
 )
@@ -117,8 +118,8 @@ type transactionFilterMapper struct {
 	colaEntradaTransaction *middleware.MessageMiddlewareQueue
 
 	exchangeSalida1 *middleware.MessageMiddlewareExchange
-	colaSalida3 *middleware.MessageMiddlewareQueue
-	colaSalida4 *middleware.MessageMiddlewareQueue
+	colaSalida3     *middleware.MessageMiddlewareQueue
+	colaSalida4     *middleware.MessageMiddlewareQueue
 }
 
 func (tfm *transactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
@@ -141,9 +142,13 @@ func (tfm *transactionFilterMapper) Process() {
 
 	go colas.InputQueue(tfm.colaEntradaTransaction, tfm.packet_channel)
 
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
+
 	for {
 		select {
-		case pkt_message := <- tfm.packet_channel:
+		case pkt_message := <-tfm.packet_channel:
 			pkt := pkt_message.Packet
 			message := pkt_message.Message
 
@@ -176,6 +181,10 @@ func (tfm *transactionFilterMapper) Process() {
 			}
 
 			message.Ack(false)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Filter Transactions received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 	}
 }

@@ -2,8 +2,10 @@ package counter
 
 import (
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/network"
 	"malasian_coffe/utils/parser"
@@ -50,13 +52,15 @@ func countFunctionQuery2b(input string) string {
 // ============================= CounterQuery2b ================================
 
 type counterQuery2b struct {
+	packet_channel chan colas.PacketMessage
+
 	colaEntradaFilteredTransactionItems *middleware.MessageMiddlewareQueue
 
 	exchangeSalidaCountedSubtotal *middleware.MessageMiddlewareExchange
 }
 
-func (c *counterQuery2b) Build(rabbitAddr string, queueAmounts map[string] uint64) {
-
+func (c *counterQuery2b) Build(rabbitAddr string, queueAmounts map[string]uint64) {
+	c.packet_channel = make(chan colas.PacketMessage)
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactionItems2b", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactionItems2b", err))
@@ -67,23 +71,40 @@ func (c *counterQuery2b) Build(rabbitAddr string, queueAmounts map[string] uint6
 	c.exchangeSalidaCountedSubtotal = colas.InstanceExchange("CountedItems2b", rabbitAddr, queueAmounts["queue"])
 }
 
-func (c *counterQuery2b) GetInput() *middleware.MessageMiddlewareQueue {
-	return c.colaEntradaFilteredTransactionItems
-}
+func (c *counterQuery2b) Process() {
+	slog.Info("Arranca procesamiento de counterQuery2b")
 
-func (c *counterQuery2b) Process(pkt packet.Packet) []colas.OutBoundMessage {
-	input := pkt.GetPayload()
+	go colas.InputQueue(c.colaEntradaFilteredTransactionItems, c.packet_channel)
 
-	counted_result := []string{countFunctionQuery2b(input)}
+	watchdogListener := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdogListener.Listen(healthcheckChannel)
 
-	newPayload := packet.ChangePayload(pkt, counted_result)
+	for {
+		select {
+		case pkt_message := <-c.packet_channel:
+			pkt := pkt_message.Packet
+			message := pkt_message.Message
 
-	outBoundMessage := []colas.OutBoundMessage{
-		{
-			Packet:     newPayload[0],
-			ColaSalida: c.exchangeSalidaCountedSubtotal,
-		},
+			input := pkt.GetPayload()
+			counted_result := []string{countFunctionQuery2b(input)}
+			newPayload := packet.ChangePayload(pkt, counted_result)
+			outBoundMessages := []colas.OutBoundMessage{
+				{
+					Packet:     newPayload[0],
+					ColaSalida: c.exchangeSalidaCountedSubtotal,
+				},
+			}
+			for _, outbound := range outBoundMessages {
+				cola := outbound.ColaSalida
+				packet := outbound.Packet
+				cola.Send(packet)
+			}
+			message.Ack(false)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("CounterQuery2b received healthcheck ping from", IP)
+			watchdogListener.Pong(IP)
+		}
 	}
-
-	return outBoundMessage
 }
