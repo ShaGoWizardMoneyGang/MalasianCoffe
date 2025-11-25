@@ -5,13 +5,18 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
+)
+
+const (
+	TMP_DIR = "/app/packet_receiver/tmp/"
 )
 
 // Atomic write [data] to [path]
 func AtomicWrite(data []byte, path string) error {
-	tmp_path := path + ".tmp"
+	file_name := filepath.Base(path)
 
-	f, err := CreateFile(tmp_path)
+	f, err := os.CreateTemp(TMP_DIR, file_name)
 	if err != nil {
 		return err
 	}
@@ -25,15 +30,16 @@ func AtomicWrite(data []byte, path string) error {
 		}
 	}
 
-	os.Rename(tmp_path, path)
+	os.Rename(f.Name(), path)
 
 	return nil
 }
 
 func AtomicWriteString(data string, path string) error {
-	tmp_path := path + ".tmp"
+	file_name := filepath.Base(path)
 
-	f, err := CreateFile(tmp_path)
+	// Por que TMP_DIR y no /tmp? Porque Docker, como siempre
+	f, err := os.CreateTemp(TMP_DIR, file_name)
 	if err != nil {
 		return err
 	}
@@ -43,7 +49,7 @@ func AtomicWriteString(data string, path string) error {
 		return err
 	}
 
-	err = os.Rename(tmp_path, path)
+	err = os.Rename(f.Name(), path)
 	if err != nil {
 		return err
 	}
@@ -52,21 +58,31 @@ func AtomicWriteString(data string, path string) error {
 }
 
 func AtomicAppend(data string, path string) error {
-	old_data, err := Read(path)
-	if err != nil {
-		// Si el archivo no existe, entonces hacemos de cuenta que el archivo
-		// estaba vacio.  Ligeramente mas ergonomico y recrea el ">>" de la
-		// shell
-		if err == fs.ErrNotExist {
-			old_data = ""
+	var old_data string
+
+	// "Aguante go"
+	exists := Exists(path)
+	if !exists {
+		old_data = ""
+	} else {
+		data_in_file, err := Read(path)
+		if err != nil {
+			// Si el archivo no existe, entonces hacemos de cuenta que el archivo
+			// estaba vacio.  Ligeramente mas ergonomico y recrea el ">>" de la
+			// shell
+			if err == fs.ErrNotExist {
+				old_data = ""
+			} else {
+				return err
+			}
 		} else {
-			return err
+			old_data = data_in_file
 		}
 	}
 
 	new_data := old_data + "\n" + data
 
-	err = AtomicWriteString(new_data, path)
+	err := AtomicWriteString(new_data, path)
 
 	return err
 }
