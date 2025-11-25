@@ -39,8 +39,8 @@ func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs ma
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery3, g.outputChannel)
 }
 
-func aggregateQuery3(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := packet_receiver.NewPacketReceiver("Agregador global 3")
+func aggregateQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-3")
 	localAcc := make(map[keyQuery3]float64)
 
 	var last_packet packet.Packet
@@ -82,11 +82,6 @@ func aggregateQuery3(inputChannel <-chan colas.PacketMessage, outputChannel chan
 		k := keyQuery3{yearHalf: yearHalf, storeID: storeID}
 		localAcc[k] += total
 	}
-
-	// if len(localAcc) == 0 {
-	// 	localReceiver = packet_receiver.NewPacketReceiver("Agregador global 3")
-	// 	continue
-	// }
 
 	keys := make([]keyQuery3, 0, len(localAcc))
 	for k := range localAcc {

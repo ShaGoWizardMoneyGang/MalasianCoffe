@@ -43,8 +43,8 @@ func (g *aggregator2aGlobal) Build(rabbitAddr string, routing_key string, outs m
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery2a, g.outputChannel)
 }
 
-func aggregateQuery2a(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := packet_receiver.NewPacketReceiver("Agregador global 2a")
+func aggregateQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-2a")
 	localAcc := make(map[keyQuery2a]int64)
 
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
@@ -89,12 +89,6 @@ func aggregateQuery2a(inputChannel <-chan colas.PacketMessage, outputChannel cha
 		k := keyQuery2a{yearMonth: yearMonth, itemID: itemID}
 		localAcc[k] += quantity
 	}
-
-	// QUESTION: No entiendo esto. Para que continuabamos?
-	// if len(localAcc) == 0 {
-	// 	localReceiver = packet_receiver.NewPacketReceiver("Agregador global 2a")
-	// 	continue
-	// }
 
 	monthlyMax := make(map[string]struct {
 		itemID   string

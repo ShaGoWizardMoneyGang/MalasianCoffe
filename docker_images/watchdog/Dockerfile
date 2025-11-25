@@ -12,7 +12,7 @@ WORKDIR /build
 
 RUN mkdir bin/
 
-COPY system/ system/
+COPY system/watchdog system/watchdog
 COPY utils/ utils/
 COPY go.mod go.mod
 COPY go.sum go.sum

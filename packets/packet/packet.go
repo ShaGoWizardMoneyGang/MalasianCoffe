@@ -207,6 +207,11 @@ func (p *Packet) GetSequenceNumber() int {
 	return int(sequence_n)
 }
 
+func (p *Packet) GetSequenceNumberString() string {
+	string_repr := strconv.FormatInt(int64(p.GetSequenceNumber()), 10)
+	return string_repr
+}
+
 // Dado un paquete, y la cantidad de colas destino, te devuelve un string con su routing key
 // devuelve un string
 func GenerateRoutingKey(pkt Packet, queueAmount uint64) string {

@@ -30,10 +30,10 @@ type joinerQuery2a struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func joinQuery2a(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	menuItemReceiver := packet_receiver.NewPacketReceiver("Menu items")
+func joinQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	menuItemReceiver := packet_receiver.NewPacketReceiver("menu-items")
 
-	transactionItemReceiver := packet_receiver.NewPacketReceiver("Transaction items")
+	transactionItemReceiver := packet_receiver.NewPacketReceiver("transaction-items")
 
 	var joinedTransactionItems strings.Builder
 

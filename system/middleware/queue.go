@@ -68,7 +68,7 @@ func CreateQueueUnderExchange(exchangeName string, options ChannelOptions, routi
 		queueName,  // name
 		false, // durable
 		false, // delete when unused
-		true,  // exclusive
+		false,  // exclusive
 		false, // no-wait
 		nil,   // arguments
 	)
@@ -253,19 +253,19 @@ Se fuerza la eliminación remota de la cola o exchange.
 Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareDeleteError.
 */
 func (q *MessageMiddlewareQueue) Delete() (error MessageMiddlewareError) {
-	lost_messages, err := (*q.channel).QueueDelete(
-		q.queueName,
-		false,
-		false,
-		false,
-	)
+	// lost_messages, err := (*q.channel).QueueDelete(
+	// 	q.queueName,
+	// 	false,
+	// 	false,
+	// 	false,
+	// )
 
-	// TODO: Cambiar por log
-	fmt.Printf("Mensajes perdidos: %d\n", lost_messages)
+	// // TODO: Cambiar por log
+	// fmt.Printf("Mensajes perdidos: %d\n", lost_messages)
 
-	if err != nil {
-		return MessageMiddlewareDeleteError
-	}
+	// if err != nil {
+	// 	return MessageMiddlewareDeleteError
+	// }
 
 	return 0
 }

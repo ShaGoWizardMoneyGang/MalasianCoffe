@@ -41,8 +41,8 @@ func (g *aggregator2bGlobal) Build(rabbitAddr string, routing_key string, outs m
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateSessionQuery2b, g.outputChannel)
 }
 
-func aggregateSessionQuery2b(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := packet_receiver.NewPacketReceiver("Agregador global 2b")
+func aggregateSessionQuery2b(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-2b")
 	localAcc := make(map[keyQuery2b]float64)
 
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
@@ -87,11 +87,6 @@ func aggregateSessionQuery2b(inputChannel <-chan colas.PacketMessage, outputChan
 		localAcc[k] += subtotal
 	}
 
-	// if len(localAcc) == 0 {
-	// 	localReceiver = packet_receiver.NewPacketReceiver("Agregador global 2b")
-	// 	continue
-	// }
-
 	monthlyMax := make(map[string]struct {
 		itemID   string
 		subtotal float64
@@ -123,13 +118,8 @@ func aggregateSessionQuery2b(inputChannel <-chan colas.PacketMessage, outputChan
 	}
 
 	final := b.String()
-	// if final != "" {
 	newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transaction_items", []string{final})
 	outputChannel <- newPkts[0]
-	// }
-
-	// localAcc = make(map[keyQuery2b]float64)
-	// localReceiver = packet_receiver.NewPacketReceiver("Agregador global 2b")
 }
 
 func (g *aggregator2bGlobal) Process() {

@@ -48,14 +48,14 @@ func createUserMap(userReceiver packet_receiver.PacketReceiver) map[string]strin
 	return storeID2Name
 }
 
-func joinQuery4(inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	storeReceiver := packet_receiver.NewPacketReceiver("Store")
+func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	storeReceiver := packet_receiver.NewPacketReceiver("store")
 
-	userReceiver := packet_receiver.NewPacketReceiver("User")
+	userReceiver := packet_receiver.NewPacketReceiver("user")
 
 	// Aca me guardo todos los packets de transactions que llegaron antes de los
 	// stores. Deberian ser pocos (si es que existen)
-	transactionReceiver := packet_receiver.NewPacketReceiver("Transactions")
+	transactionReceiver := packet_receiver.NewPacketReceiver("transactions")
 
 	// Resultado final
 	var joinedTransactions strings.Builder

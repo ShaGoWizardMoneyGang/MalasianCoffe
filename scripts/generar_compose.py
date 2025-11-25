@@ -145,15 +145,22 @@ def filter_menu_items_block(n, queueAmount2a, queueAmount2b):
 """
 
 def concat_block(n):
+    name = f"concat_{n}"
     routing_key = int(n) - 1
+
+    os.mkdir(f"packet_receiver/{name}")
+    # os.mkdir(f"packet_receiver/{name}/metadata")
+    # os.mkdir(f"packet_receiver/{name}/checkpoint")
+
     return f"""
-  concat_{n}:
-    container_name: concat_{n}
-    image: ubuntu:24.04
+  {name}:
+    container_name: {name}
+    image: worker:latest
     working_dir: /app
-    entrypoint: ./bin/concat rabbitmq:5672 {routing_key}
+    entrypoint: bash -c "entrypoint.sh && su user -c '/app/bin/concat rabbitmq:5672 {routing_key}'"
     volumes:
       - ./bin/concat:/app/bin/concat
+      - ./packet_receiver/{name}:/app/packet_receiver/
     networks:
       - testing_net
     depends_on:
@@ -248,7 +255,7 @@ def leader_watchdog_block(n):
   watchdog_{n}:
     container_name: watchdog_{n}
     hostname: watchdog_{n}
-    image: dind-dockerfile:latest
+    image: watchdog:latest
     working_dir: /app
     entrypoint: ./bin/watchdog STARTER
     volumes:

@@ -1,7 +1,7 @@
 # MalasianCoffe
 
 ## Docker custom image
-Buildear imagen de docker utilizada para docker-in-docker
+Buildear imagen de docker utilizada para docker-in-docker (esto ya lo hace la rutina de build).
 ```bash
 docker build -t dind-dockerfile .
 ```
