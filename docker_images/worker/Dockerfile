@@ -8,6 +8,10 @@ RUN mkdir -p app && chown user:users app
 
 RUN mkdir -p app/packet_receiver && chown user:users app/packet_receiver
 
+RUN mkdir -p app/packet_receiver/tmp && chown user:users app/packet_receiver/tmp
+
+RUN mkdir -p /tmpdir && chown user:users /tmpdir
+
 COPY entrypoint.sh /bin/entrypoint.sh
 
 # ENTRYPOINT ["sh", "/entrypoint.sh"]

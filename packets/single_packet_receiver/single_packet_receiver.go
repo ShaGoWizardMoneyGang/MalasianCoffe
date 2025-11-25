@@ -911,7 +911,7 @@ func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
 
 		pkt_sn := received_packets[i]
 
-		if pkt_sn +1  != nxt_pkt_sn {
+		if pkt_sn + 1  != nxt_pkt_sn {
 			allReceived = false
 			break
 		}
