@@ -1,4 +1,4 @@
-package persistent_packet_receiver
+package single_packet_receiver
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ func TestPacketReceiverInOrder(t *testing.T) {
 		},
 	}
 
-	packet_receiver := NewPersistentPacketReceiver("Packet receiver testing")
+	packet_receiver := NewSinglePacketReceiver("Packet receiver testing")
 	for _, packet := range shuffled_packets {
 		packet_receiver.ReceivePacket(packet)
 	}
@@ -68,7 +68,7 @@ func TestPacketReceiverNotInOrder(t *testing.T) {
 		},
 	}
 
-	packet_receiver := NewPersistentPacketReceiver("Packet receiver not in order test")
+	packet_receiver := NewSinglePacketReceiver("Packet receiver not in order test")
 	for _, packet := range shuffled_packets {
 		packet_receiver.ReceivePacket(packet)
 	}

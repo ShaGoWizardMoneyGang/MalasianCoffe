@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/persistent_packet_receiver"
+	"malasian_coffe/packets/single_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
@@ -30,7 +30,7 @@ func concat_func(accumulated_input string, new_input string) string {
 }
 
 func concat(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := persistent_packet_receiver.NewPersistentPacketReceiver(sessionID, concat_func)
+	localReceiver := single_packet_receiver.NewSinglePacketReceiver(sessionID, concat_func)
 
 	var concatenated_packets string
 	var last_packet packet.Packet
