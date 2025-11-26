@@ -1,0 +1,180 @@
+package main
+
+import (
+	"fmt"
+	watchdog "malasian_coffe/system/watchdog/src"
+	bully "malasian_coffe/utils/coordination"
+	"net"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+)
+
+const (
+	SHEEPS_FILE  = "sheeps.txt"
+	MEMBERS_FILE = "members.txt"
+	MAX_RETRIES  = 3
+	TIMEOUT      = 2
+)
+
+func restartContainer(name string) {
+	cmd := exec.Command("sh", "-c", "docker stop "+name)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al detener el contenedor %s: %v\n", name, err)
+	} else {
+		fmt.Printf("Se detuvo el container %s: %s\n", name, string(output))
+		time.Sleep(2 * time.Second)
+		// DEJO DOCKER RESTART
+		cmd = exec.Command("sh", "-c", "docker restart "+name)
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error al iniciar el contenedor %s: %v\n", name, err)
+		} else {
+			fmt.Printf("Se inició el contenedor %s: %s\n", name, string(output))
+		}
+	}
+}
+
+func watchSheeps() {
+	fmt.Println("[WATCHDOG]: comenzando a vigilar las ovejas...")
+	file, err := os.ReadFile(SHEEPS_FILE)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "No se pudo abrir el archivo %s: %v\n", SHEEPS_FILE, err)
+	}
+
+	listOfServices := strings.Split(string(file), "\n")
+	services := make([]string, 0, len(listOfServices))
+	for _, s := range listOfServices {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			services = append(services, s)
+			fmt.Println("Servicio:", s)
+		}
+	}
+
+	addr := net.UDPAddr{
+		Port: bully.HEALTHCHECK_PORT,
+		IP:   net.ParseIP("0.0.0.0"),
+	}
+	connListen, err := net.ListenUDP("udp", &addr)
+	if err != nil {
+		panic(err)
+	}
+	defer connListen.Close()
+
+	buffer := make([]byte, 1024)
+	for {
+		for _, serviceName := range services {
+			healthCheckAddress := serviceName + ":" + fmt.Sprint(watchdog.HEALTHCHECK_PORT)
+			successfulHealthcheck := false
+			for attempt := 1; attempt <= MAX_RETRIES; attempt++ {
+				fmt.Printf("Intento %d de %d: enviando PING a %s\n", attempt, MAX_RETRIES, healthCheckAddress)
+				// Mando PING
+				err := watchdog.Ping(healthCheckAddress)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error enviando ping a %s: %v\n", healthCheckAddress, err)
+				} else {
+					// Acá con SetReadDeadline defino que después de la hora actual + 2 segundos vence el timeout
+					connListen.SetReadDeadline(time.Now().Add(TIMEOUT * time.Second))
+					n, _, err := connListen.ReadFromUDP(buffer)
+					// Si el Read NO devuelve error, entonces se recibió el PONG y salimos
+					if err == nil {
+						fmt.Printf("Watchdog recibió PONG del %s: %s\n", serviceName, string(buffer[:n]))
+						successfulHealthcheck = true
+						break
+					}
+					// Si el error es de network y es un timeout, el PONG No llegó en el tiempo establecido (2seg)
+					netError, isNetError := err.(net.Error)
+					if isNetError && netError.Timeout() {
+						fmt.Printf("No se recibió PONG en %v segundos\n ", TIMEOUT)
+					}
+				}
+				// Espero un poco antes del siguiente intento
+				time.Sleep(1 * time.Second)
+			}
+
+			if !successfulHealthcheck {
+				fmt.Printf("No se recibió PONG tras %d intentos. Reiniciando %s\n", MAX_RETRIES, serviceName)
+				restartContainer(serviceName)
+			} else {
+				fmt.Println("El servicio respondió correctamente, no hace falta reiniciar")
+			}
+		}
+		time.Sleep(watchdog.HEARTBEAT_PERIOD * time.Second)
+	}
+}
+
+func ReadMembers(membersFile string) ([]string, error) {
+	data, err := os.ReadFile(membersFile)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(data), "\n")
+	members := []string{}
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			members = append(members, l)
+		}
+	}
+	return members, nil
+}
+
+func GetID(myName string, members []string) int {
+	for i, name := range members {
+		if name == myName {
+			return i + 1
+		}
+	}
+	return -1
+}
+
+func main() {
+	fmt.Println("Esperando a que arranque el sistema...")
+	time.Sleep(5 * time.Second)
+
+	myName, err := os.Hostname() //watchdog_1, watchdog_2, ...
+	if err != nil {
+		panic("No se pudo obtener el hostname")
+	}
+	members, err := ReadMembers(MEMBERS_FILE)
+	if err != nil {
+		panic(err)
+	}
+	myID := GetID(myName, members)
+
+	node := bully.WatchdogNode{
+		ID:           myID,
+		Addr:         myName,
+		MasterID:     -1,
+		Nodes:        members,
+		Coordinating: false,
+	}
+
+	for {
+		if node.AmIMaster() {
+			fmt.Println("Soy el iniciador, comienzo el bucle de latidos")
+			go watchSheeps()
+			node.MasterID = node.ID   //TODO sacar esto creo que no jode
+			node.BroadcastHeartbeat() //loop infinito por ahora
+		} else {
+			watchdogListener := watchdog.CreateWatchdogListener()
+			healthcheckChannel := make(chan string)
+			go watchdogListener.Listen(healthcheckChannel)
+			go func() {
+				for serviceName := range healthcheckChannel {
+					IP := strings.Split(serviceName, ":")[0]
+					fmt.Println("Replica received healthcheck ping from", IP)
+					watchdogListener.Pong(IP)
+				}
+				fmt.Println("exited go routine")
+			}()
+			node.ListenHeartbeats()
+			watchdogListener.KeepRunning = false
+			watchdogListener.Conn.Close()
+			fmt.Printf("----------------------------------------Valor de KeepRunning: %v\n", watchdogListener.KeepRunning)
+		}
+	}
+}

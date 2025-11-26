@@ -2,9 +2,11 @@ package filter_mapper
 
 import (
 	"fmt"
+	"log/slog"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"strings"
 )
@@ -62,9 +64,9 @@ func filterTransactionItems(input string) []string {
 		}
 
 		transaction_id := data[1]
-		quantity       := data[2]
-		subtotal       := data[4]
-		created_at     := data[5]
+		quantity := data[2]
+		subtotal := data[4]
+		created_at := data[5]
 
 		year_condition, err := yearCondition(created_at)
 		if err != nil {
@@ -79,10 +81,11 @@ func filterTransactionItems(input string) []string {
 	return []string{final_query2a.String(), final_query2b.String()}
 }
 
-
 // =========================== TransactionItemsFilter ==============================
 
 type transactionItemFilterMapper struct {
+	packet_channel chan colas.PacketMessage
+
 	colaEntradaTransaction *middleware.MessageMiddlewareQueue
 
 	colaSalida2a *middleware.MessageMiddlewareQueue
@@ -95,37 +98,59 @@ func (tifm *transactionItemFilterMapper) GetInput() *middleware.MessageMiddlewar
 }
 
 func (tifm *transactionItemFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
-	colaEntradaTransaction := colas.InstanceQueue("DataTransactionItems", rabbitAddr)
+	tifm.packet_channel = make(chan colas.PacketMessage)
 
-	colaSalida2a := colas.InstanceQueue("FilteredTransactionItems2a", rabbitAddr)
-	colaSalida2b := colas.InstanceQueue("FilteredTransactionItems2b", rabbitAddr)
+	tifm.colaEntradaTransaction = colas.InstanceQueue("DataTransactionItems", rabbitAddr)
 
-	tifm.colaEntradaTransaction = colaEntradaTransaction
-
-	tifm.colaSalida2a = colaSalida2a
-	tifm.colaSalida2b = colaSalida2b
+	tifm.colaSalida2a = colas.InstanceQueue("FilteredTransactionItems2a", rabbitAddr)
+	tifm.colaSalida2b = colas.InstanceQueue("FilteredTransactionItems2b", rabbitAddr)
 }
 
-func (tifm *transactionItemFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
-	input := pkt.GetPayload()
+func (tifm *transactionItemFilterMapper) Process() {
+	slog.Info("Arranca procesamiento de store filter mapper")
 
-	// Vienen en este orden: final_query2a, final_query2b
-	payloadResults := filterTransactionItems(input)
+	go colas.InputQueue(tifm.colaEntradaTransaction, tifm.packet_channel)
 
-	newPayload     := packet.ChangePayload(pkt, payloadResults)
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
 
-	outBoundMessage := []colas.OutBoundMessage{
-		{
-			Packet:     newPayload[0],
-			ColaSalida: tifm.colaSalida2a,
-		},
-		{
-			Packet:     newPayload[1],
-			ColaSalida: tifm.colaSalida2b,
-		},
+	for {
+		select {
+		case pkt_message := <-tifm.packet_channel:
+			pkt := pkt_message.Packet
+			message := pkt_message.Message
+
+			input := pkt.GetPayload()
+
+			// Vienen en este orden: final_query2a, final_query2b
+			payloadResults := filterTransactionItems(input)
+
+			newPayload := packet.ChangePayload(pkt, payloadResults)
+
+			outBoundMessages := []colas.OutBoundMessage{
+				{
+					Packet:     newPayload[0],
+					ColaSalida: tifm.colaSalida2a,
+				},
+				{
+					Packet:     newPayload[1],
+					ColaSalida: tifm.colaSalida2b,
+				},
+			}
+			for _, outbound := range outBoundMessages {
+				cola := outbound.ColaSalida
+				packet := outbound.Packet
+				cola.Send(packet)
+			}
+			message.Ack(false)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Filter TransactionItems received healthcheck ping from", IP)
+			watchdog.Pong(IP)
+		}
+
 	}
-
-	return outBoundMessage
 }
 
 // =========================== TransactionItemsFilter ==============================

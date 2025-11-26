@@ -1,9 +1,11 @@
 package filter_mapper
 
 import (
+	"fmt"
 	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"strings"
 )
@@ -31,6 +33,8 @@ func filterStores(input string) []string {
 }
 
 type storeFilterMapper struct {
+	packet_channel chan colas.PacketMessage
+
 	colaEntradaStore *middleware.MessageMiddlewareQueue
 
 	exchangeSalida3 *middleware.MessageMiddlewareExchange
@@ -38,11 +42,9 @@ type storeFilterMapper struct {
 }
 
 func (sfm *storeFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
-	colaEntradaStore := colas.InstanceQueue("DataStores", rabbitAddr)
+	sfm.packet_channel = make(chan colas.PacketMessage)
 
-	// colaSalida3 := colas.InstanceQueue("FilteredStores3", rabbitAddr)
-
-	sfm.colaEntradaStore = colaEntradaStore
+	sfm.colaEntradaStore = colas.InstanceQueue("DataStores", rabbitAddr)
 
 	sfm.exchangeSalida3 = colas.InstanceExchange("FilteredStores3", rabbitAddr, queueAmount["queue3"])
 	sfm.exchangeSalida4 = colas.InstanceExchange("FilteredStores4", rabbitAddr, queueAmount["queue4"])
@@ -52,22 +54,46 @@ func (sfm *storeFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
 	return sfm.colaEntradaStore
 }
 
-func (sfm *storeFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
-	input := pkt.GetPayload()
+func (sfm *storeFilterMapper) Process() {
+	slog.Info("Arranca procesamiento de store filter mapper")
 
-	// Ambas payloads iguales
-	mapped_stores := filterStores(input)
-	newPayload := packet.ChangePayload(pkt, mapped_stores)
-	outBoundMessage := []colas.OutBoundMessage{
-		{
-			Packet:     newPayload[0],
-			ColaSalida: sfm.exchangeSalida3,
-		},
-		{
-			Packet:     newPayload[1],
-			ColaSalida: sfm.exchangeSalida4,
-		},
+	go colas.InputQueue(sfm.colaEntradaStore, sfm.packet_channel)
+
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
+
+	for {
+		select {
+		case pkt_message := <-sfm.packet_channel:
+			pkt := pkt_message.Packet
+			message := pkt_message.Message
+
+			input := pkt.GetPayload()
+			// Ambas payloads iguales
+			mapped_stores := filterStores(input)
+			newPayload := packet.ChangePayload(pkt, mapped_stores)
+			outBoundMessages := []colas.OutBoundMessage{
+				{
+					Packet:     newPayload[0],
+					ColaSalida: sfm.exchangeSalida3,
+				},
+				{
+					Packet:     newPayload[1],
+					ColaSalida: sfm.exchangeSalida4,
+				},
+			}
+			for _, outbound := range outBoundMessages {
+				cola := outbound.ColaSalida
+				packet := outbound.Packet
+				cola.Send(packet)
+			}
+
+			message.Ack(false)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Filter Stores received healthcheck ping from", IP)
+			watchdog.Pong(IP)
+		}
 	}
-
-	return outBoundMessage
 }

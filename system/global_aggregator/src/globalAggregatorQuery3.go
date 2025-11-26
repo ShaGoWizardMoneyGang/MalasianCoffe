@@ -3,8 +3,10 @@ package global_aggregator
 import (
 	"fmt"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"sort"
 	"strconv"
@@ -17,7 +19,7 @@ type keyQuery3 struct {
 }
 
 type aggregator3Global struct {
-	inputChannel  chan packet.Packet
+	inputChannel  chan colas.PacketMessage
 	outputChannel chan packet.Packet
 
 	colaEntrada    *middleware.MessageMiddlewareQueue
@@ -28,7 +30,7 @@ type aggregator3Global struct {
 
 func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
 	// fmt.Printf("OUTS: %v\n", outs)
-	g.inputChannel = make(chan packet.Packet)
+	g.inputChannel = make(chan colas.PacketMessage)
 	g.outputChannel = make(chan packet.Packet)
 
 	g.colaEntrada = colas.InstanceQueueRouted("PartialAggregations3", rabbitAddr, routing_key)
@@ -37,16 +39,17 @@ func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs ma
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery3, g.outputChannel)
 }
 
-func aggregateQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	localReceiver := packet.NewPacketReceiver("Agregador global 3")
+func aggregateQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-3")
 	localAcc := make(map[keyQuery3]float64)
 
 	var last_packet packet.Packet
 
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
 
-		localReceiver.ReceivePacket(pkt)
+		localReceiver.ReceivePacket(pktMsg)
 
 		if localReceiver.ReceivedAll() {
 			last_packet = pkt
@@ -80,11 +83,6 @@ func aggregateQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- pac
 		localAcc[k] += total
 	}
 
-	// if len(localAcc) == 0 {
-	// 	localReceiver = packet.NewPacketReceiver("Agregador global 3")
-	// 	continue
-	// }
-
 	keys := make([]keyQuery3, 0, len(localAcc))
 	for k := range localAcc {
 		keys = append(keys, k)
@@ -113,12 +111,20 @@ func aggregateQuery3(inputChannel <-chan packet.Packet, outputChannel chan<- pac
 func (g *aggregator3Global) Process() {
 	go colas.InputQueue(g.colaEntrada, g.inputChannel)
 
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
+
 	for {
 		select {
 		case inputPacket := <-g.inputChannel:
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
 			g.exchangeSalida.Send(packetAgregado)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("GlobalAggregator 3 received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 	}
 }

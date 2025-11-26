@@ -2,9 +2,11 @@ package counter
 
 import (
 	"fmt"
+	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/system/queries/query4"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/network"
 	"strings"
@@ -41,13 +43,14 @@ func (c *counterQuery4) countFunctionQuery4(input string) string {
 }
 
 type counterQuery4 struct {
-	colaEntradaFilteredTransactions4 *middleware.MessageMiddlewareQueue
+	packet_channel chan colas.PacketMessage
 
+	colaEntradaFilteredTransactions4   *middleware.MessageMiddlewareQueue
 	exchangeSalidaPartialCountedUsers4 *middleware.MessageMiddlewareExchange
 }
 
-func (c *counterQuery4) Build(rabbitAddr string, queueAmounts map[string] uint64) {
-
+func (c *counterQuery4) Build(rabbitAddr string, queueAmounts map[string]uint64) {
+	c.packet_channel = make(chan colas.PacketMessage)
 	colaEntrada, err := middleware.CreateQueue("FilteredTransactions4", middleware.ChannelOptions{DaemonAddress: network.AddrToRabbitURI(rabbitAddr)})
 	if err != nil {
 		panic(fmt.Errorf("CreateQueue(%s): %w", "FilteredTransactions4", err))
@@ -58,22 +61,40 @@ func (c *counterQuery4) Build(rabbitAddr string, queueAmounts map[string] uint64
 	c.exchangeSalidaPartialCountedUsers4 = colas.InstanceExchange("PartialCountedUsers4", rabbitAddr, queueAmounts["queue"])
 }
 
-func (c *counterQuery4) GetInput() *middleware.MessageMiddlewareQueue {
-	return c.colaEntradaFilteredTransactions4
-}
+func (c *counterQuery4) Process() {
+	slog.Info("Arranca procesamiento de counterQuery4")
 
-func (c *counterQuery4) Process(pkt packet.Packet) []colas.OutBoundMessage {
-	input := pkt.GetPayload()
+	go colas.InputQueue(c.colaEntradaFilteredTransactions4, c.packet_channel)
 
-	counted_result := []string{c.countFunctionQuery4(input)}
+	watchdogListener := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdogListener.Listen(healthcheckChannel)
 
-	newPayload := packet.ChangePayload(pkt, counted_result)
-	outBoundMessage := []colas.OutBoundMessage{
-		{
-			Packet:     newPayload[0],
-			ColaSalida: c.exchangeSalidaPartialCountedUsers4,
-		},
+	for {
+		select {
+		case pkt_message := <-c.packet_channel:
+			pkt := pkt_message.Packet
+			message := pkt_message.Message
+
+			input := pkt.GetPayload()
+			counted_result := []string{c.countFunctionQuery4(input)}
+			newPayload := packet.ChangePayload(pkt, counted_result)
+			outBoundMessages := []colas.OutBoundMessage{
+				{
+					Packet:     newPayload[0],
+					ColaSalida: c.exchangeSalidaPartialCountedUsers4,
+				},
+			}
+			for _, outbound := range outBoundMessages {
+				cola := outbound.ColaSalida
+				packet := outbound.Packet
+				cola.Send(packet)
+			}
+			message.Ack(false)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("CounterQuery4 received healthcheck ping from", IP)
+			watchdogListener.Pong(IP)
+		}
 	}
-
-	return outBoundMessage
 }

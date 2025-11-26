@@ -7,15 +7,17 @@ import (
 	"strings"
 
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
+	watchdog "malasian_coffe/system/watchdog/src"
 
 	// "malasian_coffe/system/queries/query4"
 	"malasian_coffe/utils/colas"
 )
 
 type aggregator4Global struct {
-	inputChannel  chan packet.Packet
+	inputChannel  chan colas.PacketMessage
 	outputChannel chan packet.Packet
 
 	colaEntrada    *middleware.MessageMiddlewareQueue
@@ -25,7 +27,7 @@ type aggregator4Global struct {
 }
 
 func (g *aggregator4Global) Build(rabbitAddr string, routing_key string, outs map[string]uint64) {
-	g.inputChannel = make(chan packet.Packet)
+	g.inputChannel = make(chan colas.PacketMessage)
 	g.outputChannel = make(chan packet.Packet)
 
 	fmt.Printf("ROUTING KEY %s\n", routing_key)
@@ -99,16 +101,17 @@ func buildOutput(localAcc map[string]map[string]uint64) string {
 	return b.String()
 }
 
-func aggregateQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) {
-	localReceiver := packet.NewPacketReceiver("Agregador global 4")
+func aggregateQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-4")
 	localAcc := make(map[string]map[string]uint64)
 
 	var last_packet packet.Packet
 
 	for {
-		pkt := <-inputChannel
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
 
-		localReceiver.ReceivePacket(pkt)
+		localReceiver.ReceivePacket(pktMsg)
 
 		if localReceiver.ReceivedAll() {
 			last_packet = pkt
@@ -130,12 +133,20 @@ func aggregateQuery4(inputChannel <-chan packet.Packet, outputChannel chan<- pac
 func (g *aggregator4Global) Process() {
 	go colas.InputQueue(g.colaEntrada, g.inputChannel)
 
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
+
 	for {
 		select {
 		case inputPacket := <-g.inputChannel:
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
 			g.exchangeSalida.Send(packetAgregado)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("GlobalAggregator 4 received healthcheck ping from", IP)
+			watchdog.Pong(IP)
 		}
 	}
 }

@@ -26,7 +26,7 @@ networks:
     {external_text}
     driver: bridge
 """
-
+# Saco directamente los sheeps de los parámetros
 def commons():
     return """  rabbitmq:
     container_name: rabbitmq
@@ -145,15 +145,22 @@ def filter_menu_items_block(n, queueAmount2a, queueAmount2b):
 """
 
 def concat_block(n):
+    name = f"concat_{n}"
     routing_key = int(n) - 1
+
+    os.mkdir(f"packet_receiver/{name}")
+    # os.mkdir(f"packet_receiver/{name}/metadata")
+    # os.mkdir(f"packet_receiver/{name}/checkpoint")
+
     return f"""
-  concat_{n}:
-    container_name: concat_{n}
-    image: ubuntu:24.04
+  {name}:
+    container_name: {name}
+    image: worker:latest
     working_dir: /app
-    entrypoint: ./bin/concat rabbitmq:5672 {routing_key}
+    entrypoint: bash -c "entrypoint.sh && su user -c '/app/bin/concat rabbitmq:5672 {routing_key}'"
     volumes:
       - ./bin/concat:/app/bin/concat
+      - ./packet_receiver/{name}:/app/packet_receiver/
     networks:
       - testing_net
     depends_on:
@@ -177,6 +184,7 @@ def sender_block(n, query):
     extra_hosts:
       - "host.docker.internal:host-gateway"
 """
+
 
 def counter_block(n, query, queueAmount):
     return f"""
@@ -241,6 +249,43 @@ def partial_aggregator_block(n, query, queueAmount):
     depends_on:
       - server
 """
+
+def leader_watchdog_block(n):
+    return f"""
+  watchdog_{n}:
+    container_name: watchdog_{n}
+    hostname: watchdog_{n}
+    image: watchdog:latest
+    working_dir: /app
+    entrypoint: ./bin/watchdog STARTER
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./sheeps.txt:/app/sheeps.txt
+      - ./members.txt:/app/members.txt
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
+
+def replica_watchdog_block(n):
+    return f"""
+  watchdog_{n}:
+    container_name: watchdog_{n}
+    hostname: watchdog_{n}
+    image: watchdog:latest
+    working_dir: /app
+    entrypoint: ./bin/watchdog REPLICA
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./sheeps.txt:/app/sheeps.txt
+      - ./members.txt:/app/members.txt
+    networks:
+      - testing_net
+    depends_on:
+      - watchdog_{n-1}
+"""
+
 
 def client(n, external):
     # Creo un directorio en out para que no sea creado por root
@@ -330,41 +375,102 @@ def main():
     if external:
         output_file = "docker-compose-gen-external.yml"
 
+    #Guardo los servicios en una lista y después escribo todo juntito
+    sheeps_list = []
+    members_list = [] # aca guardo los nodos del anillo, los separo de la otra logixca
+
     with open(output_file, 'w') as file:
         file.write(header())
         if external == False:
             file.write(commons())
-        file.writelines(filter_transactions_block(i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
-        file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
-        file.writelines(filter_users_block(i, configs["joiner4"]) for i in range(1, configs.get("filter-users", 0) + 1))
-        file.writelines(filter_stores_block(i, configs["joiner3"], configs["joiner4"]) for i in range(1, configs.get("filter-stores", 0) + 1))
-        file.writelines(filter_menu_items_block(i, configs["joiner2a"], configs["joiner2b"]) for i in range(1, configs.get("filter-menu-items", 0) + 1))
-        
 
+        file.writelines(leader_watchdog_block(1))
+
+        file.writelines(replica_watchdog_block(i) for i in range(2, configs.get("watchdog", 0) + 1))
+        for i in range(1, configs.get("watchdog", 0) + 1):
+            members_list.append(f"watchdog_{i}")
+        for i in range(1, configs.get("watchdog", 0) + 1):
+            sheeps_list.append(f"watchdog_{i}")
+
+        file.writelines(filter_transactions_block(i, configs["concat1"]) for i in range(1, configs.get("filter-transactions", 0) + 1))
+        for i in range(1, configs.get("filter-transactions", 0) + 1):
+            sheeps_list.append(f"filter_transactions{i}")
+
+        file.writelines(filter_transaction_items_block(i) for i in range(1, configs.get("filter-transaction-items", 0) + 1))
+        for i in range(1, configs.get("filter-transaction-items", 0) + 1):
+            sheeps_list.append(f"filter_transaction_items{i}")
+
+        file.writelines(filter_users_block(i, configs["joiner4"]) for i in range(1, configs.get("filter-users", 0) + 1))
+        for i in range(1, configs.get("filter-users", 0) + 1):
+            sheeps_list.append(f"filter_users{i}")
+
+        file.writelines(filter_stores_block(i, configs["joiner3"], configs["joiner4"]) for i in range(1, configs.get("filter-stores", 0) + 1))
+        for i in range(1, configs.get("filter-stores", 0) + 1):
+            sheeps_list.append(f"filter_stores{i}")
+
+        file.writelines(filter_menu_items_block(i, configs["joiner2a"], configs["joiner2b"]) for i in range(1, configs.get("filter-menu-items", 0) + 1))
+        for i in range(1, configs.get("filter-menu-items", 0) + 1):
+            sheeps_list.append(f"filter_menu_items{i}")
         
         file.writelines(concat_block(i) for i in range(1, configs.get("concat1", 0) + 1))
+        for i in range(1, configs.get("concat1", 0) + 1):
+            sheeps_list.append(f"concat_{i}")
         
         file.writelines(sender_block(i, "1") for i in range(1, configs.get("sender1", 0) + 1))
+        for i in range(1, configs.get("sender1", 0) + 1):
+            sheeps_list.append(f"sender1_{i}")
         file.writelines(sender_block(i, "2a") for i in range(1, configs.get("sender2a", 0) + 1))
+        for i in range(1, configs.get("sender2a", 0) + 1):
+            sheeps_list.append(f"sender2a_{i}")
         file.writelines(sender_block(i, "2b") for i in range(1, configs.get("sender2b", 0) + 1))
+        for i in range(1, configs.get("sender2b", 0) + 1):
+            sheeps_list.append(f"sender2b_{i}")
         file.writelines(sender_block(i, "3") for i in range(1, configs.get("sender3", 0) + 1))
+        for i in range(1, configs.get("sender3", 0) + 1):
+            sheeps_list.append(f"sender3_{i}")
         file.writelines(sender_block(i, "4") for i in range(1, configs.get("sender4", 0) + 1))
+        for i in range(1, configs.get("sender4", 0) + 1):
+            sheeps_list.append(f"sender4_{i}")
         
         file.writelines(counter_block(i, "2a", configs["global-aggregator2a"]) for i in range(1, configs.get("counter2a", 0) + 1))
+        for i in range(1, configs.get("counter2a", 0) + 1):
+            sheeps_list.append(f"counter2a_{i}")
         file.writelines(counter_block(i, "2b", configs["global-aggregator2b"]) for i in range(1, configs.get("counter2b", 0) + 1))
+        for i in range(1, configs.get("counter2b", 0) + 1):
+            sheeps_list.append(f"counter2b_{i}")
         file.writelines(counter_block(i, "4", configs["global-aggregator4"]) for i in range(1, configs.get("counter4", 0) + 1))
+        for i in range(1, configs.get("counter4", 0) + 1):
+            sheeps_list.append(f"counter4_{i}")
 
         file.writelines(global_aggregator_block(i, "2a", configs["joiner2a"]) for i in range(1, configs.get("global-aggregator2a", 0) + 1))
+        for i in range(1, configs.get("global-aggregator2a", 0) + 1):
+            sheeps_list.append(f"global_aggregator2a_{i}")
         file.writelines(global_aggregator_block(i, "2b", configs["joiner2b"]) for i in range(1, configs.get("global-aggregator2b", 0) + 1))
+        for i in range(1, configs.get("global-aggregator2b", 0) + 1):
+            sheeps_list.append(f"global_aggregator2b_{i}")
         file.writelines(global_aggregator_block(i, "3", configs["joiner3"]) for i in range(1, configs.get("global-aggregator3", 0) + 1))
+        for i in range(1, configs.get("global-aggregator3", 0) + 1):
+            sheeps_list.append(f"global_aggregator3_{i}")
         file.writelines(global_aggregator_block(i, "4", configs["joiner4"]) for i in range(1, configs.get("global-aggregator4", 0) + 1))
+        for i in range(1, configs.get("global-aggregator4", 0) + 1):
+            sheeps_list.append(f"global_aggregator4_{i}")
 
         file.writelines(joiner_block(i, "2a") for i in range(1, configs.get("joiner2a", 0) + 1))
+        for i in range(1, configs.get("joiner2a", 0) + 1):
+            sheeps_list.append(f"joiner2a_{i}")
         file.writelines(joiner_block(i, "2b") for i in range(1, configs.get("joiner2b", 0) + 1))
+        for i in range(1, configs.get("joiner2b", 0) + 1):
+            sheeps_list.append(f"joiner2b_{i}")
         file.writelines(joiner_block(i, "3") for i in range(1, configs.get("joiner3", 0) + 1))
+        for i in range(1, configs.get("joiner3", 0) + 1):
+            sheeps_list.append(f"joiner3_{i}")
         file.writelines(joiner_block(i, "4") for i in range(1, configs.get("joiner4", 0) + 1))
+        for i in range(1, configs.get("joiner4", 0) + 1):
+            sheeps_list.append(f"joiner4_{i}")
 
         file.writelines(partial_aggregator_block(i, "3", configs["global-aggregator3"]) for i in range(1, configs.get("partial-aggregator3", 0) + 1))
+        for i in range(1, configs.get("partial-aggregator3", 0) + 1):
+            sheeps_list.append(f"partial_aggregator3_{i}")
 
         for i in range(1, configs.get("cliente", 0) + 1):
             client_line = client(i, external)
@@ -372,6 +478,12 @@ def main():
             file.writelines(client_line)
 
         file.write(networks(external))
+
+    with open("sheeps.txt", "w") as sf:
+        sf.write("\n".join(sheeps_list) + "\n")
+
+    with open("members.txt", "w") as sf:
+        sf.write("\n".join(members_list) + "\n")
 
 if __name__ == "__main__":
     main()

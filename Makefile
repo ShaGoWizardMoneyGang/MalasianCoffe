@@ -57,7 +57,10 @@ run-global-aggregator: build-global-aggregator
 
 #============================== Build directives ===============================
 # Poner en order
-build: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4
+build: docker-build-all build-go-all
+
+build-go-all: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4 build-watchdog
+
 build-server:
 	cd system; go build -o ${BINDIR}/server
 
@@ -87,6 +90,9 @@ build-partial-aggregator:
 
 build-global-aggregator:
 	cd system/global_aggregator; go build -o ${BINDIR}/global_aggregator
+
+build-watchdog:
+	cd system/watchdog; go build -o ${BINDIR}/watchdog
 
 build-test-output-query-4:
 	go build -o ${current_dir}/bin/test_output_query_4 ./test_output_query4/test_output_query4.go
@@ -122,7 +128,7 @@ CONFIG                  ?= MuchosSinEstado
 generate-config:
 	bash scripts/generate-config.sh ${CONFIG}
 
-generate-compose:
+generate-compose: clean-out
 	python3 scripts/generar_compose.py NOEXTERNAL
 
 generate-compose-external:
@@ -151,9 +157,16 @@ docker-logs:
 docker-ci:
 	docker compose -f docker-compose-ci.yml up -d
 
+
+# Cada imagen tiene su propio directorio. Si queres anadir una nueva imagen, solo
+# hace falta anadir un directorio.
+docker-build-all:
+	$(MAKE) -C docker_images/
+
 #============================== Misc directives ===============================
 clean-out:
 	find out/ ! -name '.gitignore' ! -name 'out' -type d -exec rm -irf {} +
+	rm -rf packet_receiver/*
 
 download-dataset:
 	curl -C - -L https://www.kaggle.com/api/v1/datasets/download/geraldooizx/g-coffee-shop-transaction-202307-to-202506 -o dataset/dataset.zip

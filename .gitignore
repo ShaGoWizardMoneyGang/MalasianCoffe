@@ -3,3 +3,6 @@ compose.config
 
 docker-compose-gen-external.yml
 compose-external.config
+
+sheeps.txt
+members.txt

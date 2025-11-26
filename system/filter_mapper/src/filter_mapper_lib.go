@@ -2,9 +2,6 @@ package filter_mapper
 
 import (
 	"fmt"
-	"malasian_coffe/packets/packet"
-	"malasian_coffe/system/middleware"
-	"malasian_coffe/utils/colas"
 	"strconv"
 	"time"
 )
@@ -48,11 +45,8 @@ type FilterMapper interface {
 	// Funcion que inicializa las cosas que el filter necesita
 	Build(rabbitAddr string, queueAmount map[string]uint64)
 
-	// Devuelve referencia de la cola de la cual tiene que consumir
-	GetInput() *middleware.MessageMiddlewareQueue
-
 	// Funcio que hace el filtrado
-	Process(pkt packet.Packet) []colas.OutBoundMessage
+	Process()
 }
 
 func FilterMapperBuilder(datasetName string, rabbitAddr string, queueAmounts map[string] uint64) FilterMapper {

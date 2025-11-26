@@ -3,15 +3,21 @@ package colas
 import (
 	"bytes"
 	"fmt"
-	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type OutBoundMessage struct {
-	Packet packet.Packet
+	Packet     packet.Packet
 	ColaSalida middleware.MessageMiddleware
+}
+
+type PacketMessage struct {
+	Packet  packet.Packet
+	Message amqp.Delivery
 }
 
 // Wrapper function a las colas para hacerlo mas amigable
@@ -49,7 +55,7 @@ func InstanceExchange(exchangeName string, rabbitAddr string, queueAmount uint64
 	return exchange
 }
 
-func InputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- packet.Packet) {
+func InputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- PacketMessage) {
 	colasEntrada := input
 
 	messages := ConsumeInput(colasEntrada)
@@ -57,11 +63,17 @@ func InputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- pa
 		packetReader := bytes.NewReader(message.Body)
 		pkt, _ := packet.DeserializePackage(packetReader)
 
-		err := message.Ack(false)
+		//No tenemos que ack dos veces
+		/*err := message.Ack(false)
 		if err != nil {
 			bitacora.Error(fmt.Errorf("Could not ack, %w", err).Error())
+		}*/
+
+		packet_message := PacketMessage{
+			Packet:  pkt,
+			Message: message,
 		}
 
-		inputChannel <- pkt
+		inputChannel <- packet_message
 	}
 }

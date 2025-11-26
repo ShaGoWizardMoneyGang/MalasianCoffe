@@ -1,15 +1,17 @@
-package packet
+package packet_receiver
 
 import (
 	"fmt"
 	"malasian_coffe/bitacora"
+	"malasian_coffe/utils/colas"
+	"malasian_coffe/packets/packet"
 	"slices"
 	"strings"
 )
 
 type PacketReceiver struct {
 	// received_packages map[string]Packet
-	ordered_package []Packet
+	ordered_package []packet.Packet
 
 	// Determina si el buffer interno recibio todos los paquetes que esperaba.
 	allReceived bool
@@ -27,7 +29,7 @@ type PacketReceiver struct {
 // la hora de leer los prints del log.
 func NewPacketReceiver(humanIdentifier string) PacketReceiver {
 	return PacketReceiver{
-		ordered_package: []Packet{},
+		ordered_package: []packet.Packet{},
 		receivedEOF:     false,
 		allReceived:     false,
 		humanIdentifier: humanIdentifier,
@@ -36,12 +38,14 @@ func NewPacketReceiver(humanIdentifier string) PacketReceiver {
 
 // Devuelve un booleano que representa si se recivieron todos los paquetes
 // esperados o no.
-func (pr *PacketReceiver) ReceivePacket(pkt Packet) bool {
+func (pr *PacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// Apenas llega un nuevo paquete, el buffer queda invalido. Reseteamos.
 	pr.buffer.Reset()
 
+	pkt := pktMsg.Packet
+
 	n, exits := slices.BinarySearchFunc(pr.ordered_package, pkt,
-		func(i, j Packet) int {
+		func(i, j packet.Packet) int {
 			sn_i := i.GetSequenceNumber()
 			sn_j := j.GetSequenceNumber()
 			return sn_i - sn_j
@@ -61,6 +65,11 @@ Nuevo:
 	} else {
 		pr.ordered_package = slices.Insert(pr.ordered_package, n, pkt)
 	}
+
+	// Una vez insertado en el slice, lo podemos marcar como recibido.
+	// TODO: Esto no se esta guardando en disco todavia, hay que incluirlo
+	// Ver issue: https://github.com/ShaGoWizardMoneyGang/MalasianCoffe/issues/123
+	pktMsg.Message.Ack(false)
 
 	// Solamente actualizamos esto si no recibimos el EOF hasta ahora.
 	if !pr.receivedEOF {
@@ -105,7 +114,7 @@ Nuevo:
 	if pr.allReceived == false {
 		pr.buffer.Reset()
 	} else {
-		bitacora.Info(fmt.Sprintf("El packet receiver %s, recibio todos los paquetes que esperaba", pr.humanIdentifier))
+		bitacora.Info(fmt.Sprintf("El packet receiver %s, recibio todos los paquetes que esperaba. El tamano es de: %d", pr.humanIdentifier, len(pr.ordered_package)))
 	}
 
 	return pr.allReceived

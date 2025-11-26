@@ -4,29 +4,33 @@ import (
 	"fmt"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/utils/colas"
 )
 
 type SessionHandler struct {
-	outputChannel      chan<- packet.Packet
+	outputChannel chan<- packet.Packet
 
-	sessionMap         map[string](chan packet.Packet)
+	sessionMap map[string](chan colas.PacketMessage)
 
-	associatedFunction func(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) ()
+	associatedFunction func(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet)
 }
 
-func NewSessionHandler(sessionFunction func(inputChannel <-chan packet.Packet, outputChannel chan<- packet.Packet) (), outputChannel chan<- packet.Packet) SessionHandler {
+func NewSessionHandler(sessionFunction func(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet),
+	outputChannel chan<- packet.Packet) SessionHandler {
+
 	// Map from SessionID to session channel
-	sessionMap := make(map[string](chan packet.Packet))
+	sessionMap := make(map[string](chan colas.PacketMessage))
 
 	return SessionHandler{
-		sessionMap: sessionMap,
+		sessionMap:         sessionMap,
 		associatedFunction: sessionFunction,
-		outputChannel: outputChannel,
+		outputChannel:      outputChannel,
 	}
 }
 
 // Funcion que le pasa el packet.Packet a una session.
-func (sh *SessionHandler) PassPacketToSession(pkt packet.Packet) {
+func (sh *SessionHandler) PassPacketToSession(pktMsg colas.PacketMessage) {
+	pkt := pktMsg.Packet
 	sessionID := pkt.GetSessionID()
 	channel, exists := sh.sessionMap[sessionID]
 
@@ -35,8 +39,8 @@ func (sh *SessionHandler) PassPacketToSession(pkt packet.Packet) {
 	if !exists {
 		bitacora.Info(fmt.Sprintf("Nueva session detectada: %s", sessionID))
 		// Canal de input asignado a esta session
-		assigned_channel := make(chan packet.Packet)
-		go sh.associatedFunction(assigned_channel, sh.outputChannel)
+		assigned_channel := make(chan colas.PacketMessage)
+		go sh.associatedFunction(sessionID, assigned_channel, sh.outputChannel)
 
 		// No hace falta un mutex porque este diccionario se accede de forma
 		// secuencial
@@ -46,5 +50,5 @@ func (sh *SessionHandler) PassPacketToSession(pkt packet.Packet) {
 		channel = assigned_channel
 	}
 
-	channel <- pkt
+	channel <- pktMsg //pushea al output channel (inferido porque no sabemos como funca)
 }

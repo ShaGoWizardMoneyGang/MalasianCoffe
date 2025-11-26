@@ -2,9 +2,11 @@ package filter_mapper
 
 import (
 	"fmt"
+	"log/slog"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
+	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
 	"strings"
 )
@@ -111,11 +113,13 @@ func filterTransactions(input string) []string {
 }
 
 type transactionFilterMapper struct {
+	packet_channel chan colas.PacketMessage
+
 	colaEntradaTransaction *middleware.MessageMiddlewareQueue
 
 	exchangeSalida1 *middleware.MessageMiddlewareExchange
-	colaSalida3 *middleware.MessageMiddlewareQueue
-	colaSalida4 *middleware.MessageMiddlewareQueue
+	colaSalida3     *middleware.MessageMiddlewareQueue
+	colaSalida4     *middleware.MessageMiddlewareQueue
 }
 
 func (tfm *transactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueue {
@@ -124,39 +128,63 @@ func (tfm *transactionFilterMapper) GetInput() *middleware.MessageMiddlewareQueu
 }
 
 func (tfm *transactionFilterMapper) Build(rabbitAddr string, queueAmount map[string]uint64) {
-	colaEntradaTransaction := colas.InstanceQueue("DataTransactions", rabbitAddr)
+	tfm.packet_channel = make(chan colas.PacketMessage)
 
-	colaSalida3 := colas.InstanceQueue("FilteredTransactions3", rabbitAddr)
-	colaSalida4 := colas.InstanceQueue("FilteredTransactions4", rabbitAddr)
-
-	tfm.colaEntradaTransaction = colaEntradaTransaction
+	tfm.colaEntradaTransaction = colas.InstanceQueue("DataTransactions", rabbitAddr)
 
 	tfm.exchangeSalida1 = colas.InstanceExchange("FilteredTransactions1", rabbitAddr, queueAmount["queue1"])
-	tfm.colaSalida3 = colaSalida3
-	tfm.colaSalida4 = colaSalida4
+
+	tfm.colaSalida3 = colas.InstanceQueue("FilteredTransactions3", rabbitAddr)
+	tfm.colaSalida4 = colas.InstanceQueue("FilteredTransactions4", rabbitAddr)
 }
-func (tfm *transactionFilterMapper) Process(pkt packet.Packet) []colas.OutBoundMessage {
-	input := pkt.GetPayload()
+func (tfm *transactionFilterMapper) Process() {
+	slog.Info("Arranca procesamiento de store filter mapper")
 
-	// Vienen en este orden: final_query1, final_query3, final_query4
-	payloadResults := filterTransactions(input)
+	go colas.InputQueue(tfm.colaEntradaTransaction, tfm.packet_channel)
 
-	newPayload := packet.ChangePayload(pkt, payloadResults)
+	watchdog := watchdog.CreateWatchdogListener()
+	healthcheckChannel := make(chan string)
+	go watchdog.Listen(healthcheckChannel)
 
-	outBoundMessage := []colas.OutBoundMessage{
-		{
-			Packet:     newPayload[0],
-			ColaSalida: tfm.exchangeSalida1,
-		},
-		{
-			Packet:     newPayload[1],
-			ColaSalida: tfm.colaSalida3,
-		},
-		{
-			Packet:     newPayload[2],
-			ColaSalida: tfm.colaSalida4,
-		},
+	for {
+		select {
+		case pkt_message := <-tfm.packet_channel:
+			pkt := pkt_message.Packet
+			message := pkt_message.Message
+
+			input := pkt.GetPayload()
+
+			// Vienen en este orden: final_query1, final_query3, final_query4
+			payloadResults := filterTransactions(input)
+
+			newPayload := packet.ChangePayload(pkt, payloadResults)
+
+			outBoundMessages := []colas.OutBoundMessage{
+				{
+					Packet:     newPayload[0],
+					ColaSalida: tfm.exchangeSalida1,
+				},
+				{
+					Packet:     newPayload[1],
+					ColaSalida: tfm.colaSalida3,
+				},
+				{
+					Packet:     newPayload[2],
+					ColaSalida: tfm.colaSalida4,
+				},
+			}
+
+			for _, outbound := range outBoundMessages {
+				cola := outbound.ColaSalida
+				packet := outbound.Packet
+				cola.Send(packet)
+			}
+
+			message.Ack(false)
+		case responseAddress := <-healthcheckChannel:
+			IP := strings.Split(responseAddress, ":")[0]
+			fmt.Println("Filter Transactions received healthcheck ping from", IP)
+			watchdog.Pong(IP)
+		}
 	}
-
-	return outBoundMessage
 }

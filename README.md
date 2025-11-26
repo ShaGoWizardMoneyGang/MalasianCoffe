@@ -1,5 +1,11 @@
 # MalasianCoffe
 
+## Docker custom image
+Buildear imagen de docker utilizada para docker-in-docker (esto ya lo hace la rutina de build).
+```bash
+docker build -t dind-dockerfile .
+```
+
 ## Links
 - [Documentacion RabbitMQ](https://pkg.go.dev/github.com/rabbitmq/amqp091-go)
 - [Graceful shuthdown RabbitMQ](fastfoto.net/posts/rabbitmq-work-queue-graceful-shutdown-with-timeout/)

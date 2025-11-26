@@ -70,6 +70,7 @@ func (h *Header) append(id int) Header {
 	return new_header
 }
 
+
 type Packet struct {
 	header Header
 
@@ -204,6 +205,11 @@ func (p *Packet) GetSequenceNumber() int {
 	}
 
 	return int(sequence_n)
+}
+
+func (p *Packet) GetSequenceNumberString() string {
+	string_repr := strconv.FormatInt(int64(p.GetSequenceNumber()), 10)
+	return string_repr
 }
 
 // Dado un paquete, y la cantidad de colas destino, te devuelve un string con su routing key
