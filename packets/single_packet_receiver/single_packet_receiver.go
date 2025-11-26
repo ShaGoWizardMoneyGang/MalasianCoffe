@@ -78,6 +78,9 @@ type SinglePacketReceiver struct {
 	// ACK con la funcion de clean.
 	// OJO AL PIOJO: Arranca como basura hasta que se obtiene el ultimo paquete.
 	last_packet colas.PacketMessage
+
+	// Session UUID
+	identifier string
 }
 
 type pathResolver struct {
@@ -308,6 +311,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 		windowFull:                false,
 		checkpointer:              checkpointer,
+		identifier:                identifier,
 	}
 
 	// Chequeo si me quedo pendiente un flush
@@ -329,6 +333,10 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
 	pr.checkpointer.checkpoint(LlegoElPaquete)
+
+	if pkt.GetSessionID() != pr.identifier {
+		panic("Recibi un paquete que no era de mi session.")
+	}
 
 	// Tengo que chequear si ya recibi todo antes de empezar, puede ser que me
 	// haya muerto justo antes de procesar el ultimo paquete.
