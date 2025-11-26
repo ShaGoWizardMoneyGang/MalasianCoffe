@@ -1,4 +1,4 @@
-package single_packet_receiver
+package persistent_packet_receiver
 
 import (
 	"bytes"
@@ -51,7 +51,7 @@ const (
 // - En el directorio "packets/" se guardan todos los paquetes recibidos que son
 //   parte de la ventana actual, es decir, que todavia no fueron procesados.
 // - El archivo "window_log" guarda el log de los paquetes procesados.
-type SinglePacketReceiver struct {
+type PersistentPacketReceiver struct {
 
 	// Packets que estan en la ventana actual. En cualquier momento, esto tiene
 	// que ser HASTA PACKET_WINDOW.
@@ -226,7 +226,7 @@ func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
 	disk.CreateFile(full_path)
 }
 
-func NewSinglePacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) SinglePacketReceiver {
+func NewPersistentPacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) PersistentPacketReceiver {
 	pathResolver := newPathResolver(identifier)
 	packet_receiver_dir := pathResolver.resolve_path(Root)
 	if !disk.Exists(packet_receiver_dir) {
@@ -302,7 +302,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	checkpointer := newCheckpointer(checkpointer_root)
 
 
-	single_packet_receiver := SinglePacketReceiver{
+	single_packet_receiver := PersistentPacketReceiver{
 		packets_in_window:         packets_in_window,
 		transformer:               transformer,
 		EOF:                       received_eof,
@@ -328,7 +328,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 
 // Devuelve un booleano que representa si se recivieron todos los paquetes
 // dentro de la ventana. Si este es el caso, se tienen que procesar.
-func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
+func (pr *PersistentPacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	pr.checkpointer.reset_window()
 	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
@@ -425,7 +425,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 
 // Funcion que destruye todos los archivos creados por el SinglePacketReceiver
-func (pr *SinglePacketReceiver) Clean() {
+func (pr *PersistentPacketReceiver) Clean() {
 	path := pr.path_resolver.resolve_path(Root)
 	disk.DeleteDirRecursively(path)
 
@@ -784,7 +784,7 @@ func (l *logger) clear() {
 }
 
 // Devuelve el packet acumulado.
-func (pr *SinglePacketReceiver) GetPayload() string {
+func (pr *PersistentPacketReceiver) GetPayload() string {
 	if pr.windowFull != true {
 		// NOTE: No borrar este panic. Es importante que si en algun momento
 		// se rompe la invariante, que el programa explote para poder debugear
@@ -803,7 +803,7 @@ func (pr *SinglePacketReceiver) GetPayload() string {
 
 // windowContent contiente el contenido de la ventana. Esto normalmente se obtiene
 // con un strings.Builder y el metodo WriteString
-func (pr *SinglePacketReceiver) flushWindow() {
+func (pr *PersistentPacketReceiver) flushWindow() {
 	var buffer strings.Builder
 	defer buffer.Reset()
 	var pkt_sqn_number []int
@@ -864,7 +864,7 @@ func (pr *SinglePacketReceiver) flushWindow() {
 	pr.logger.clear()
 }
 
-func (pr *SinglePacketReceiver) checkIfInWindow(pkt packet.Packet) bool {
+func (pr *PersistentPacketReceiver) checkIfInWindow(pkt packet.Packet) bool {
 	is_in := false
 
 	for i := 0; i < len(pr.packets_in_window) && is_in == false ; i++ {
@@ -877,7 +877,7 @@ func (pr *SinglePacketReceiver) checkIfInWindow(pkt packet.Packet) bool {
 	return is_in
 }
 
-func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
+func (pr *PersistentPacketReceiver) checkIfReceivedAll() bool {
 	processed_sequence_number := pr.logger.get_processed_number()
 
 	received_packets := make([]int, len(processed_sequence_number) + len(pr.packets_in_window))
@@ -929,7 +929,7 @@ func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
 	return allReceived
 }
 
-func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []int) {
+func (pr *PersistentPacketReceiver) writePartialWork(input string, ventana []int) {
 	received_window_empty := len(ventana) == 0
 	// Si la venta que obtuve es vacia, eso quiere decir que se perdio EL ULTIMO
 	// paquete, en estos casos no quiero realizar trabajo. POTENCIALMENTE, no
@@ -996,7 +996,7 @@ func newPartialWork(ventana []int, accumulated_work string) partialWork {
 }
 
 // Construye el formato de partial work
-func (pr *SinglePacketReceiver) serialize_partial_work(partial_work partialWork) string {
+func (pr *PersistentPacketReceiver) serialize_partial_work(partial_work partialWork) string {
 	var partial_work_buffer strings.Builder
 	partial_work_buffer.WriteString("VENTANA")
 
@@ -1022,7 +1022,7 @@ func (pr *SinglePacketReceiver) serialize_partial_work(partial_work partialWork)
 }
 
 // Parsea el archivo de partial work
-func (pr *SinglePacketReceiver) read_partial_work() partialWork {
+func (pr *PersistentPacketReceiver) read_partial_work() partialWork {
 	partial_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
 	if err != nil {
 		panic(err)
