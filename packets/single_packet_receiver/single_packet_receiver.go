@@ -625,9 +625,8 @@ type pathResolver struct {
 }
 
 // root es el directorio que todos los packet_receiver usan en comun.
-// identifier es el identificador de ESTA INSTANCIA de packet receiver
-func newPathResolver(identifier string) pathResolver {
-	root := "packet_receiver" + "/" + identifier
+func newPathResolver(session_id string) pathResolver {
+	root := "packet_receiver" + "/" + session_id
 	return pathResolver {
 		root: root,
 	}

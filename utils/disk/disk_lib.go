@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 )
 
+// Esto es una cagada monumental. Tener hardcodead el directorio temporal es una
+// m$#!@a, pero Docker fue hecha por el diablo y ubuntu:latest es su sabueso.
+// Es lo que toca.
 const (
 	TMP_DIR = "/app/packet_receiver/tmp/"
 )

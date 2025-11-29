@@ -30,7 +30,7 @@ func TestPacketReceiverInOrder(t *testing.T) {
 		},
 	}
 
-	packet_receiver := NewSinglePacketReceiver("Packet receiver testing")
+	packet_receiver := NewMultiplePacketReceiver("Packet receiver testing")
 	for _, packet := range shuffled_packets {
 		packet_receiver.ReceivePacket(packet)
 	}
@@ -68,7 +68,7 @@ func TestPacketReceiverNotInOrder(t *testing.T) {
 		},
 	}
 
-	packet_receiver := NewSinglePacketReceiver("Packet receiver not in order test")
+	packet_receiver := NewMultiplePacketReceiver("Packet receiver not in order test")
 	for _, packet := range shuffled_packets {
 		packet_receiver.ReceivePacket(packet)
 	}
