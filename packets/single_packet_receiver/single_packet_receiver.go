@@ -134,34 +134,34 @@ func (pr *pathResolver) resolve_path(file knownFile) string {
 
 type checkpointMoment int
 const (
-	Cleaned checkpointMoment = iota
-	LlegoElPaquete
-	PreACK
-	HiceACK
-	PreFlushear
-	LogAhead
-	LaburoParcial
-	LogBehind
+	cleaned checkpointMoment = iota
+	llegoElPaquete
+	preACK
+	hiceACK
+	preFlushear
+	logAhead
+	laburoParcial
+	logBehind
 )
 
 func (c *checkpointMoment) toString() string {
 	var repr string
 	switch *c {
-	case Cleaned:
+	case cleaned:
 		repr = "CLEANED"
-	case LlegoElPaquete:
+	case llegoElPaquete:
 		repr = "LLEGOPAQUETE"
-	case PreACK:
+	case preACK:
 		repr = "PRE-ACK"
-	case HiceACK:
+	case hiceACK:
 		repr = "ACK"
-	case PreFlushear:
+	case preFlushear:
 		repr = "PRE-FLUSH"
-	case LogAhead:
+	case logAhead:
 		repr = "LOGAHEAD"
-	case LaburoParcial:
+	case laburoParcial:
 		repr = "LABUROPARCIAL"
-	case LogBehind:
+	case logBehind:
 		repr = "LOGBEHIND"
 	}
 	return repr
@@ -215,7 +215,7 @@ func (c *checkpointer) reset_window() {
 	}
 	c.uses = 0
 
-	c.checkpoint(Cleaned)
+	c.checkpoint(cleaned)
 }
 
 func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
@@ -332,7 +332,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	pr.checkpointer.reset_window()
 	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
 	pkt := pktMsg.Packet
-	pr.checkpointer.checkpoint(LlegoElPaquete)
+	pr.checkpointer.checkpoint(llegoElPaquete)
 
 	if pkt.GetSessionID() != pr.identifier {
 		panic("Recibi un paquete que no era de mi session.")
@@ -400,7 +400,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 	pr.windowFull = allReceived
 
-	pr.checkpointer.checkpoint(PreACK)
+	pr.checkpointer.checkpoint(preACK)
 	// Hacemos ACK recien al final. Antes lo haciamos apenas guardabamos el paquete en disco.
 	// Pero, haciendolo al final nos aseguramos que el flujo sea mas
 	// consistente. Esto es especialmente util en el caso borde del ultimo
@@ -417,7 +417,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	} else {
 		pktMsg.Message.Ack(false)
 	}
-	pr.checkpointer.checkpoint(HiceACK)
+	pr.checkpointer.checkpoint(hiceACK)
 
 
 	return allReceived
@@ -812,7 +812,7 @@ func (pr *SinglePacketReceiver) flushWindow() {
 		pkt_sqn_number = append(pkt_sqn_number, wind_pkt.GetSequenceNumber())
 	}
 
-	pr.checkpointer.checkpoint(PreFlushear)
+	pr.checkpointer.checkpoint(preFlushear)
 
 
 
@@ -831,11 +831,11 @@ func (pr *SinglePacketReceiver) flushWindow() {
 		pr.logger.write_ahead(sq_n)
 	}
 
-	pr.checkpointer.checkpoint(LogAhead)
+	pr.checkpointer.checkpoint(logAhead)
 
 	pr.writePartialWork(buffer.String(), pkt_sqn_number)
 
-	pr.checkpointer.checkpoint(LaburoParcial)
+	pr.checkpointer.checkpoint(laburoParcial)
 
 	// LOG De todos los archivos que borre: Stage 2.
 	// En la packet window: A, B, C
@@ -855,7 +855,7 @@ func (pr *SinglePacketReceiver) flushWindow() {
 		// Aca tambien se borra el recurso asociado
 		pr.logger.delete_behind(sq_n)
 	}
-	pr.checkpointer.checkpoint(LogBehind)
+	pr.checkpointer.checkpoint(logBehind)
 
 	// Ahora que la ventana esta procesada, y el cambio esta en disco,
 	// actualizamos la memoria.
