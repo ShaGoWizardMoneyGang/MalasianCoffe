@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	PACKET_WINDOW int = 50
+	pACKET_WINDOW int = 50
 )
 
 // Este Packet Receiver esta pensado para workers que solo reciben un tipo de paquete,
@@ -318,7 +318,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	allReceived := single_packet_receiver.checkIfReceivedAll()
 
 	amount_packets_in_window := len(single_packet_receiver.packets_in_window)
-	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
+	do_flush_window := amount_packets_in_window >= pACKET_WINDOW
 	if do_flush_window || allReceived {
 		single_packet_receiver.flushWindow()
 	}
@@ -393,7 +393,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	//    ventana. Lo que puede pasar es que la ventana este llena a medias,
 	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
 	amount_packets_in_window := len(pr.packets_in_window)
-	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
+	do_flush_window := amount_packets_in_window >= pACKET_WINDOW
 	if do_flush_window || allReceived {
 		pr.flushWindow()
 	}
