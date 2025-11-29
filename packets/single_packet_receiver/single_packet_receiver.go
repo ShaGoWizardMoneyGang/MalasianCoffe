@@ -96,37 +96,37 @@ func newPathResolver(identifier string) pathResolver {
 	}
 }
 
-type KnownFile int
+type knownFile int
 const (
-	Root KnownFile = iota
-	Metadata
-	ReceivedEof
-	ReceivedSqns
-	PartialWork
-	Packets
-	LogFile
-	Checkpoint
+	root knownFile = iota
+	metadata
+	receivedEof
+	receivedSqns
+	partialWorkIndicator
+	packets
+	logFile
+	checkpoint
 )
 
-func (pr *pathResolver) resolve_path(file KnownFile) string {
+func (pr *pathResolver) resolve_path(file knownFile) string {
 	var path string
 	switch file {
-	case Root:
+	case root:
 		path = pr.root
-	case Metadata:
+	case metadata:
 		path = pr.root + "/" + "metadata"
-	case ReceivedEof:
-		path = pr.resolve_path(Metadata) + "/" + "received_eof"
-	case ReceivedSqns:
-		path = pr.resolve_path(Metadata) + "/" + "received_sqns"
-	case PartialWork:
+	case receivedEof:
+		path = pr.resolve_path(metadata) + "/" + "received_eof"
+	case receivedSqns:
+		path = pr.resolve_path(metadata) + "/" + "received_sqns"
+	case partialWorkIndicator:
 		path = pr.root + "/" + "partial_work"
-	case Packets:
+	case packets:
 		// Le pongo un 0 para que sea lo primero que aparece
 		path = pr.root + "/" + "0packets" + "/"
-	case LogFile:
+	case logFile:
 		path = pr.root + "/" + "window_log"
-	case Checkpoint:
+	case checkpoint:
 		path = pr.root + "/" + "checkpoint"
 	}
 	return path
@@ -228,25 +228,25 @@ func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
 
 func NewSinglePacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) SinglePacketReceiver {
 	pathResolver := newPathResolver(identifier)
-	packet_receiver_dir := pathResolver.resolve_path(Root)
+	packet_receiver_dir := pathResolver.resolve_path(root)
 	if !disk.Exists(packet_receiver_dir) {
 		disk.CreateDir(packet_receiver_dir)
 	}
 
-	metada_dir := pathResolver.resolve_path(Metadata)
+	metada_dir := pathResolver.resolve_path(metadata)
 	if !disk.Exists(metada_dir) {
 		disk.CreateDir(metada_dir)
 	}
-	received_eof_file := pathResolver.resolve_path(ReceivedEof)
+	received_eof_file := pathResolver.resolve_path(receivedEof)
 	if !disk.Exists(received_eof_file) {
 		disk.CreateFile(received_eof_file)
 	}
 
-	partial_work_file := pathResolver.resolve_path(PartialWork)
+	partial_work_file := pathResolver.resolve_path(partialWorkIndicator)
 	if !disk.Exists(partial_work_file) {
 		disk.CreateFile(partial_work_file)
 	}
-	packets_dir := pathResolver.resolve_path(Packets)
+	packets_dir := pathResolver.resolve_path(packets)
 	if !disk.Exists(packets_dir) {
 		disk.CreateDir(packets_dir)
 	}
@@ -273,9 +273,9 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	// Tenemos que llamar al logger antes de calcular la ventana, porque este lo
 	// va a modificar.
 	logger := newLogger("BORRAR", "BORRADO",
-		pathResolver.resolve_path(ReceivedSqns),
-		pathResolver.resolve_path(LogFile),
-		pathResolver.resolve_path(Packets),
+		pathResolver.resolve_path(receivedSqns),
+		pathResolver.resolve_path(logFile),
+		pathResolver.resolve_path(packets),
 	)
 
 
@@ -298,7 +298,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	}
 
 
-	checkpointer_root := pathResolver.resolve_path(Checkpoint)
+	checkpointer_root := pathResolver.resolve_path(checkpoint)
 	checkpointer := newCheckpointer(checkpointer_root)
 
 
@@ -351,12 +351,12 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// Esto quiere decir que ni esta en la ventana ni esta ya procesado.
 	if !alreadyInWindow && !allreadyProcessed && !allReceived {
 		// NOTE: Por convencion, el nombre del archivo es su numero de secuencia
-		pkt_file := pr.path_resolver.resolve_path(Packets) + pkt.GetSequenceNumberString()
+		pkt_file := pr.path_resolver.resolve_path(packets) + pkt.GetSequenceNumberString()
 		disk.AtomicWrite(pkt.Serialize(), pkt_file)
 		if pkt.IsEOF() {
 			pr.EOF = pkt.GetSequenceNumber()
 			eof_sequence_number := pkt.GetSequenceNumberString()
-			received_eof_file := pr.path_resolver.resolve_path(ReceivedEof)
+			received_eof_file := pr.path_resolver.resolve_path(receivedEof)
 			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
 		}
 	}
@@ -426,7 +426,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 // Funcion que destruye todos los archivos creados por el SinglePacketReceiver
 func (pr *SinglePacketReceiver) Clean() {
-	path := pr.path_resolver.resolve_path(Root)
+	path := pr.path_resolver.resolve_path(root)
 	disk.DeleteDirRecursively(path)
 
 	// Ahora que ya borramos todo los archivos, podemos ACKear el ultimo mensaje.
@@ -979,7 +979,7 @@ func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []int) {
 
 		partial_work_s := pr.serialize_partial_work(new_partial_work)
 
-		disk.AtomicWriteString(partial_work_s, pr.path_resolver.resolve_path(PartialWork))
+		disk.AtomicWriteString(partial_work_s, pr.path_resolver.resolve_path(partialWorkIndicator))
 	}
 }
 
@@ -1023,7 +1023,7 @@ func (pr *SinglePacketReceiver) serialize_partial_work(partial_work partialWork)
 
 // Parsea el archivo de partial work
 func (pr *SinglePacketReceiver) read_partial_work() partialWork {
-	partial_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
+	partial_work, err := disk.Read(pr.path_resolver.resolve_path(partialWorkIndicator))
 	if err != nil {
 		panic(err)
 	}
