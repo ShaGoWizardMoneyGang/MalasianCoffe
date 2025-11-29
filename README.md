@@ -1,10 +1,13 @@
 # MalasianCoffe
 
-## Docker custom image
-Buildear imagen de docker utilizada para docker-in-docker (esto ya lo hace la rutina de build).
-```bash
-docker build -t dind-dockerfile .
+## Docker custom images
+El repositorio usa un par de imagenes de docker custom. Todas estan en el directorio: `docker_images/`.
+
+Para construirlas, se puede llamar a la directiva:
 ```
+make docker-build-all
+```
+Va a crear una imagen por cada sub-directorio en `docker_images/` llamada igual que el nombre del subdirectorio.
 
 ## Links
 - [Documentacion RabbitMQ](https://pkg.go.dev/github.com/rabbitmq/amqp091-go)
