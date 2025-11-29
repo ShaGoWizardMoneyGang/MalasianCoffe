@@ -92,7 +92,7 @@ type MultiplePacketReceiver struct {
 	// transformacion y se enviaron al siguiente worker.
 	// Usado al final para ver si se tiene que enviar el trabajo procesado de
 	// nuevo.
-	done bool
+	allReceived bool
 }
 
 
@@ -126,9 +126,11 @@ func (pr *MultiplePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool
 	// Antes de empezar, me fijo si ya termine. SI ya termine pero llegue
 	// hasta aca, signfica que alguno de los packet receivers no llego a
 	// enviar ACK porque murio la computadora antes.
-	if pr.done {
+	if pr.allReceived {
 		return true
 	}
+
+	pkt := pktMsg.Packet
 
 	sent := false
 	for _, receiver := range pr.receivers {
@@ -139,7 +141,7 @@ func (pr *MultiplePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool
 		// Si me muero antes de enviarlo, no pasa nada porque al revivir, lo
 		// voy a volver a enviar.
 		// Le enviamos el paquete al recibir que lo necesite.
-		receiver.receivePacket(pktMsg)
+		receiver.receivePacket(pkt)
 
 		sent = true
 
@@ -175,25 +177,42 @@ func (pr *MultiplePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool
 		pktMsg.Message.Ack(false)
 	}
 
+	pr.allReceived = allReceived
+
 	return allReceived
 }
 
 
 // Funcion que destruye todos los archivos creados por el SinglePacketReceiver
 func (pr *MultiplePacketReceiver) Clean() {
-	panic("")
-}
+	// Antes de borrar, tenemos que ACKEAR. Sino, podria pasar de borrar todo,
+	// morir, y cuando nos re-envian el ultimo paquete, no sabemos que ya
+	// terminamos.
+	pr.last_packet.Message.Ack(false)
 
+	for _, receiver := range pr.receivers {
+		receiver.clean()
+	}
+}
 
 // Devuelve el resultado de aplicar la funcion
 func (pr *MultiplePacketReceiver) GetPayload() string {
-	if pr.done != true {
+	if pr.allReceived != true {
 		// NOTE: No borrar este panic. Es importante que si en algun momento
 		// se rompe la invariante, que el programa explote para poder debugear
 		// mejor.
 		// Un error no lo solucionaria porque esos son ignorables.
 		panic("Invariante del Single Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
 	}
+
+	dataset_map := make(map[NombreDataset] ContenidoCompleto, len(pr.receivers))
+	for _, receiver := range pr.receivers {
+		dataset_name    := receiver.getDatasetName()
+		dataset_content := receiver.getReceivedPackets()
+		dataset_map[dataset_name] = ContenidoCompleto(dataset_content)
+	}
+
+	finished_work := pr.transformer(dataset_map)
 
 	return finished_work
 }
@@ -421,4 +440,14 @@ func (dr *datasetReceiver) checkIfAlreadyProcessed(resourceId int) bool {
 	}
 
 	return alreadyProcessed
+}
+
+func (dr *datasetReceiver) getDatasetName() NombreDataset {
+	return dr.datasetName
+}
+
+func (dr *datasetReceiver) clean() {
+	path := dr.path_resolver.resolve_path(root)
+
+	disk.DeleteDirRecursively(path)
 }

@@ -294,11 +294,13 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 
 // Funcion que destruye todos los archivos creados por el SinglePacketReceiver
 func (pr *SinglePacketReceiver) Clean() {
+	// Antes de borrar, tenemos que ACKEAR. Sino, podria pasar de borrar todo,
+	// morir, y cuando nos re-envian el ultimo paquete, no sabemos que ya
+	// terminamos.
+	pr.last_packet.Message.Ack(false)
+
 	path := pr.path_resolver.resolve_path(root)
 	disk.DeleteDirRecursively(path)
-
-	// Ahora que ya borramos todo los archivos, podemos ACKear el ultimo mensaje.
-	pr.last_packet.Message.Ack(false)
 }
 
 
