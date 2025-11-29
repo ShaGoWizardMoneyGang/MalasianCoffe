@@ -83,6 +83,11 @@ type MultiplePacketReceiver struct {
 	// }
 	transformer func(inputs map[NombreDataset] ContenidoCompleto) string
 
+	// Ultimo paquete de la session. Este lo guardamos porque damos el ultimo
+	// ACK con la funcion de clean.
+	// OJO AL PIOJO: Arranca como basura hasta que se obtiene el ultimo paquete.
+	last_packet colas.PacketMessage
+
 	// Indica que se recibieron todos los datasets, se les aplico la funcion de
 	// transformacion y se enviaron al siguiente worker.
 	// Usado al final para ver si se tiene que enviar el trabajo procesado de
@@ -104,7 +109,6 @@ func NewMultiplePacketReceiver(
 		receivers = append(receivers, new_receiver)
 	}
 	// Crea un directorio con el nombre de la session
-	panic("")
 	single_packet_receiver := MultiplePacketReceiver{
 		identifier:                identifier,
 		receivers:                 receivers,
@@ -119,6 +123,59 @@ func NewMultiplePacketReceiver(
 // Devuelve un booleano que representa si se recivieron todos los paquetes
 // dentro de la ventana. Si este es el caso, se tienen que procesar.
 func (pr *MultiplePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
+	// Antes de empezar, me fijo si ya termine. SI ya termine pero llegue
+	// hasta aca, signfica que alguno de los packet receivers no llego a
+	// enviar ACK porque murio la computadora antes.
+	if pr.done {
+		return true
+	}
+
+	sent := false
+	for _, receiver := range pr.receivers {
+		if !receiver.canReceivePacket(&pktMsg.Packet) {
+			continue
+		}
+
+		// Si me muero antes de enviarlo, no pasa nada porque al revivir, lo
+		// voy a volver a enviar.
+		// Le enviamos el paquete al recibir que lo necesite.
+		receiver.receivePacket(pktMsg)
+
+		sent = true
+
+		// Si me muero despues de recibirlo, no pasa nada porque el receiver
+		// ya guardo el paquete en disco e hizo ACK del paquete.
+	}
+
+	// Sanity check
+	if sent == false {
+		dataset_name := "Couldn't get name"
+		packet_id, err := strconv.ParseUint(pktMsg.Packet.GetDirID(), 10, 64)
+		if err == nil {
+			dataset_name_local, err := dataset.IDtoDataset(packet_id)
+			if err == nil {
+				dataset_name = dataset_name_local
+			}
+		}
+		panic(fmt.Sprintf("Failed to send pkt %s to any receiver. It contained dataset %s.", pktMsg.Packet.GetUUID(), dataset_name))
+	}
+
+	allReceived := true
+	for i := 0; i < len(pr.receivers) && allReceived == true; i++ {
+		curr_receiver := pr.receivers[i]
+		is_done := curr_receiver.checkIfReceivedAll()
+
+		// Si cualquiera es falso, este for loop corta
+		allReceived = allReceived && is_done
+	}
+
+	if allReceived {
+		pr.last_packet = pktMsg
+	} else {
+		pktMsg.Message.Ack(false)
+	}
+
+	return allReceived
 }
 
 
@@ -128,20 +185,15 @@ func (pr *MultiplePacketReceiver) Clean() {
 }
 
 
-// Devuelve el packet acumulado.
+// Devuelve el resultado de aplicar la funcion
 func (pr *MultiplePacketReceiver) GetPayload() string {
-	if pr.windowFull != true {
+	if pr.done != true {
 		// NOTE: No borrar este panic. Es importante que si en algun momento
 		// se rompe la invariante, que el programa explote para poder debugear
 		// mejor.
 		// Un error no lo solucionaria porque esos son ignorables.
 		panic("Invariante del Single Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
 	}
-
-	// TODO: Optimizacion: Si ya esta cargado en memoria, no lo vuelvo a leer
-	// del disco.
-	partial_work := pr.read_partial_work()
-	finished_work := partial_work.accumulated_work
 
 	return finished_work
 }
@@ -180,8 +232,6 @@ type datasetReceiver struct {
 	receivedAll bool
 
 	path_resolver pathResolver
-
-	last_packet colas.PacketMessage
 }
 
 func newDatasetReceiver(identifier string, datasetName NombreDataset) datasetReceiver {
@@ -214,8 +264,11 @@ func (dr *datasetReceiver) canReceivePacket(pkt *packet.Packet) bool {
 	return can_receive
 }
 
-func (dr *datasetReceiver) receivePacket(pktMsg colas.PacketMessage) {
-	pkt := pktMsg.Packet
+// Recibe un paquete y lo guarda en disco si no lo tenia antes.
+func (dr *datasetReceiver) receivePacket(pkt packet.Packet) {
+	if !dr.canReceivePacket(&pkt) {
+		panic("Dataset receiver recibio paquete que no le correspondia.")
+	}
 
 
 	// fmt.Printf("Recibi %s\n", pkt.GetSequenceNumberString())
@@ -238,15 +291,6 @@ func (dr *datasetReceiver) receivePacket(pktMsg colas.PacketMessage) {
 		// Ahora, como lo guardamos en disco, anadimo el ID a la lista de paquetes
 		// recibidos.
 		dr.received_sequence_numbers = append(dr.received_sequence_numbers, pkt.GetSequenceNumber())
-	}
-
-	allReceived := dr.checkIfReceivedAll()
-
-	// NOTE: Leer single packet receiver para ver por que hacemos ACK al final.
-	if allReceived {
-		dr.last_packet = pktMsg
-	} else {
-		pktMsg.Message.Ack(false)
 	}
 }
 
@@ -289,19 +333,26 @@ func (dr *datasetReceiver) checkIfReceivedAll() bool {
 	return dr.receivedAll
 }
 
-// Retorna todos los recursos
+// Retorna todos los paquetes recibidos SI estan todos.
 func (dr *datasetReceiver) getReceivedPackets() string {
 	if !dr.receivedAll {
 		panic("Invariante rota. Solo es valido obtener los paquetes recibidos si recibi todo.")
 	}
+
+	full_payload := dr.readStoredPackets()
+
+	return full_payload
 }
 
 // Lee todos los paquetes guardados en disco y devuelve su contenido
 func (dr *datasetReceiver) readStoredPackets() string {
 	var buffer strings.Builder
 
-	received_packets := []packet.Packet{}
+	packets_dir := dr.path_resolver.resolve_path(packets)
 	entries, err := os.ReadDir(packets_dir)
+	if err != nil {
+		panic(err)
+	}
 	for _, file := range entries {
 		packet_file, err := os.Open(packets_dir + "/" + file.Name())
 		if err != nil {
@@ -315,8 +366,11 @@ func (dr *datasetReceiver) readStoredPackets() string {
 		packetReader := bytes.NewReader(packet_serialized)
 		packet, err := packet.DeserializePackage(packetReader)
 
-		received_packets = append(received_packets, packet)
+		payload := packet.GetPayload()
+		buffer.WriteString(payload)
 	}
+
+	return buffer.String()
 }
 
 // ============================= PATH RESOLVER ================================
