@@ -14,9 +14,19 @@ import (
 	"strings"
 )
 
-const (
-	pACKET_WINDOW int = 50
-)
+// =============================================================================
+// ===                                                                       ===
+// ===                                                                       ===
+// ===   ___  ______ _____    ______ _   _______ _     _____ _____   ___     ===
+// ===  / _ \ | ___ \_   _|   | ___ \ | | | ___ \ |   |_   _/  __ \ / _ \    ===
+// === / /_\ \| |_/ / | |     | |_/ / | | | |_/ / |     | | | /  \// /_\ \   ===
+// === |  _  ||  __/  | |     |  __/| | | | ___ \ |     | | | |    |  _  |   ===
+// === | | | || |    _| |_    | |   | |_| | |_/ / |_____| |_| \__/\| | | |   ===
+// === \_| |_/\_|    \___/    \_|    \___/\____/\_____/\___/ \____/\_| |_/   ===
+// ===                                                                       ===
+// ===                                                                       ===
+// ===                                                                       ===
+// =============================================================================
 
 // Este Packet Receiver esta pensado para workers que solo reciben un tipo de paquete,
 // como los global aggregators y el concater.
@@ -83,148 +93,6 @@ type SinglePacketReceiver struct {
 	identifier string
 }
 
-type pathResolver struct {
-	root string
-}
-
-// root es el directorio que todos los packet_receiver usan en comun.
-// identifier es el identificador de ESTA INSTANCIA de packet receiver
-func newPathResolver(identifier string) pathResolver {
-	root := "packet_receiver" + "/" + identifier
-	return pathResolver {
-		root: root,
-	}
-}
-
-type knownFile int
-const (
-	root knownFile = iota
-	metadata
-	receivedEof
-	receivedSqns
-	partialWorkIndicator
-	packets
-	logFile
-	checkpoint
-)
-
-func (pr *pathResolver) resolve_path(file knownFile) string {
-	var path string
-	switch file {
-	case root:
-		path = pr.root
-	case metadata:
-		path = pr.root + "/" + "metadata"
-	case receivedEof:
-		path = pr.resolve_path(metadata) + "/" + "received_eof"
-	case receivedSqns:
-		path = pr.resolve_path(metadata) + "/" + "received_sqns"
-	case partialWorkIndicator:
-		path = pr.root + "/" + "partial_work"
-	case packets:
-		// Le pongo un 0 para que sea lo primero que aparece
-		path = pr.root + "/" + "0packets" + "/"
-	case logFile:
-		path = pr.root + "/" + "window_log"
-	case checkpoint:
-		path = pr.root + "/" + "checkpoint"
-	}
-	return path
-}
-
-type checkpointMoment int
-const (
-	cleaned checkpointMoment = iota
-	llegoElPaquete
-	preACK
-	hiceACK
-	preFlushear
-	logAhead
-	laburoParcial
-	logBehind
-)
-
-func (c *checkpointMoment) toString() string {
-	var repr string
-	switch *c {
-	case cleaned:
-		repr = "CLEANED"
-	case llegoElPaquete:
-		repr = "LLEGOPAQUETE"
-	case preACK:
-		repr = "PRE-ACK"
-	case hiceACK:
-		repr = "ACK"
-	case preFlushear:
-		repr = "PRE-FLUSH"
-	case logAhead:
-		repr = "LOGAHEAD"
-	case laburoParcial:
-		repr = "LABUROPARCIAL"
-	case logBehind:
-		repr = "LOGBEHIND"
-	}
-	return repr
-}
-
-// Estructura para debugear mejor el Momento en el tiempo en el que se murio la
-// instancia.
-type checkpointer struct {
-	// Root de la CORRIENTE CORRIDA para marcar los checkpoints.
-	checkpoint_root_current string
-
-	// Llamda. Usado para indicar el orden de las operaciones
-	uses int
-}
-
-func newCheckpointer(checkpoint_root string) checkpointer {
-
-	// Creo el directorio donde van a estar todos los directorios con los
-	// checkpoints.
-	if !disk.Exists(checkpoint_root) {
-		disk.CreateDir(checkpoint_root)
-	}
-
-	entries, err := os.ReadDir(checkpoint_root)
-	if err != nil {
-		panic(err)
-	}
-
-	var amount_runs int
-	for range entries {
-		amount_runs += 1
-	}
-	amount_runs_s := strconv.FormatInt(int64(amount_runs), 10)
-	checkpoint_root_current := checkpoint_root + "/" + amount_runs_s
-
-	disk.CreateDir(checkpoint_root_current)
-
-	return checkpointer{
-		checkpoint_root_current: checkpoint_root_current,
-		uses: 0,
-	}
-}
-
-func (c *checkpointer) reset_window() {
-	entries, err := os.ReadDir(c.checkpoint_root_current)
-	if err != nil {
-		panic(err)
-	}
-	for _, file := range entries {
-		disk.DeleteFile(file.Name())
-	}
-	c.uses = 0
-
-	c.checkpoint(cleaned)
-}
-
-func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
-	file_name := checkpoint.toString()
-	uses := strconv.FormatInt(int64(c.uses), 10)
-	full_path := c.checkpoint_root_current + "/" + string(uses) + file_name
-	c.uses += 1
-	disk.CreateFile(full_path)
-}
 
 func NewSinglePacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) SinglePacketReceiver {
 	pathResolver := newPathResolver(identifier)
@@ -433,355 +301,6 @@ func (pr *SinglePacketReceiver) Clean() {
 	pr.last_packet.Message.Ack(false)
 }
 
-// Estructura encargada de escribir logs para trackear operaciones que tienen un
-// par logico de "comienzo" y "fin".
-type logger struct {
-	// Path al log file.
-	log_file string
-
-	// Associated resource directory
-	resource_dir string
-
-	// Nombre de la operacion que marca el comienzo de la modicacion.
-	write_operation string
-
-	// Nombre de la operacion que marca el fin de la edicion.
-	delete_operation string
-
-	// Hashset de todos los numeros de sequencia recibidos y procesados hasta el
-	// momento.
-	processed_sequence_number []int
-
-	// Log de todos los recursos procesados.
-	processed_resource_log string
-
-// ==================== CONSTRUCTED DURING INSTANTIATION =======================
-	// Resources that are waiting to be "deleted_behind"
-	pending_resources map[string] struct{}
-
-	// Resources that are done and should not receive any modifications.
-	done_resources map[string] struct{}
-}
-
-
-type operationType int
-const (
-	Write operationType = iota
-	Delete
-)
-
-type log_entry struct {
-	operation operationType
-	resource string
-}
-
-// If it's not a write, it's a delete
-func (le *log_entry) is_write() bool {
-	return le.operation == Write
-}
-
-// Funcion que crea un logger.
-// - log_file_path: Path al log file
-// - write_operation: Nombre de la operacion que marca el comienzo de la edicion.
-// - delete_operation: Nombre de la operacion que marca el fin de la edicion.
-func newLogger(write_operation string, delete_operation string,
-	received_sqns_file string,
-	log_file_path      string,
-	resouce_dir        string,
-	) logger {
-
-	write_op  := strings.ToUpper(write_operation)
-	delete_op := strings.ToUpper(delete_operation)
-
-	if !disk.Exists(received_sqns_file) {
-		disk.CreateFile(received_sqns_file)
-	}
-	if !disk.Exists(log_file_path) {
-		disk.CreateFile(log_file_path)
-	}
-
-	received_sqns_s, err := disk.Read(received_sqns_file)
-	if err != nil {
-		panic(err)
-	}
-	sqns := strings.Split(received_sqns_s, "\n")
-	processed_sequence_numbers := []int{}
-	for _, sqn := range sqns {
-		if sqn == "" {
-			continue
-		}
-		sqn_i, err := strconv.Atoi(sqn)
-		if err != nil {
-			panic(err)
-		}
-
-		already_added := slices.Contains(processed_sequence_numbers, sqn_i)
-		if already_added {
-			bitacora.Info(fmt.Sprintf("Duplicate packet in file. UUID: %s", sqn))
-		}
-		processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
-	}
-
-
-	logger := logger {
-		log_file: log_file_path,
-		resource_dir: resouce_dir,
-		write_operation: write_op,
-		delete_operation: delete_op,
-		processed_sequence_number: processed_sequence_numbers,
-		processed_resource_log: received_sqns_file,
-		pending_resources: make(map[string]struct{}),
-		done_resources: make(map[string]struct{}),
-	}
-
-	log_file, err := disk.Read(log_file_path)
-	if err != nil {
-		panic(err)
-	}
-
-	// Leo todos los logs que quedaron escritos para ya saber cual es el estado
-	// actual.
-	logs := strings.Split(log_file, "\n")
-	for _, log := range logs {
-		if log == "" {
-			continue
-		}
-		log_entry := logger.parse_log_entry(log)
-		resource  := log_entry.resource
-
-		_, is_pending := logger.pending_resources[resource]
-		_, is_done := logger.done_resources[resource]
-		// If it's not a write, it's a delete.
-		is_write   := log_entry.is_write()
-
-		if is_write && !is_pending && !is_done {
-			// Caso "basico" alguien escribio WRITE REC en el log.
-			// Lo marco como pendiente de borrado.
-			logger.pending_resources[resource] = struct{}{}
-		} else if is_write && is_pending && !is_done {
-			// Es un doble WRITE, esto es un error y no deberia pasar.
-			panic(fmt.Sprintf("DOBLE WRITE DETECTED %s in file %s", resource, log_file_path))
-		} else if is_write && is_pending && is_done {
-			// Esto rompe una invariante. O esta en una tabla, o esta en la
-			// otra.
-			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", log_file_path))
-		} else if is_write && !is_pending && is_done {
-			// Esto es un recurso que fue logeado en el pasado, y ya termino.
-			// TECNICAMENTE valido, pero no deberia suceder.
-			bitacora.Info("Logger: Se detecto que un recurso que fue modificado y borrado en el pasado fue anadido de nuevo en el log.")
-		} else if !is_write && is_pending && !is_done {
-			// Caso tipico de que se escribio "borrado" en el log de un recurso.
-			delete(logger.pending_resources, resource)
-			logger.done_resources[resource] = struct{}{}
-
-			// Tengo que fijarme si se borro el archivo.
-			associated_file := logger.get_associate_file(resource)
-			if disk.Exists(associated_file) {
-				bitacora.Info(fmt.Sprintf("LOGGER: Encontre recurso que figuraba como borrado: %s. Lo borro.", associated_file))
-				disk.DeleteFile(associated_file)
-			}
-
-			resource_i, err := strconv.Atoi(resource)
-			if err != nil {
-				panic(err)
-			}
-
-			// Si el paquete figura como borrado, pero no esta en la lista,
-			// entonces signfica que el programa se cayo antes de appendear
-			// el numero de paquete al log de paquetes procesados
-			if !slices.Contains(processed_sequence_numbers, resource_i) {
-				disk.AtomicAppend(resource, logger.processed_resource_log)
-			}
-
-		} else if !is_write && is_pending && is_done {
-			// Esto rompe una invariante. O esta en una tabla, o esta en la
-			// otra.
-			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", log_file_path))
-		} else if !is_write && !is_pending && is_done {
-			// Es un doble WRITE, esto es un error y no deberia pasar.
-			panic(fmt.Sprintf("DOBLE DELETE DETECTED: %s", log_file_path))
-		} else if !is_write && !is_pending && !is_done {
-			// Es un doble WRITE, esto es un error y no deberia pasar.
-			panic(fmt.Sprintf("DELETE DE RECURSO NO WRITEADO DETECTADO: %s", log_file_path))
-		}
-	}
-	has_pending := len(logger.pending_resources) > 0
-	// Si al final de todo esto tengo cosas pendientes y borradas, signfica que
-	// el programa se murio mientras estaba borrando. En ese caso, tengo que
-	// borrar las cosas que me quedaron pendientes.
-	cut_in_the_middle_of_deleting := has_pending && len(logger.done_resources) > 0
-	if cut_in_the_middle_of_deleting {
-		for resource, _ := range logger.pending_resources {
-			logger.delete_behind(resource)
-		}
-
-		// Despues de borrar todo esto, no deberiamos tener nada pendiente
-		has_pending = len(logger.pending_resources) > 0
-		if has_pending != false {
-			panic("Despues de borrar los paquetes pendientes, sigue figurando como que me quedan.")
-		}
-
-	}
-
-	// Motivos por los cuales puede no tener nada pendiente:
-	//    1. No tenia nada pendiente al inicializar. Esto puede pasar si al
-	//    programa lo mataron despues de borrar todos los paquetes de la
-	//    ventana, pero antes de llamar a clear().
-	//    2. Porque lo mataron en el medio de los llamados a delete_behind y
-	//    acabamos de terminar el proceso con el startup.
-	if !has_pending {
-		logger.clear()
-	}
-
-
-	return logger
-}
-
-func (l *logger) get_processed_number() []int {
-	return l.processed_sequence_number
-}
-
-// Lee un entry de un log y te dice la log_entry que encontro. Principalmente
-// esto es util para saber si es un operationType::Write o un
-// operationType::Delete y el recurso modificado.
-//
-// NOTE: Todas los log entries son del tipo:
-// <WRITE|DELETE> <RESOURCE>
-//
-// NOTE on a NOTE: WRITE|DELETE no se leen literalmente asi, depende de lo que
-// se pase a write_operation y delete_operation en tiempo de creacion.
-func (l *logger) parse_log_entry(log_entry_raw string) log_entry {
-	log_entry_split := strings.Split(log_entry_raw, " ")
-	if len(log_entry_split) > 2 {
-		panic(fmt.Sprintf("Invalid log entry. Tried to split into 2, got split into: %d", len(log_entry_split)))
-	}
-
-	operation_s := log_entry_split[0]
-	var operation operationType
-	if operation_s == l.write_operation {
-		operation = Write
-	} else if operation_s == l.delete_operation {
-		operation = Delete
-	} else {
-		panic(fmt.Sprintf("Invalid log entry. Expected %s or %s, got: %s", l.write_operation, l.delete_operation, operation_s))
-	}
-
-	resource := log_entry_split[1]
-
-	return log_entry {
-		operation: operation,
-		resource: resource,
-	}
-}
-
-// Indica al logger de loggear que [resource] va a ser modificado.
-// WARNING: Por cada llamada a `write_ahead` tiene que haber una llamada a
-// `delete_behind`
-func (l *logger) write_ahead(resource string) {
-	_, exists := l.pending_resources[resource]
-	if exists {
-		bitacora.Info(fmt.Sprintf("DOBLE WRITE DETECTED of resource %s in file %s, skipping write.", resource, l.log_file))
-		return
-	}
-
-	write := l.write_operation
-
-	log_entry_s := write + " " + resource
-
-
-	err := disk.AtomicAppend(log_entry_s, l.log_file)
-	if err != nil {
-		panic(err)
-	}
-	l.pending_resources[resource] = struct{}{}
-}
-
-func (l *logger) get_associate_file(resource string) string {
-	associated_file        := l.resource_dir + resource
-	return associated_file
-}
-
-
-// Indica al logger de loggear que [resource] fue modificado
-// WARNING: Por cada llamada a `delete_behind` tiene que haber una llamada a
-// `write_ahead`
-func (l *logger) delete_behind(resource string) {
-	associated_file        := l.get_associate_file(resource)
-
-	_, marked_as_pending   := l.pending_resources[resource]
-	_, marked_as_done      := l.done_resources[resource]
-	associated_file_exists := disk.Exists(l.resource_dir + resource)
-
-
-	if        marked_as_pending  && marked_as_done {
-		// Esto no deberia suceder nunca. Ni siquiera es un error.
-		panic(fmt.Sprintf("Resource %s found in both pending and done tables", resource))
-	} else if marked_as_pending  && !marked_as_done {
-		// Este es el caso canonico.
-
-		// Si el archivo existe, significa que el programa se detuvo justo
-		// antes de borrarlo. No pasa nada, is all good, lo borramos ahora.
-		if associated_file_exists {
-			delete_op   := l.delete_operation
-
-			log_entry_s := delete_op + " " + resource
-
-			err := disk.AtomicAppend(log_entry_s, l.log_file)
-			if err != nil {
-				panic(err)
-			}
-
-			// Si me muero aca, no pasa nada. Lo anado al revivir.
-			err = disk.AtomicAppend(resource, l.processed_resource_log)
-			if err != nil {
-				panic(err)
-			}
-			resource_i, err := strconv.Atoi(resource)
-			if err != nil {
-				panic(err)
-			}
-			l.processed_sequence_number = append(l.processed_sequence_number, resource_i)
-
-
-			// Si me muero aca, antes de borrarlo, no pasa nada porque va a
-			// borrar el archivo al levantar el logger despues de morir.
-			disk.DeleteFile(associated_file)
-		}
-
-		delete(l.pending_resources, resource)
-		l.done_resources[resource] = struct{}{}
-	} else if !marked_as_pending && marked_as_done {
-		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente.: %s", resource))
-	} else if !marked_as_pending && !marked_as_done {
-		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente ni como listo (WTF?).: %s", resource))
-	}
-
-}
-
-func (l *logger) checkIfAlreadyProcessed(resourceId int) bool {
-	alreadyProcessed := false
-	for i := 0; i < len(l.processed_sequence_number) && alreadyProcessed == false ; i++ {
-		curr_id := l.processed_sequence_number[i]
-		alreadyProcessed = curr_id == resourceId
-	}
-
-	return alreadyProcessed
-}
-
-// Clears all the resources in its table, since it finished processing the window.
-func (l *logger) clear() {
-	l.pending_resources = make(map[string]struct{})
-	l.done_resources = make(map[string]struct{})
-
-	// Si por algun motivo el archivo no existia, no pasa nada.
-	// Es "idempotente", lo unico que nos interesa es que el archivo no este.
-	if disk.Exists(l.log_file) {
-		err := disk.DeleteFile(l.log_file)
-		if err != nil {
-			panic(err)
-		}
-	}
-}
 
 // Devuelve el packet acumulado.
 func (pr *SinglePacketReceiver) GetPayload() string {
@@ -800,6 +319,28 @@ func (pr *SinglePacketReceiver) GetPayload() string {
 
 	return finished_work
 }
+
+
+// =============================================================================
+// ===                                                                       ===
+// ===                                                                       ===
+// ===                      _     ___________                                ===
+// ===                     | |   |_   _| ___ \                               ===
+// ===                     | |     | | | |_/ /                               ===
+// ===                     | |     | | | ___ \                               ===
+// ===                     | |_____| |_| |_/ /                               ===
+// ===                     \_____/\___/\____/                                ===
+// ===                                                                       ===
+// ===                                                                       ===
+// ===                                                                       ===
+// =============================================================================
+
+// Libreria interna del packet receiver.
+
+const (
+	pACKET_WINDOW int = 50
+)
+
 
 // windowContent contiente el contenido de la ventana. Esto normalmente se obtiene
 // con un strings.Builder y el metodo WriteString
@@ -1072,5 +613,508 @@ func (pr *SinglePacketReceiver) read_partial_work() partialWork {
 	return partialWork {
 		ventana: ventana,
 		accumulated_work: partial_work_s,
+	}
+}
+
+// ============================= PATH RESOLVER ================================
+
+// Estructura para centralizar la resolucion de paths y aprovechar el sistema de
+// tipos para asegurar que no se mezclan los paths con otra cosa.
+type pathResolver struct {
+	root string
+}
+
+// root es el directorio que todos los packet_receiver usan en comun.
+// identifier es el identificador de ESTA INSTANCIA de packet receiver
+func newPathResolver(identifier string) pathResolver {
+	root := "packet_receiver" + "/" + identifier
+	return pathResolver {
+		root: root,
+	}
+}
+
+type knownFile int
+const (
+	root knownFile = iota
+	metadata
+	receivedEof
+	receivedSqns
+	partialWorkIndicator
+	packets
+	logFile
+	checkpoint
+)
+
+func (pr *pathResolver) resolve_path(file knownFile) string {
+	var path string
+	switch file {
+	case root:
+		path = pr.root
+	case metadata:
+		path = pr.root + "/" + "metadata"
+	case receivedEof:
+		path = pr.resolve_path(metadata) + "/" + "received_eof"
+	case receivedSqns:
+		path = pr.resolve_path(metadata) + "/" + "received_sqns"
+	case partialWorkIndicator:
+		path = pr.root + "/" + "partial_work"
+	case packets:
+		// Le pongo un 0 para que sea lo primero que aparece
+		path = pr.root + "/" + "0packets" + "/"
+	case logFile:
+		path = pr.root + "/" + "window_log"
+	case checkpoint:
+		path = pr.root + "/" + "checkpoint"
+	}
+	return path
+}
+
+
+// ============================== CHECKPOINTER =================================
+
+// Estructura para debugear mejor el Momento en el tiempo en el que se murio la
+// instancia.
+type checkpointer struct {
+	// Root de la CORRIENTE CORRIDA para marcar los checkpoints.
+	checkpoint_root_current string
+
+	// Llamda. Usado para indicar el orden de las operaciones
+	uses int
+}
+
+func newCheckpointer(checkpoint_root string) checkpointer {
+
+	// Creo el directorio donde van a estar todos los directorios con los
+	// checkpoints.
+	if !disk.Exists(checkpoint_root) {
+		disk.CreateDir(checkpoint_root)
+	}
+
+	entries, err := os.ReadDir(checkpoint_root)
+	if err != nil {
+		panic(err)
+	}
+
+	var amount_runs int
+	for range entries {
+		amount_runs += 1
+	}
+	amount_runs_s := strconv.FormatInt(int64(amount_runs), 10)
+	checkpoint_root_current := checkpoint_root + "/" + amount_runs_s
+
+	disk.CreateDir(checkpoint_root_current)
+
+	return checkpointer{
+		checkpoint_root_current: checkpoint_root_current,
+		uses: 0,
+	}
+}
+
+type checkpointMoment int
+const (
+	cleaned checkpointMoment = iota
+	llegoElPaquete
+	preACK
+	hiceACK
+	preFlushear
+	logAhead
+	laburoParcial
+	logBehind
+)
+
+func (c *checkpointMoment) toString() string {
+	var repr string
+	switch *c {
+	case cleaned:
+		repr = "CLEANED"
+	case llegoElPaquete:
+		repr = "LLEGOPAQUETE"
+	case preACK:
+		repr = "PRE-ACK"
+	case hiceACK:
+		repr = "ACK"
+	case preFlushear:
+		repr = "PRE-FLUSH"
+	case logAhead:
+		repr = "LOGAHEAD"
+	case laburoParcial:
+		repr = "LABUROPARCIAL"
+	case logBehind:
+		repr = "LOGBEHIND"
+	}
+	return repr
+}
+
+func (c *checkpointer) reset_window() {
+	entries, err := os.ReadDir(c.checkpoint_root_current)
+	if err != nil {
+		panic(err)
+	}
+	for _, file := range entries {
+		disk.DeleteFile(file.Name())
+	}
+	c.uses = 0
+
+	c.checkpoint(cleaned)
+}
+
+func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
+	file_name := checkpoint.toString()
+	uses := strconv.FormatInt(int64(c.uses), 10)
+	full_path := c.checkpoint_root_current + "/" + string(uses) + file_name
+	c.uses += 1
+	disk.CreateFile(full_path)
+}
+
+// ================================= LOGGER ====================================
+
+// Estructura encargada de escribir logs para trackear operaciones que tienen un
+// par logico de "comienzo" y "fin".
+type logger struct {
+	// Path al log file.
+	log_file string
+
+	// Associated resource directory
+	resource_dir string
+
+	// Nombre de la operacion que marca el comienzo de la modicacion.
+	write_operation string
+
+	// Nombre de la operacion que marca el fin de la edicion.
+	delete_operation string
+
+	// Hashset de todos los numeros de sequencia recibidos y procesados hasta el
+	// momento.
+	processed_sequence_number []int
+
+	// Log de todos los recursos procesados.
+	processed_resource_log string
+
+// ==================== CONSTRUCTED DURING INSTANTIATION =======================
+	// Resources that are waiting to be "deleted_behind"
+	pending_resources map[string] struct{}
+
+	// Resources that are done and should not receive any modifications.
+	done_resources map[string] struct{}
+}
+
+// Funcion que crea un logger.
+// - log_file_path: Path al log file
+// - write_operation: Nombre de la operacion que marca el comienzo de la edicion.
+// - delete_operation: Nombre de la operacion que marca el fin de la edicion.
+func newLogger(write_operation string, delete_operation string,
+	received_sqns_file string,
+	log_file_path      string,
+	resouce_dir        string,
+	) logger {
+
+	write_op  := strings.ToUpper(write_operation)
+	delete_op := strings.ToUpper(delete_operation)
+
+	if !disk.Exists(received_sqns_file) {
+		disk.CreateFile(received_sqns_file)
+	}
+	if !disk.Exists(log_file_path) {
+		disk.CreateFile(log_file_path)
+	}
+
+	received_sqns_s, err := disk.Read(received_sqns_file)
+	if err != nil {
+		panic(err)
+	}
+	sqns := strings.Split(received_sqns_s, "\n")
+	processed_sequence_numbers := []int{}
+	for _, sqn := range sqns {
+		if sqn == "" {
+			continue
+		}
+		sqn_i, err := strconv.Atoi(sqn)
+		if err != nil {
+			panic(err)
+		}
+
+		already_added := slices.Contains(processed_sequence_numbers, sqn_i)
+		if already_added {
+			bitacora.Info(fmt.Sprintf("Duplicate packet in file. UUID: %s", sqn))
+		}
+		processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
+	}
+
+
+	logger := logger {
+		log_file: log_file_path,
+		resource_dir: resouce_dir,
+		write_operation: write_op,
+		delete_operation: delete_op,
+		processed_sequence_number: processed_sequence_numbers,
+		processed_resource_log: received_sqns_file,
+		pending_resources: make(map[string]struct{}),
+		done_resources: make(map[string]struct{}),
+	}
+
+	log_file, err := disk.Read(log_file_path)
+	if err != nil {
+		panic(err)
+	}
+
+	// Leo todos los logs que quedaron escritos para ya saber cual es el estado
+	// actual.
+	logs := strings.Split(log_file, "\n")
+	for _, log := range logs {
+		if log == "" {
+			continue
+		}
+		log_entry := logger.parse_log_entry(log)
+		resource  := log_entry.resource
+
+		_, is_pending := logger.pending_resources[resource]
+		_, is_done := logger.done_resources[resource]
+		// If it's not a write, it's a delete.
+		is_write   := log_entry.is_write()
+
+		if is_write && !is_pending && !is_done {
+			// Caso "basico" alguien escribio WRITE REC en el log.
+			// Lo marco como pendiente de borrado.
+			logger.pending_resources[resource] = struct{}{}
+		} else if is_write && is_pending && !is_done {
+			// Es un doble WRITE, esto es un error y no deberia pasar.
+			panic(fmt.Sprintf("DOBLE WRITE DETECTED %s in file %s", resource, log_file_path))
+		} else if is_write && is_pending && is_done {
+			// Esto rompe una invariante. O esta en una tabla, o esta en la
+			// otra.
+			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", log_file_path))
+		} else if is_write && !is_pending && is_done {
+			// Esto es un recurso que fue logeado en el pasado, y ya termino.
+			// TECNICAMENTE valido, pero no deberia suceder.
+			bitacora.Info("Logger: Se detecto que un recurso que fue modificado y borrado en el pasado fue anadido de nuevo en el log.")
+		} else if !is_write && is_pending && !is_done {
+			// Caso tipico de que se escribio "borrado" en el log de un recurso.
+			delete(logger.pending_resources, resource)
+			logger.done_resources[resource] = struct{}{}
+
+			// Tengo que fijarme si se borro el archivo.
+			associated_file := logger.get_associate_file(resource)
+			if disk.Exists(associated_file) {
+				bitacora.Info(fmt.Sprintf("LOGGER: Encontre recurso que figuraba como borrado: %s. Lo borro.", associated_file))
+				disk.DeleteFile(associated_file)
+			}
+
+			resource_i, err := strconv.Atoi(resource)
+			if err != nil {
+				panic(err)
+			}
+
+			// Si el paquete figura como borrado, pero no esta en la lista,
+			// entonces signfica que el programa se cayo antes de appendear
+			// el numero de paquete al log de paquetes procesados
+			if !slices.Contains(processed_sequence_numbers, resource_i) {
+				disk.AtomicAppend(resource, logger.processed_resource_log)
+			}
+
+		} else if !is_write && is_pending && is_done {
+			// Esto rompe una invariante. O esta en una tabla, o esta en la
+			// otra.
+			panic(fmt.Sprintf("LOG ESTA EN LAS DOS TABLAS %s", log_file_path))
+		} else if !is_write && !is_pending && is_done {
+			// Es un doble WRITE, esto es un error y no deberia pasar.
+			panic(fmt.Sprintf("DOBLE DELETE DETECTED: %s", log_file_path))
+		} else if !is_write && !is_pending && !is_done {
+			// Es un doble WRITE, esto es un error y no deberia pasar.
+			panic(fmt.Sprintf("DELETE DE RECURSO NO WRITEADO DETECTADO: %s", log_file_path))
+		}
+	}
+	has_pending := len(logger.pending_resources) > 0
+	// Si al final de todo esto tengo cosas pendientes y borradas, signfica que
+	// el programa se murio mientras estaba borrando. En ese caso, tengo que
+	// borrar las cosas que me quedaron pendientes.
+	cut_in_the_middle_of_deleting := has_pending && len(logger.done_resources) > 0
+	if cut_in_the_middle_of_deleting {
+		for resource, _ := range logger.pending_resources {
+			logger.delete_behind(resource)
+		}
+
+		// Despues de borrar todo esto, no deberiamos tener nada pendiente
+		has_pending = len(logger.pending_resources) > 0
+		if has_pending != false {
+			panic("Despues de borrar los paquetes pendientes, sigue figurando como que me quedan.")
+		}
+
+	}
+
+	// Motivos por los cuales puede no tener nada pendiente:
+	//    1. No tenia nada pendiente al inicializar. Esto puede pasar si al
+	//    programa lo mataron despues de borrar todos los paquetes de la
+	//    ventana, pero antes de llamar a clear().
+	//    2. Porque lo mataron en el medio de los llamados a delete_behind y
+	//    acabamos de terminar el proceso con el startup.
+	if !has_pending {
+		logger.clear()
+	}
+
+
+	return logger
+}
+
+type operationType int
+const (
+	writeResource operationType = iota
+	deleteResource
+)
+
+// Entrada del log
+type log_entry struct {
+	operation operationType
+	resource string
+}
+
+// If it's not a write, it's a delete
+func (le *log_entry) is_write() bool {
+	return le.operation == writeResource
+}
+
+
+func (l *logger) get_processed_number() []int {
+	return l.processed_sequence_number
+}
+
+// Lee un entry de un log y te dice la log_entry que encontro. Principalmente
+// esto es util para saber si es un operationType::Write o un
+// operationType::Delete y el recurso modificado.
+//
+// NOTE: Todas los log entries son del tipo:
+// <WRITE|DELETE> <RESOURCE>
+//
+// NOTE on a NOTE: WRITE|DELETE no se leen literalmente asi, depende de lo que
+// se pase a write_operation y delete_operation en tiempo de creacion.
+func (l *logger) parse_log_entry(log_entry_raw string) log_entry {
+	log_entry_split := strings.Split(log_entry_raw, " ")
+	if len(log_entry_split) > 2 {
+		panic(fmt.Sprintf("Invalid log entry. Tried to split into 2, got split into: %d", len(log_entry_split)))
+	}
+
+	operation_s := log_entry_split[0]
+	var operation operationType
+	if operation_s == l.write_operation {
+		operation = writeResource
+	} else if operation_s == l.delete_operation {
+		operation = deleteResource
+	} else {
+		panic(fmt.Sprintf("Invalid log entry. Expected %s or %s, got: %s", l.write_operation, l.delete_operation, operation_s))
+	}
+
+	resource := log_entry_split[1]
+
+	return log_entry {
+		operation: operation,
+		resource: resource,
+	}
+}
+
+// Indica al logger de loggear que [resource] va a ser modificado.
+// WARNING: Por cada llamada a `write_ahead` tiene que haber una llamada a
+// `delete_behind`
+func (l *logger) write_ahead(resource string) {
+	_, exists := l.pending_resources[resource]
+	if exists {
+		bitacora.Info(fmt.Sprintf("DOBLE WRITE DETECTED of resource %s in file %s, skipping write.", resource, l.log_file))
+		return
+	}
+
+	write := l.write_operation
+
+	log_entry_s := write + " " + resource
+
+
+	err := disk.AtomicAppend(log_entry_s, l.log_file)
+	if err != nil {
+		panic(err)
+	}
+	l.pending_resources[resource] = struct{}{}
+}
+
+func (l *logger) get_associate_file(resource string) string {
+	associated_file        := l.resource_dir + resource
+	return associated_file
+}
+
+
+// Indica al logger de loggear que [resource] fue modificado
+// WARNING: Por cada llamada a `delete_behind` tiene que haber una llamada a
+// `write_ahead`
+func (l *logger) delete_behind(resource string) {
+	associated_file        := l.get_associate_file(resource)
+
+	_, marked_as_pending   := l.pending_resources[resource]
+	_, marked_as_done      := l.done_resources[resource]
+	associated_file_exists := disk.Exists(l.resource_dir + resource)
+
+
+	if        marked_as_pending  && marked_as_done {
+		// Esto no deberia suceder nunca. Ni siquiera es un error.
+		panic(fmt.Sprintf("Resource %s found in both pending and done tables", resource))
+	} else if marked_as_pending  && !marked_as_done {
+		// Este es el caso canonico.
+
+		// Si el archivo existe, significa que el programa se detuvo justo
+		// antes de borrarlo. No pasa nada, is all good, lo borramos ahora.
+		if associated_file_exists {
+			delete_op   := l.delete_operation
+
+			log_entry_s := delete_op + " " + resource
+
+			err := disk.AtomicAppend(log_entry_s, l.log_file)
+			if err != nil {
+				panic(err)
+			}
+
+			// Si me muero aca, no pasa nada. Lo anado al revivir.
+			err = disk.AtomicAppend(resource, l.processed_resource_log)
+			if err != nil {
+				panic(err)
+			}
+			resource_i, err := strconv.Atoi(resource)
+			if err != nil {
+				panic(err)
+			}
+			l.processed_sequence_number = append(l.processed_sequence_number, resource_i)
+
+
+			// Si me muero aca, antes de borrarlo, no pasa nada porque va a
+			// borrar el archivo al levantar el logger despues de morir.
+			disk.DeleteFile(associated_file)
+		}
+
+		delete(l.pending_resources, resource)
+		l.done_resources[resource] = struct{}{}
+	} else if !marked_as_pending && marked_as_done {
+		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente.: %s", resource))
+	} else if !marked_as_pending && !marked_as_done {
+		panic(fmt.Sprintf("LOGGER: Se pidio borrar un recurso que no estaba marcado como pendiente ni como listo (WTF?).: %s", resource))
+	}
+
+}
+
+func (l *logger) checkIfAlreadyProcessed(resourceId int) bool {
+	alreadyProcessed := false
+	for i := 0; i < len(l.processed_sequence_number) && alreadyProcessed == false ; i++ {
+		curr_id := l.processed_sequence_number[i]
+		alreadyProcessed = curr_id == resourceId
+	}
+
+	return alreadyProcessed
+}
+
+// Clears all the resources in its table, since it finished processing the window.
+func (l *logger) clear() {
+	l.pending_resources = make(map[string]struct{})
+	l.done_resources = make(map[string]struct{})
+
+	// Si por algun motivo el archivo no existia, no pasa nada.
+	// Es "idempotente", lo unico que nos interesa es que el archivo no este.
+	if disk.Exists(l.log_file) {
+		err := disk.DeleteFile(l.log_file)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
