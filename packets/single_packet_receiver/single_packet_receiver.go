@@ -80,7 +80,7 @@ type SinglePacketReceiver struct {
 
 	logger logger
 
-	windowFull bool
+	allReceived bool
 
 	checkpointer checkpointer
 
@@ -177,7 +177,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		path_resolver:             pathResolver,
 		logger:                    logger,
 		// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
-		windowFull:                false,
+		allReceived:                false,
 		checkpointer:              checkpointer,
 		identifier:                identifier,
 	}
@@ -266,7 +266,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		pr.flushWindow()
 	}
 
-	pr.windowFull = allReceived
+	pr.allReceived = allReceived
 
 	pr.checkpointer.checkpoint(preACK)
 	// Hacemos ACK recien al final. Antes lo haciamos apenas guardabamos el paquete en disco.
@@ -304,7 +304,7 @@ func (pr *SinglePacketReceiver) Clean() {
 
 // Devuelve el packet acumulado.
 func (pr *SinglePacketReceiver) GetPayload() string {
-	if pr.windowFull != true {
+	if pr.allReceived != true {
 		// NOTE: No borrar este panic. Es importante que si en algun momento
 		// se rompe la invariante, que el programa explote para poder debugear
 		// mejor.
