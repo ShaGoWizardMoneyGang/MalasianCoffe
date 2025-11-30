@@ -286,6 +286,22 @@ def replica_watchdog_block(n):
       - watchdog_{n-1}
 """
 
+def chaos_monkey_block():
+    return f"""
+  chaos_monkey:
+    container_name: chaos_monkey
+    hostname: chaos_monkey
+    image: chaos_monkey:latest
+    working_dir: /app
+    entrypoint: ./bin/chaos_monkey
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./sheeps.txt:/app/sheeps.txt
+    networks:
+      - testing_net
+    depends_on:
+      - server
+"""
 
 def client(n, external):
     # Creo un directorio en out para que no sea creado por root
@@ -471,6 +487,8 @@ def main():
         file.writelines(partial_aggregator_block(i, "3", configs["global-aggregator3"]) for i in range(1, configs.get("partial-aggregator3", 0) + 1))
         for i in range(1, configs.get("partial-aggregator3", 0) + 1):
             sheeps_list.append(f"partial_aggregator3_{i}")
+
+        file.writelines(chaos_monkey_block())
 
         for i in range(1, configs.get("cliente", 0) + 1):
             client_line = client(i, external)
