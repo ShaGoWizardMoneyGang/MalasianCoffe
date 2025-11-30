@@ -7,7 +7,7 @@ import (
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_receiver"
+	"malasian_coffe/packets/multiple_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
@@ -48,17 +48,22 @@ func createUserMap(userReceiver packet_receiver.PacketReceiver) map[string]strin
 	return storeID2Name
 }
 
+
+func joinerFunctionQuery42(inputs map[multiple_packet_receiver.NombreDataset]multiple_packet_receiver.ContenidoCompleto) string {
+	panic("Not yet implemented")
+}
+
 func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	storeReceiver := packet_receiver.NewPacketReceiver("store")
+	expected_datasets := []multiple_packet_receiver.NombreDataset {
+		multiple_packet_receiver.NombreDataset("store"),
+		multiple_packet_receiver.NombreDataset("user"),
+		multiple_packet_receiver.NombreDataset("transactions"),
+	};
 
-	userReceiver := packet_receiver.NewPacketReceiver("user")
-
-	// Aca me guardo todos los packets de transactions que llegaron antes de los
-	// stores. Deberian ser pocos (si es que existen)
-	transactionReceiver := packet_receiver.NewPacketReceiver("transactions")
+	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery42)
 
 	// Resultado final
-	var joinedTransactions strings.Builder
+	var joinedTransactions string
 
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
 	// jugosa metadata
@@ -68,42 +73,25 @@ func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outpu
 		pktMsg := <-inputChannel
 		pkt := pktMsg.Packet
 
-		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
-		dataset_name, err := dataset.IDtoDataset(packet_id)
-		if err != nil {
-			panic(err)
+		received_all := packet_receiver.ReceivePacket(pktMsg)
+
+		if !received_all {
+			continue
 		}
 
-		if dataset_name == "stores" {
-			storeReceiver.ReceivePacket(pktMsg)
-		} else if dataset_name == "users" {
-			userReceiver.ReceivePacket(pktMsg)
-		} else if dataset_name == "transactions" {
-			transactionReceiver.ReceivePacket(pktMsg)
-
-		} else {
-			bitacora.Error(fmt.Sprintf("JoinerQuery4 received packet from dataset that was not expecting: %s", dataset_name))
-		}
-
-		// No joineamos hasta tenerlo todo.
-		if storeReceiver.ReceivedAll() && userReceiver.ReceivedAll() && transactionReceiver.ReceivedAll() {
-			// jq4.logger.Info("Comienza proceso de join")
-			joinerFunctionQuery4(storeReceiver, userReceiver, transactionReceiver, &joinedTransactions)
-
-			last_packet = pkt
-			break
-		}
+		joinedTransactions = packet_receiver.GetPayload()
+		last_packet = pkt
+		break
 	}
 
-	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"users", "stores", "transactions"}, []string{joinedTransactions.String()})
-
-	// Liberamos
-	joinedTransactions.Reset()
+	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"users", "stores", "transactions"}, []string{joinedTransactions})
 
 	for _, pkt := range pkt_joineado {
 		bitacora.Info(fmt.Sprintf("Envio pkt joineado al sender, session: %s", pkt.GetSessionID()))
 		outputChannel <- pkt
 	}
+
+	packet_receiver.Clean()
 }
 
 func (jq4 *joinerQuery4) Build(rabbitAddr string, routingKey string) {
