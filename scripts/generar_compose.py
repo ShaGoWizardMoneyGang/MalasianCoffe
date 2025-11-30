@@ -218,16 +218,20 @@ def global_aggregator_block(n, query, queueAmount):
 """
 
 def joiner_block(n, query):
+    name = f"joiner{query}_{n}"
     routing_key = int(n) - 1
 
+    os.mkdir(f"packet_receiver/{name}")
+
     return f"""
-  joiner{query}_{n}:
-    container_name: joiner{query}_{n}
-    image: ubuntu:24.04
+  {name}:
+    container_name: {name}
+    image: worker:latest
     working_dir: /app
-    entrypoint: ./bin/joiner rabbitmq:5672 Query{query} {routing_key}
+    entrypoint: bash -c "entrypoint.sh && su user -c '/app/bin/joiner rabbitmq:5672 Query{query} {routing_key}'"
     volumes:
       - ./bin/joiner:/app/bin/joiner
+      - ./packet_receiver/{name}:/app/packet_receiver/
     networks:
       - testing_net
     depends_on:
@@ -249,6 +253,16 @@ def partial_aggregator_block(n, query, queueAmount):
     depends_on:
       - server
 """
+
+# Devuelve la cantidad de watchdogs lideres y no lideres se necesita
+def cant_watchdogs(n):
+    if n == 0:
+        return (0, 0)
+
+    lider_cant = 1
+    no_lider_cant = n - 1
+
+    return (lider_cant, no_lider_cant)
 
 def leader_watchdog_block(n):
     return f"""
@@ -384,9 +398,14 @@ def main():
         if external == False:
             file.write(commons())
 
-        file.writelines(leader_watchdog_block(1))
+        lider_cant, no_lider_cant = cant_watchdogs(configs.get("watchdog", 0))
 
-        file.writelines(replica_watchdog_block(i) for i in range(2, configs.get("watchdog", 0) + 1))
+        for i in range(lider_cant):
+            lider_id = i + 1
+            file.writelines(leader_watchdog_block(lider_id))
+
+        file.writelines(replica_watchdog_block(i) for i in range(2, no_lider_cant + 1))
+
         for i in range(1, configs.get("watchdog", 0) + 1):
             members_list.append(f"watchdog_{i}")
         for i in range(1, configs.get("watchdog", 0) + 1):
