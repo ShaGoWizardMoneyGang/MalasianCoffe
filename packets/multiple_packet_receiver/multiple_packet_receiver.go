@@ -3,6 +3,7 @@ package multiple_packet_receiver
 import (
 	"bytes"
 	"fmt"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
@@ -250,11 +251,11 @@ type datasetReceiver struct {
 	// NOTE: Usado solo como sanity check
 	receivedAll bool
 
-	path_resolver pathResolver
+	path_resolver datasetPathResolver
 }
 
 func newDatasetReceiver(identifier string, datasetName NombreDataset) datasetReceiver {
-	pathResolver := newPathResolver(identifier, datasetName)
+	pathResolver := newDatasetPathResolver(identifier, datasetName)
 
 	metada_dir := pathResolver.resolve_path(metadata)
 	if !disk.Exists(metada_dir) {
@@ -449,12 +450,12 @@ func (dr *datasetReceiver) readStoredPackets() string {
 
 // Estructura para centralizar la resolucion de paths y aprovechar el sistema de
 // tipos para asegurar que no se mezclan los paths con otra cosa.
-type pathResolver struct {
+type datasetPathResolver struct {
 	root string
 }
 
 // root es el directorio que todos los packet_receiver usan en comun.
-func newPathResolver(session_id string, dataset_name NombreDataset) pathResolver {
+func newDatasetPathResolver(session_id string, dataset_name NombreDataset) datasetPathResolver {
 	root := "packet_receiver" + "/" + session_id
 	if !disk.Exists(root) {
 		disk.CreateDir(root)
@@ -465,7 +466,7 @@ func newPathResolver(session_id string, dataset_name NombreDataset) pathResolver
 		disk.CreateDir(root_with_dataset)
 	}
 
-	return pathResolver {
+	return datasetPathResolver {
 		root: root_with_dataset,
 	}
 }
@@ -478,7 +479,7 @@ const (
 	packets
 )
 
-func (pr *pathResolver) resolve_path(file knownFile) string {
+func (pr *datasetPathResolver) resolve_path(file knownFile) string {
 	var path string
 	switch file {
 	case root:
