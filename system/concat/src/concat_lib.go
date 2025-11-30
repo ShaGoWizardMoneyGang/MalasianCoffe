@@ -9,6 +9,7 @@ import (
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
+	"strings"
 )
 
 type Concat struct {

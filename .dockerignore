@@ -2,6 +2,7 @@
 
 # Archivos a copiar
 !/system
+!/utils
 !go.mod
 !go.sum
 !/entrypoint.sh
