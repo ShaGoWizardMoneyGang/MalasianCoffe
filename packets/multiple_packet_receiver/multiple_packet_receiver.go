@@ -3,7 +3,6 @@ package multiple_packet_receiver
 import (
 	"bytes"
 	"fmt"
-	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
@@ -92,20 +91,53 @@ type MultiplePacketReceiver struct {
 	// Usado al final para ver si se tiene que enviar el trabajo procesado de
 	// nuevo.
 	allReceived bool
+
+	pathResolver pathResolver
 }
 
+// Estructura para centralizar la resolucion de paths y aprovechar el sistema de
+// tipos para asegurar que no se mezclan los paths con otra cosa.
+type pathResolver struct {
+	root string
+}
+// root es el directorio que todos los packet_receiver usan en comun.
+func newPathResolver(session_id string) pathResolver {
+	root := "packet_receiver" + "/" + session_id
 
+	return pathResolver {
+		root: root,
+	}
+}
+
+type knownFile int
+const (
+	root knownFile = iota
+)
+func (pr *pathResolver) resolve_path(file knownFile) string {
+	var path string
+	switch file {
+	case root:
+		path = pr.root
+	}
+	return path
+}
 
 func NewMultiplePacketReceiver(
 	identifier string,
 	expected_datasets []NombreDataset,
 	transformer func(inputs map[NombreDataset] ContenidoCompleto) string,
 ) MultiplePacketReceiver {
+	pathResolver := newPathResolver(identifier)
+	packet_receiver_dir := pathResolver.resolve_path(root)
+	if !disk.Exists(packet_receiver_dir) {
+		disk.CreateDir(packet_receiver_dir)
+	}
+
 	receivers := make([]datasetReceiver, len(expected_datasets))
 
 	for i := 0; i < len(expected_datasets); i++ {
 		name := expected_datasets[i]
-		new_receiver := newDatasetReceiver(identifier, name)
+		new_receiver := newDatasetReceiver(&pathResolver, name)
 		receivers[i] = new_receiver
 	}
 	// Crea un directorio con el nombre de la session
@@ -114,6 +146,7 @@ func NewMultiplePacketReceiver(
 		receivers:                 receivers,
 		transformer:               transformer,
 		allReceived:               false,
+		pathResolver:              pathResolver,
 	}
 
 	return multiple_packet_receiver
@@ -193,6 +226,10 @@ func (pr *MultiplePacketReceiver) Clean() {
 
 		receiver.clean()
 	}
+
+	path := pr.pathResolver.resolve_path(root)
+
+	disk.DeleteDirRecursively(path)
 }
 
 // Devuelve el resultado de aplicar la funcion
@@ -254,8 +291,13 @@ type datasetReceiver struct {
 	path_resolver datasetPathResolver
 }
 
-func newDatasetReceiver(identifier string, datasetName NombreDataset) datasetReceiver {
-	pathResolver := newDatasetPathResolver(identifier, datasetName)
+func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDataset) datasetReceiver {
+	pathResolver := newDatasetPathResolver(originalPathResolver, datasetName)
+
+	packet_receiver_dir := pathResolver.resolve_path(datasetRoot)
+	if !disk.Exists(packet_receiver_dir) {
+		disk.CreateDir(packet_receiver_dir)
+	}
 
 	metada_dir := pathResolver.resolve_path(metadata)
 	if !disk.Exists(metada_dir) {
@@ -398,10 +440,6 @@ func (dr *datasetReceiver) checkIfReceivedAll() bool {
 	}
 
 	dr.receivedAll = allReceived
-	if allReceived == true {
-		message := fmt.Sprintf("El packet receiver %s, recibio todos los paquetes que esperaba. El tamano es de: %d", dr.datasetName, len(dr.received_sequence_numbers))
-		bitacora.Info(message)
-	}
 
 	return dr.receivedAll
 }
@@ -455,34 +493,29 @@ type datasetPathResolver struct {
 }
 
 // root es el directorio que todos los packet_receiver usan en comun.
-func newDatasetPathResolver(session_id string, dataset_name NombreDataset) datasetPathResolver {
-	root := "packet_receiver" + "/" + session_id
-	if !disk.Exists(root) {
-		disk.CreateDir(root)
-	}
+func newDatasetPathResolver(pathResolver *pathResolver, dataset_name NombreDataset) datasetPathResolver {
+	root := pathResolver.resolve_path(root)
+	println(root)
 
 	root_with_dataset := root + "/" + string(dataset_name)
-	if !disk.Exists(root_with_dataset) {
-		disk.CreateDir(root_with_dataset)
-	}
 
 	return datasetPathResolver {
 		root: root_with_dataset,
 	}
 }
 
-type knownFile int
+type knownDatasetFile int
 const (
-	root knownFile = iota
+	datasetRoot knownDatasetFile = iota
 	metadata
 	receivedEof
 	packets
 )
 
-func (pr *datasetPathResolver) resolve_path(file knownFile) string {
+func (pr *datasetPathResolver) resolve_path(file knownDatasetFile) string {
 	var path string
 	switch file {
-	case root:
+	case datasetRoot:
 		path = pr.root
 	case metadata:
 		path = pr.root + "/" + "metadata"
@@ -510,7 +543,7 @@ func (dr *datasetReceiver) getDatasetName() NombreDataset {
 }
 
 func (dr *datasetReceiver) clean() {
-	path := dr.path_resolver.resolve_path(root)
+	path := dr.path_resolver.resolve_path(datasetRoot)
 
 	disk.DeleteDirRecursively(path)
 }
