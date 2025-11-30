@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	SHEEPS_FILE  = "sheeps.txt"
-	MEMBERS_FILE = "members.txt"
-	MAX_RETRIES  = 3
-	TIMEOUT      = 2
+	SHEEPS_FILE          = "sheeps.txt"
+	MEMBERS_FILE         = "members.txt"
+	MAX_RETRIES          = 3
+	TIMEOUT              = 2
+	HEALTHCHECK_PORT int = 1958
 )
 
 func restartContainer(name string) {
@@ -55,7 +56,7 @@ func watchSheeps() {
 	}
 
 	addr := net.UDPAddr{
-		Port: bully.HEALTHCHECK_PORT,
+		Port: HEALTHCHECK_PORT,
 		IP:   net.ParseIP("0.0.0.0"),
 	}
 	connListen, err := net.ListenUDP("udp", &addr)

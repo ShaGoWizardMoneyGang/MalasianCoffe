@@ -19,9 +19,7 @@ type WatchdogNode struct {
 }
 
 const (
-	HEALTHCHECK_PORT int = 1958
-	HEARTBEAT_PORT       = 1960
-	// COORD_PORT            = 1959
+	HEARTBEAT_PORT    = 1960
 	HEARTBEAT_PERIOD  = 1
 	HEARTBEAT_TIMEOUT = 3
 )
