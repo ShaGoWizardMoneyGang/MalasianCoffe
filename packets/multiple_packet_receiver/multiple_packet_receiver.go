@@ -256,11 +256,6 @@ type datasetReceiver struct {
 func newDatasetReceiver(identifier string, datasetName NombreDataset) datasetReceiver {
 	pathResolver := newPathResolver(identifier, datasetName)
 
-	packet_receiver_dir := pathResolver.resolve_path(root)
-	if !disk.Exists(packet_receiver_dir) {
-		disk.CreateDir(packet_receiver_dir)
-	}
-
 	metada_dir := pathResolver.resolve_path(metadata)
 	if !disk.Exists(metada_dir) {
 		disk.CreateDir(metada_dir)
@@ -459,9 +454,18 @@ type pathResolver struct {
 
 // root es el directorio que todos los packet_receiver usan en comun.
 func newPathResolver(session_id string, dataset_name NombreDataset) pathResolver {
-	root := "packet_receiver" + "/" + session_id + "/" + string(dataset_name)
+	root := "packet_receiver" + "/" + session_id
+	if !disk.Exists(root) {
+		disk.CreateDir(root)
+	}
+
+	root_with_dataset := root + "/" + string(dataset_name)
+	if !disk.Exists(root_with_dataset) {
+		disk.CreateDir(root_with_dataset)
+	}
+
 	return pathResolver {
-		root: root,
+		root: root_with_dataset,
 	}
 }
 
