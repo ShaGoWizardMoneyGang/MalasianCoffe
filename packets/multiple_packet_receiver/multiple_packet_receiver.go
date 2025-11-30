@@ -2,7 +2,6 @@ package multiple_packet_receiver
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
