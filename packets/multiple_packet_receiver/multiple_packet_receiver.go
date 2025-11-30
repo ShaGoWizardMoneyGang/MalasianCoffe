@@ -103,9 +103,10 @@ func NewMultiplePacketReceiver(
 ) MultiplePacketReceiver {
 	receivers := make([]datasetReceiver, len(expected_datasets))
 
-	for _, name := range expected_datasets {
+	for i := 0; i < len(expected_datasets); i++ {
+		name := expected_datasets[i]
 		new_receiver := newDatasetReceiver(identifier, name)
-		receivers = append(receivers, new_receiver)
+		receivers[i] = new_receiver
 	}
 	// Crea un directorio con el nombre de la session
 	multiple_packet_receiver := MultiplePacketReceiver{
