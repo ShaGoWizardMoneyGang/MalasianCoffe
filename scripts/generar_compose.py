@@ -165,7 +165,6 @@ def concat_block(n):
       - testing_net
     depends_on:
       - server
-      - rabbitmq
 """
 
 def sender_block(n, query):
@@ -202,15 +201,19 @@ def counter_block(n, query, queueAmount):
 """
 
 def global_aggregator_block(n, query, queueAmount):
+    name = f"global_aggregator{query}_{n}"
     routing_key = int(n) - 1
+
+    os.mkdir(f"packet_receiver/{name}")
     return f"""
-  global_aggregator{query}_{n}:
-    container_name: global_aggregator{query}_{n}
-    image: ubuntu:24.04
+  {name}:
+    container_name: {name}
+    image: worker:latest
     working_dir: /app
-    entrypoint: ./bin/global_aggregator rabbitmq:5672 Query{query} {routing_key} 1 queue:{queueAmount}
+    entrypoint: bash -c "entrypoint.sh && su user -c '/app/bin/global_aggregator rabbitmq:5672 Query{query} {routing_key} 1 queue:{queueAmount}'"
     volumes:
       - ./bin/global_aggregator:/app/bin/global_aggregator
+      - ./packet_receiver/{name}:/app/packet_receiver/
     networks:
       - testing_net
     depends_on:
