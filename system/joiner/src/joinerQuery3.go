@@ -118,7 +118,7 @@ func (jq3 *joinerQuery3) Process() {
 }
 
 func joinerFunctionQuery3(storeReceiver packet_receiver.PacketReceiver, transactionReceiver packet_receiver.PacketReceiver, joinedTransactions *strings.Builder) {
-	storeMap := createStoreMap(storeReceiver)
+	storeMap := createStoreMap(storeReceiver.GetPayload())
 
 	transactions := transactionReceiver.GetPayload()
 	lines := strings.Split(transactions, "\n")

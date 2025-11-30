@@ -29,9 +29,8 @@ func addStoreToMap(storePkt packet.Packet, storeMap map[string]string) bool {
 	}
 }
 
-func createStoreMap(storeReceiver packet_receiver.PacketReceiver) map[string]string {
-	stores := storeReceiver.GetPayload()
-	lines := strings.Split(stores, "\n")
+func createStoreMap(storePayload string) map[string]string {
+	lines := strings.Split(storePayload, "\n")
 	lines = lines[:len(lines)-1]
 
 	// Le damos un tamano inicial de lines porque deberia tener un tamano igual
