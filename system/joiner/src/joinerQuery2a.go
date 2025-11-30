@@ -44,7 +44,6 @@ func joinQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage, outp
 		pktMsg := <-inputChannel
 		pkt := pktMsg.Packet
 
-
 		received_all := packet_receiver.ReceivePacket(pktMsg)
 
 		if !received_all {
