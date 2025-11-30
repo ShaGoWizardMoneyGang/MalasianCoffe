@@ -134,10 +134,10 @@ func (jq4 *joinerQuery4) Process() {
 func joinerFunctionQuery4(inputs map[multiple_packet_receiver.NombreDataset]multiple_packet_receiver.ContenidoCompleto) string {
 	userMap := createUserMap(string(inputs["user"]))
 	storeMap := createStoreMap(string(inputs["store"]))
+	transactions := string(inputs["transaction"])
 
 	var joinedTransactions strings.Builder
 
-	transactions := string(inputs["transaction"])
 	lines := strings.Split(transactions, "\n")
 	lines = lines[:len(lines)-1]
 	for _, r := range lines {
