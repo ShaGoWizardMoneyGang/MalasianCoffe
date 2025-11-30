@@ -330,7 +330,8 @@ func (dr *datasetReceiver) canReceivePacket(pkt *packet.Packet) bool {
 		panic("Failed to translate packet id to dataset name")
 	}
 
-	can_receive := dataset_name == string(dr.datasetName)
+	my_dataset_name := string(dr.datasetName)
+	can_receive := dataset_name == my_dataset_name
 
 	return can_receive
 }
