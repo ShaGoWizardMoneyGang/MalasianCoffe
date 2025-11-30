@@ -28,23 +28,32 @@ import (
 // ===                                                                       ===
 // =============================================================================
 
-// Este Packet Receiver esta pensado para workers que solo reciben un tipo de paquete,
-// como los global aggregators y el concater.
-// Cada Packet Receiver va a almacenar los datos en un directorio propio.
+// Este Packet Receiver esta pensado para workers que reciben de multiples
+// datasets, como los joiners. El Multiple Packet Receiver tiene una serie de
+// DatasetReceivers que alamacenan todos los paquetes de un mismo dataset.
+// Este packet receiver va a aplicar el lambda pasado al constructor recien
+// despues de que dataset receiver detecte que recibio todos los paquetes de su
+// dataset.
+// Cada Multiple Packet Receiver va a almacenar los datos en un directorio propio.
 // Ese directorio tiene la siguiente estructura:
-//
-// packet_receiver-<identifier>/
-//   \_metadata/
-//       \_received_eof
-//       \_received_sqns
-//   \_partial_work
-//   \_packets/
-//       \_packet-1
-//       \_packet-2
-//       \_packet-3
-//       \_packet-4
-//       \_packet-5
-//   \_window_log
+// packet_receiver/
+//   \_session_id
+//       \_<dataset_receiver_1>
+//           \_metadata/
+//               \_received_eof
+//               \_received_sqns
+//           \_packets/
+//               \_packet-1
+//               \_packet-2
+//               \_packet-3
+//       \_<dataset_receiver_2>
+//           \_metadata/
+//               \_received_eof
+//               \_received_sqns
+//           \_packets/
+//               \_packet-1
+//               \_packet-2
+//               \_packet-3
 //
 // Funcionamiento:
 // - En el directorio "metadata/" se va a guardar metadata del estado actual de los
@@ -55,12 +64,7 @@ import (
 //       - received_sqns: contiene una lista de todos los sequence numbers
 //       recibidos hasta el momento.
 //   paquetes recibidos.
-// - En el archivo "partial_work" se guarda el procesamiento actual que se le
-//   hizo a la ventana de paquetes. Despues de cada ventana, este archivo se carga
-//   en memoria para agregar la informacion de los nuevos paquetes.
-// - En el directorio "packets/" se guardan todos los paquetes recibidos que son
-//   parte de la ventana actual, es decir, que todavia no fueron procesados.
-// - El archivo "window_log" guarda el log de los paquetes procesados.
+// - En el directorio "packets/" se guardan todos los paquetes recibidos.
 
 // Nombre del dataset que origino estos datos.
 type NombreDataset string;
