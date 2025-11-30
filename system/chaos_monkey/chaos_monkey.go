@@ -1,4 +1,4 @@
-package chaosmonkey
+package main
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 const (
@@ -28,7 +29,6 @@ func ReadNodes(nodesFile string) ([]string, error) {
 	return nodes, nil
 }
 
-// docker stop -s SIGKILL <imagen>
 func main() {
 	fmt.Println("HOLA MUNDO")
 	nodes, err := ReadNodes(NODES_FILE)
@@ -36,10 +36,9 @@ func main() {
 		println("Error reading nodes:", err.Error())
 	}
 
-	semilla := int64(os.Getpid()) + int64(os.Getuid()) // Semilla semi aleatoria
-	fmt.Printf("Semilla utilizada: %d\n", semilla)
-
 	for _, node := range nodes {
+		semilla := time.Now().UnixNano() // Semilla aleatoria basada en el tiempo actual
+		//fmt.Printf("Semilla utilizada: %d\n", semilla)
 		rnd := rand.New(rand.NewSource(semilla))
 		numAleatorio := rnd.Intn(100) // Número aleatorio entre 0 y 99
 		fmt.Printf("Nodo: %s, número aleatorio: %d\n", node, numAleatorio)
@@ -52,5 +51,7 @@ func main() {
 				fmt.Printf("Se detuvo el container %s con SIGKILL: %s\n", node, string(output))
 			}
 		}
+		// Sleep de 10 segundos después de cada nodo para poder observar mejor
+		time.Sleep(10 * time.Second)
 	}
 }
