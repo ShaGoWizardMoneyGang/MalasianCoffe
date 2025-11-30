@@ -2,7 +2,6 @@ package joiner
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"malasian_coffe/bitacora"
@@ -12,7 +11,6 @@ import (
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
-	"malasian_coffe/utils/dataset"
 )
 
 type joinerQuery4 struct {
@@ -30,9 +28,8 @@ type joinerQuery4 struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func createUserMap(userReceiver packet_receiver.PacketReceiver) map[string]string {
-	storePkt := userReceiver.GetPayload()
-	lines := strings.Split(storePkt, "\n")
+func createUserMap(userPayload string) map[string]string {
+	lines := strings.Split(userPayload, "\n")
 	lines = lines[:len(lines)-1]
 
 	// Le damos un tamano inicial de lines porque deberia tener un tamano igual
@@ -48,10 +45,6 @@ func createUserMap(userReceiver packet_receiver.PacketReceiver) map[string]strin
 	return storeID2Name
 }
 
-
-func joinerFunctionQuery42(inputs map[multiple_packet_receiver.NombreDataset]multiple_packet_receiver.ContenidoCompleto) string {
-	panic("Not yet implemented")
-}
 
 func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
 	expected_datasets := []multiple_packet_receiver.NombreDataset {
@@ -138,11 +131,14 @@ func (jq4 *joinerQuery4) Process() {
 	}
 }
 
-func joinerFunctionQuery4(storeReceiver packet_receiver.PacketReceiver, userReceiver packet_receiver.PacketReceiver, transactionReceiver packet_receiver.PacketReceiver, joinedTransactions *strings.Builder) {
-	userMap := createUserMap(userReceiver)
-	storeMap := createStoreMap(storeReceiver)
+// func joinerFunctionQuery4(storeReceiver packet_receiver.PacketReceiver, userReceiver packet_receiver.PacketReceiver, transactionReceiver packet_receiver.PacketReceiver, joinedTransactions *strings.Builder) {
+func joinerFunctionQuery42(inputs map[multiple_packet_receiver.NombreDataset]multiple_packet_receiver.ContenidoCompleto) string {
+	userMap := createUserMap(string(inputs["user"]))
+	storeMap := createStoreMap(string(inputs["store"]))
 
-	transactions := transactionReceiver.GetPayload()
+	var joinedTransactions strings.Builder
+
+	transactions := string(inputs["transaction"])
 	lines := strings.Split(transactions, "\n")
 	lines = lines[:len(lines)-1]
 	for _, r := range lines {
@@ -160,6 +156,10 @@ func joinerFunctionQuery4(storeReceiver packet_receiver.PacketReceiver, userRece
 		}
 
 		// Necesito algo del estilo: storeName, birthday
-		fmt.Fprintf(joinedTransactions, "%s,%s\n", storeName, userBirthday)
+		fmt.Fprintf(&joinedTransactions, "%s,%s\n", storeName, userBirthday)
 	}
+
+	final_result := joinedTransactions.String()
+
+	return final_result
 }

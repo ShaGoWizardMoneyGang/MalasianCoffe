@@ -108,15 +108,14 @@ func NewMultiplePacketReceiver(
 		receivers = append(receivers, new_receiver)
 	}
 	// Crea un directorio con el nombre de la session
-	single_packet_receiver := MultiplePacketReceiver{
+	multiple_packet_receiver := MultiplePacketReceiver{
 		identifier:                identifier,
 		receivers:                 receivers,
+		transformer:               transformer,
+		allReceived:               false,
 	}
 
-	// Chequeo si me quedo pendiente un flush
-	allReceived := single_packet_receiver.checkIfReceivedAll()
-
-	return single_packet_receiver
+	return multiple_packet_receiver
 }
 
 // Devuelve un booleano que representa si se recivieron todos los paquetes
@@ -125,21 +124,18 @@ func (pr *MultiplePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool
 	// Antes de empezar, me fijo si ya termine. SI ya termine pero llegue
 	// hasta aca, signfica que alguno de los packet receivers no llego a
 	// enviar ACK porque murio la computadora antes.
-	if pr.allReceived {
-		return true
-	}
 
 	pkt := pktMsg.Packet
 
 	sent := false
 	for _, receiver := range pr.receivers {
-		if !receiver.canReceivePacket(&pktMsg.Packet) {
+		if !receiver.canReceivePacket(&pkt) {
 			continue
 		}
 
 		// Si me muero antes de enviarlo, no pasa nada porque al revivir, lo
 		// voy a volver a enviar.
-		// Le enviamos el paquete al recibir que lo necesite.
+		// Le enviamos el pauete al recibir que lo necesite.
 		receiver.receivePacket(pkt)
 
 		sent = true
@@ -254,11 +250,68 @@ type datasetReceiver struct {
 
 func newDatasetReceiver(identifier string, datasetName NombreDataset) datasetReceiver {
 	pathResolver := newPathResolver(identifier, datasetName)
+
+	packet_receiver_dir := pathResolver.resolve_path(root)
+	if !disk.Exists(packet_receiver_dir) {
+		disk.CreateDir(packet_receiver_dir)
+	}
+
+	metada_dir := pathResolver.resolve_path(metadata)
+	if !disk.Exists(metada_dir) {
+		disk.CreateDir(metada_dir)
+	}
+	received_eof_file := pathResolver.resolve_path(receivedEof)
+	if !disk.Exists(received_eof_file) {
+		disk.CreateFile(received_eof_file)
+	}
+
+	packets_dir := pathResolver.resolve_path(packets)
+	if !disk.Exists(packets_dir) {
+		disk.CreateDir(packets_dir)
+	}
+
+	received_eof_s, err := disk.Read(received_eof_file)
+	if err != nil {
+		panic(err)
+	}
+	var received_eof int
+	if received_eof_s == "" {
+		// -1 representa si lo recibi o no
+		received_eof = -1
+	} else {
+		received_eof_i64, err := strconv.ParseInt(received_eof_s, 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		received_eof_i := int(received_eof_i64)
+
+		received_eof = received_eof_i
+	}
+
+
+	// Anadimos los seq numbers de todos los paquetes recibidos
+	received_sequence_numbers := []int{}
+	entries, err := os.ReadDir(packets_dir)
+	for _, file := range entries {
+		packet_file, err := os.Open(packets_dir + "/" + file.Name())
+		if err != nil {
+			panic(err)
+		}
+
+		file_name := packet_file.Name()
+		packet_sq_num, err := strconv.ParseInt(file_name, 10, 64)
+		if err != nil {
+			panic(err)
+		}
+
+		received_sequence_numbers = append(received_sequence_numbers, int(packet_sq_num))
+	}
+
 	// TODO: Chequear disco
 	receiver := datasetReceiver {
 		datasetName: datasetName,
-		received_sequence_numbers: []int{},
-		EOF                      : -1,
+		received_sequence_numbers: received_sequence_numbers,
+		EOF                      : received_eof,
 		receivedAll: false,
 		path_resolver: pathResolver,
 	 }
