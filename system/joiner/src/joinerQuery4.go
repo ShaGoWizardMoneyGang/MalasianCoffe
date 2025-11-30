@@ -53,7 +53,7 @@ func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outpu
 		multiple_packet_receiver.NombreDataset("transactions"),
 	};
 
-	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery42)
+	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery4)
 
 	// Resultado final
 	var joinedTransactions string
@@ -131,8 +131,7 @@ func (jq4 *joinerQuery4) Process() {
 	}
 }
 
-// func joinerFunctionQuery4(storeReceiver packet_receiver.PacketReceiver, userReceiver packet_receiver.PacketReceiver, transactionReceiver packet_receiver.PacketReceiver, joinedTransactions *strings.Builder) {
-func joinerFunctionQuery42(inputs map[multiple_packet_receiver.NombreDataset]multiple_packet_receiver.ContenidoCompleto) string {
+func joinerFunctionQuery4(inputs map[multiple_packet_receiver.NombreDataset]multiple_packet_receiver.ContenidoCompleto) string {
 	userMap := createUserMap(string(inputs["user"]))
 	storeMap := createStoreMap(string(inputs["store"]))
 

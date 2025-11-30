@@ -8,6 +8,7 @@ import (
 	"malasian_coffe/utils/dataset"
 	"malasian_coffe/utils/disk"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -336,12 +337,12 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 	received_sequence_numbers := []int{}
 	entries, err := os.ReadDir(packets_dir)
 	for _, file := range entries {
-		packet_file, err := os.Open(packets_dir + "/" + file.Name())
+		packet_file, err := os.Open(packets_dir + file.Name())
 		if err != nil {
 			panic(err)
 		}
 
-		file_name := packet_file.Name()
+		file_name := filepath.Base(packet_file.Name())
 		packet_sq_num, err := strconv.ParseInt(file_name, 10, 64)
 		if err != nil {
 			panic(err)
