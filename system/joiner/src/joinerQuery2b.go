@@ -115,7 +115,7 @@ func (jq2b *joinerQuery2b) Process() {
 }
 
 func joinerFunctionQuery2b(menuItemReceiver packet_receiver.PacketReceiver, transactionItemReceiver packet_receiver.PacketReceiver, joinedTransactionItems *strings.Builder) {
-	menuItemMap := createMenuItemMap(menuItemReceiver)
+	menuItemMap := createMenuItemMap(menuItemReceiver.GetPayload())
 
 	transactionItems := transactionItemReceiver.GetPayload()
 	lines := strings.Split(transactionItems, "\n")
