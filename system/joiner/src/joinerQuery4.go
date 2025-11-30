@@ -48,8 +48,8 @@ func createUserMap(userPayload string) map[string]string {
 
 func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
 	expected_datasets := []multiple_packet_receiver.NombreDataset {
-		multiple_packet_receiver.NombreDataset("store"),
-		multiple_packet_receiver.NombreDataset("user"),
+		multiple_packet_receiver.NombreDataset("stores"),
+		multiple_packet_receiver.NombreDataset("users"),
 		multiple_packet_receiver.NombreDataset("transactions"),
 	};
 
