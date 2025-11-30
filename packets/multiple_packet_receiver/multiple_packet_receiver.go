@@ -3,7 +3,6 @@ package multiple_packet_receiver
 import (
 	"bytes"
 	"fmt"
-	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
@@ -129,7 +128,9 @@ func (pr *MultiplePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool
 	pkt := pktMsg.Packet
 
 	sent := false
-	for _, receiver := range pr.receivers {
+	for i := 0; i < len(pr.receivers); i++ {
+		receiver := &pr.receivers[i]
+
 		if !receiver.canReceivePacket(&pkt) {
 			continue
 		}
@@ -186,7 +187,9 @@ func (pr *MultiplePacketReceiver) Clean() {
 	// terminamos.
 	pr.last_packet.Message.Ack(false)
 
-	for _, receiver := range pr.receivers {
+	for i := 0; i < len(pr.receivers); i++ {
+		receiver := &pr.receivers[i]
+
 		receiver.clean()
 	}
 }
@@ -202,7 +205,8 @@ func (pr *MultiplePacketReceiver) GetPayload() string {
 	}
 
 	dataset_map := make(map[NombreDataset] ContenidoCompleto, len(pr.receivers))
-	for _, receiver := range pr.receivers {
+	for i := 0; i < len(pr.receivers); i++ {
+		receiver        :=     &pr.receivers[i]
 		dataset_name    := receiver.getDatasetName()
 		dataset_content := receiver.getReceivedPackets()
 		dataset_map[dataset_name] = ContenidoCompleto(dataset_content)
