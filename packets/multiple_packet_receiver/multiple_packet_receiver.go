@@ -411,8 +411,8 @@ func (dr *datasetReceiver) checkIfReceivedAll() bool {
 
 // Retorna todos los paquetes recibidos SI estan todos.
 func (dr *datasetReceiver) getReceivedPackets() string {
-	if !dr.receivedAll {
-		panic("Invariante rota. Solo es valido obtener los paquetes recibidos si recibi todo.")
+	if !dr.checkIfReceivedAll() {
+		panic(fmt.Sprintf("Invariante rota de %s. Solo es valido obtener los paquetes recibidos si recibi todo.", dr.datasetName))
 	}
 
 	full_payload := dr.readStoredPackets()
