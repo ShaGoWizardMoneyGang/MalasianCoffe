@@ -111,6 +111,10 @@ func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to connect to the channel: %w", err)
 	}
+	err = ch.Confirm(false)
+	if err != nil {
+		panic("Failed to create channel")
+	}
 
 	q, err := ch.QueueDeclare(
 		name,  // name
@@ -131,11 +135,15 @@ func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, 
 	consumerTag := "ctag-" + name + "-" + uuid.GenerateUUID()
 	// Channel es donde van a llegar los mensajes a la cola
 
+	confirmation := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+
 	// Aca obtenemos channel
 	return &MessageMiddlewareQueue{
 		queueName:   name,
 		channel:     ch,
 		consumerTag: consumerTag,
+
+		confirmChannel: confirmation,
 	}, nil
 
 }
@@ -233,6 +241,15 @@ func (q *MessageMiddlewareQueue) Send(pkt packet.Packet) (error MessageMiddlewar
 		panic(fmt.Errorf("failed to send message: %w", err))
 		return MessageMiddlewareMessageError
 	}
+
+	confirmation, ok := <-q.confirmChannel
+	if !ok {
+		panic(fmt.Errorf("failed to send message: %w", err))
+	}
+	if !confirmation.Ack {
+		panic(fmt.Errorf("failed to send message: %w", err))
+	}
+
 	return 0
 }
 
