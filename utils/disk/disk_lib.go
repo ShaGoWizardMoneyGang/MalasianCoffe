@@ -101,6 +101,15 @@ func Read(path string) (string, error) {
 	return string_r, nil
 }
 
+func ReadBytes(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return []byte{}, nil
+	}
+
+	return data, nil
+}
+
 // Check if file/dir exists
 // Taken from: https://stackoverflow.com/a/10510783
 func Exists(path string) bool {

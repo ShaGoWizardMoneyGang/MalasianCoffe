@@ -169,6 +169,20 @@ func ChangePayloadGlobalAggregator(pkt Packet, datasetName string, newPayload []
 	return packets
 }
 
+func (p *Packet) ToString() string {
+	repr := fmt.Sprintf("======\n")
+	repr += fmt.Sprintf("HEADER\n")
+	repr += fmt.Sprintf("Session ID: %s\n", p.header.session_id)
+	repr += fmt.Sprintf("Packet UUID: %s\n", p.header.packet_uuid.uuid)
+	repr += fmt.Sprintf("Is EOF: %t\n", p.header.packet_uuid.eof)
+	repr += fmt.Sprintf("Client IP: %s\n", p.header.client_ip_port)
+	repr += fmt.Sprintf("PAYLOAD\n")
+	repr += fmt.Sprintf("%s\n", p.payload)
+	repr += fmt.Sprintf("======\n")
+	repr += fmt.Sprintf("\n")
+
+	return repr
+}
 
 func (p *Packet) GetPayload() string {
 	return p.payload
