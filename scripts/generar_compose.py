@@ -510,7 +510,7 @@ def main():
         for i in range(1, configs.get("partial-aggregator3", 0) + 1):
             sheeps_list.append(f"partial_aggregator3_{i}")
 
-        file.writelines(chaos_monkey_block())
+        # file.writelines(chaos_monkey_block())
 
         for i in range(1, configs.get("cliente", 0) + 1):
             client_line = client(i, external)

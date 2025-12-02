@@ -2,7 +2,9 @@ package network
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 )
 
@@ -20,7 +22,7 @@ func SendToNetwork(conn net.Conn, data []byte) error {
 func ReceiveFromNetwork(conn net.Conn) ([]byte, error) {
 	indicator, err := read(conn, 1)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to receive NetworkPacketIndicator (%w)", err)
+		return nil, fmt.Errorf("failed to receive network packet indicator: %w", err)
 	}
 	if indicator[0] != networkpacketindicator {
 		return nil, fmt.Errorf("NetworkPacket does not match expected NetworkPacket indicator. Expected %d, found %d", networkpacketindicator, int(indicator[0]))
@@ -28,11 +30,14 @@ func ReceiveFromNetwork(conn net.Conn) ([]byte, error) {
 
 	size_b, err := read(conn, 8)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to receive NetworkPacketIndicator size")
+		return nil, fmt.Errorf("Failed to receive NetworkPacketIndicator size: %w", err)
 	}
 	size := binary.BigEndian.Uint64(size_b)
 
 	data, err := read(conn, int(size))
+	if err != nil {
+		return nil, err
+	}
 
 	return data, nil
 }
@@ -73,14 +78,15 @@ func (np *networkPacket) serialize() []byte {
 func send(conn net.Conn, data []byte) error {
 	length := len(data)
 	if data == nil || length == 0 {
-		return fmt.Errorf("Tried to send empty data")
+		return fmt.Errorf("tried to send empty data")
 	}
 	var sent = 0
 	var err error
 	for offset := 0; offset < length; offset += sent {
-		sent, err = conn.Write(data[offset:])
+		data_send := data[offset:]
+		sent, err = conn.Write(data_send)
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 
@@ -95,11 +101,13 @@ func read(conn net.Conn, size int) ([]byte, error) {
 	for offset := 0; offset < size; offset += received {
 		received, err = conn.Read(buffer[offset:])
 		if err != nil {
-			break
+			if errors.Is(err, io.EOF) {
+				return nil, fmt.Errorf("[read func]connection closed while reading: %w", err)
+			}
+			return nil, err
 		}
 	}
-
-	return buffer, err
+	return buffer, nil
 }
 
 // NOTE: Esto no va a andar en Docker puede ser? Mepa que si.

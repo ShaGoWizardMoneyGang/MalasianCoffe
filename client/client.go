@@ -61,14 +61,14 @@ func createPackagesFrom(dir string, session_ID string, listen_addr string, send_
 
 			err = packetBuilder.Send(register)
 			if err != nil {
-				return err
+				panic(err)
 			}
 		}
 	}
 
 	err = packetBuilder.End()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	return nil
@@ -92,8 +92,8 @@ func main() {
 		panic(err)
 	}
 
-	client := Client {
-		sessionID: session_id,
+	client := Client{
+		sessionID:   session_id,
 		listen_addr: conn,
 	}
 
@@ -209,11 +209,11 @@ func (ra *received_answers) display() {
 	}
 }
 
-func receiveAnswer(conn net.Conn, out_dir string, sessionID string, finish_ch chan <- string) {
+func receiveAnswer(conn net.Conn, out_dir string, sessionID string, finish_ch chan<- string) {
 	packet_answer_b, err := network.ReceiveFromNetwork(conn)
 	if err != nil {
 		panic(fmt.Errorf("Failed to receive packet from %s because of %s", conn.LocalAddr().String(), err))
-		}
+	}
 
 	packet_answer_reader := bytes.NewReader(packet_answer_b)
 	packet_answer, err := packetanswer.DeserializePackageAnswer(packet_answer_reader)
@@ -238,7 +238,7 @@ func (c *Client) waitForAnswers(listen_addr string, out_dir string) error {
 	}
 	received_answers := new_received_answers()
 
-	finish     := make(chan string)
+	finish := make(chan string)
 	new_connection := make(chan net.Conn)
 
 	list, err := net.Listen("tcp", listen_addr)
