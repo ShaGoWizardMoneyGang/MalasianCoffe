@@ -3,7 +3,7 @@ package global_aggregator
 import (
 	"fmt"
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_receiver"
+	"malasian_coffe/packets/single_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
@@ -39,40 +39,43 @@ func (g *aggregator3Global) Build(rabbitAddr string, routing_key string, outs ma
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery3, g.outputChannel)
 }
 
-func aggregateQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-3")
+func aggregate_3_func(accumulated_input string, new_input string) string {
 	localAcc := make(map[keyQuery3]float64)
+	if accumulated_input != "" {
+		lines := strings.Split(accumulated_input, "\n")
+		for _, line := range lines {
+			if line == "" {
+				continue
+			}
+			columns := strings.Split(line, ",")
+			if len(columns) != 3 {
+				continue
+			}
+			yearHalf := columns[0]
+			storeID := columns[1]
+			totalStr := columns[2]
 
-	var last_packet packet.Packet
+			total, err := strconv.ParseFloat(totalStr, 64)
+			if err != nil {
+				panic("Total con formato inválido")
+			}
 
-	for {
-		pktMsg := <-inputChannel
-		pkt := pktMsg.Packet
-
-		localReceiver.ReceivePacket(pktMsg)
-
-		if localReceiver.ReceivedAll() {
-			last_packet = pkt
-			break
+			k := keyQuery3{yearHalf: yearHalf, storeID: storeID}
+			localAcc[k] = total
 		}
 	}
-
-	consolidatedInput := localReceiver.GetPayload()
-
-	lines := strings.Split(consolidatedInput, "\n")
-	lines = lines[:len(lines)-1]
-
+	lines := strings.Split(new_input, "\n")
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
-		cols := strings.Split(line, ",")
-		if len(cols) != 3 {
-			panic("Se esperaban 3 columnas")
+		columns := strings.Split(line, ",")
+		if len(columns) != 3 {
+			continue
 		}
-		yearHalf := cols[0]
-		storeID := cols[1]
-		totalStr := cols[2]
+		yearHalf := columns[0]
+		storeID := columns[1]
+		totalStr := columns[2]
 
 		total, err := strconv.ParseFloat(totalStr, 64)
 		if err != nil {
@@ -83,8 +86,61 @@ func aggregateQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, 
 		localAcc[k] += total
 	}
 
-	keys := make([]keyQuery3, 0, len(localAcc))
-	for k := range localAcc {
+	var b strings.Builder
+	for key, total := range localAcc {
+		fmt.Fprintf(&b, "%s,%s,%f\n", key.yearHalf, key.storeID, total)
+	}
+
+	return b.String()
+}
+
+func aggregateQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := single_packet_receiver.NewSinglePacketReceiver(sessionID, aggregate_3_func)
+
+	var last_packet packet.Packet
+	var aggregated_packets string
+
+	for {
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
+
+		received_all := localReceiver.ReceivePacket(pktMsg)
+
+		if !received_all {
+			continue
+		}
+
+		aggregated_packets = localReceiver.GetPayload()
+		last_packet = pkt
+		break
+	}
+
+	totalAcc := make(map[keyQuery3]float64)
+
+	lines := strings.Split(aggregated_packets, "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		columns := strings.Split(line, ",")
+		if len(columns) != 3 {
+			continue
+		}
+		yearHalf := columns[0]
+		storeID := columns[1]
+		totalStr := columns[2]
+
+		total, err := strconv.ParseFloat(totalStr, 64)
+		if err != nil {
+			panic("Total con formato inválido")
+		}
+
+		k := keyQuery3{yearHalf: yearHalf, storeID: storeID}
+		totalAcc[k] = total
+	}
+
+	keys := make([]keyQuery3, 0, len(totalAcc))
+	for k := range totalAcc {
 		keys = append(keys, k)
 	}
 
@@ -97,15 +153,18 @@ func aggregateQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, 
 
 	var b strings.Builder
 	for _, k := range keys {
-		total := localAcc[k]
+		total := totalAcc[k]
 		fmt.Fprintf(&b, "%s,%s,%.2f\n", k.yearHalf, k.storeID, total)
 	}
 
 	final := b.String()
-	// if final != "" {
+
 	newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transactions", []string{final})
+
 	outputChannel <- newPkts[0]
-	// }
+
+	localReceiver.Clean()
+
 }
 
 func (g *aggregator3Global) Process() {

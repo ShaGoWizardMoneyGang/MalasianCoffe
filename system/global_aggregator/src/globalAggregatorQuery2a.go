@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_receiver"
+	"malasian_coffe/packets/single_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
@@ -43,43 +42,46 @@ func (g *aggregator2aGlobal) Build(rabbitAddr string, routing_key string, outs m
 	g.sessionHandler = sessionhandler.NewSessionHandler(aggregateQuery2a, g.outputChannel)
 }
 
-func aggregateQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	localReceiver := packet_receiver.NewPacketReceiver("agregador-global-2a")
+func aggregate_2a_func(accumulated_input string, new_input string) string {
 	localAcc := make(map[keyQuery2a]int64)
 
-	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
-	// jugosa metadata
-	var last_packet packet.Packet
+	// Si no está vacío el accumulated_input, convierto a diccionario el contenido
+	if accumulated_input != "" {
+		lines := strings.Split(accumulated_input, "\n")
+		for _, line := range lines {
+			if line == "" {
+				continue
+			}
+			columns := strings.Split(line, ",")
+			if len(columns) != 3 {
+				continue
+			}
+			yearMonth := columns[0]
+			itemID := columns[1]
+			quantityStr := columns[2]
 
-	for {
-		pktMsg := <-inputChannel
-		pkt := pktMsg.Packet
+			quantity, err := strconv.ParseInt(quantityStr, 10, 64)
+			if err != nil {
+				panic("Quantity con formato inválido")
+			}
 
-		localReceiver.ReceivePacket(pktMsg)
-
-		if localReceiver.ReceivedAll() {
-			last_packet = pkt
-			break
+			k := keyQuery2a{yearMonth: yearMonth, itemID: itemID}
+			localAcc[k] = quantity
 		}
 	}
 
-	consolidatedInput := localReceiver.GetPayload()
-
-	lines := strings.Split(consolidatedInput, "\n")
-	lines = lines[:len(lines)-1]
-
+	lines := strings.Split(new_input, "\n")
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
-		cols := strings.Split(line, ",")
-		if len(cols) != 3 {
-			bitacora.Debug("Se esperaban 3 columnas")
+		columns := strings.Split(line, ",")
+		if len(columns) != 3 {
 			continue
 		}
-		yearMonth := cols[0]
-		itemID := cols[1]
-		quantityStr := cols[2]
+		yearMonth := columns[0]
+		itemID := columns[1]
+		quantityStr := columns[2]
 
 		quantity, err := strconv.ParseInt(quantityStr, 10, 64)
 		if err != nil {
@@ -88,6 +90,62 @@ func aggregateQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage,
 
 		k := keyQuery2a{yearMonth: yearMonth, itemID: itemID}
 		localAcc[k] += quantity
+
+	}
+
+	var b strings.Builder
+	for key, quantity := range localAcc {
+		fmt.Fprintf(&b, "%s,%s,%d\n", key.yearMonth, key.itemID, quantity)
+	}
+
+	return b.String()
+
+}
+
+func aggregateQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	localReceiver := single_packet_receiver.NewSinglePacketReceiver(sessionID, aggregate_2a_func)
+
+	var last_packet packet.Packet
+	var aggregated_packets string
+
+	for {
+		pktMsg := <-inputChannel
+		pkt := pktMsg.Packet
+
+		received_all := localReceiver.ReceivePacket(pktMsg)
+
+		if !received_all {
+			continue
+		}
+
+		aggregated_packets = localReceiver.GetPayload()
+		last_packet = pkt
+		break
+	}
+
+	totalAcc := make(map[keyQuery2a]int64)
+
+	// Si no está vacío el accumulated_input, convierto a diccionario el contenido
+	lines := strings.Split(aggregated_packets, "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		columns := strings.Split(line, ",")
+		if len(columns) != 3 {
+			continue
+		}
+		yearMonth := columns[0]
+		itemID := columns[1]
+		quantityStr := columns[2]
+
+		quantity, err := strconv.ParseInt(quantityStr, 10, 64)
+		if err != nil {
+			panic("Quantity con formato inválido")
+		}
+
+		k := keyQuery2a{yearMonth: yearMonth, itemID: itemID}
+		totalAcc[k] = quantity
 	}
 
 	monthlyMax := make(map[string]struct {
@@ -95,7 +153,7 @@ func aggregateQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage,
 		quantity int64
 	})
 
-	for k, value := range localAcc {
+	for k, value := range totalAcc {
 		yearMonth := k.yearMonth
 		if current, exists := monthlyMax[yearMonth]; !exists || value > current.quantity {
 			monthlyMax[yearMonth] = struct {
@@ -108,7 +166,7 @@ func aggregateQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage,
 		}
 	}
 
-	var b strings.Builder
+	var topQuantityProducts strings.Builder
 	months := make([]string, 0, len(monthlyMax))
 	for month := range monthlyMax {
 		months = append(months, month)
@@ -117,19 +175,14 @@ func aggregateQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage,
 
 	for _, month := range months {
 		maxItem := monthlyMax[month]
-		fmt.Fprintf(&b, "%s,%s,%d\n", month, maxItem.itemID, maxItem.quantity)
+		fmt.Fprintf(&topQuantityProducts, "%s,%s,%d\n", month, maxItem.itemID, maxItem.quantity)
 	}
 
-	final := b.String()
-
-	// QUESTION: Ojo, es *RE* importante que siempre mandemos un paquete. Si
-	// por algun motivo esto esta vacio, hay que enviar el texto vacio porque
-	// sino rompemos la invariante del sistema del ordenamiento de paquetes.
-	// if final != "" {
-	newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transaction_items", []string{final})
+	newPkts := packet.ChangePayloadGlobalAggregator(last_packet, "transaction_items", []string{topQuantityProducts.String()})
 
 	outputChannel <- newPkts[0]
-	// }
+
+	localReceiver.Clean()
 }
 
 func (g *aggregator2aGlobal) Process() {
