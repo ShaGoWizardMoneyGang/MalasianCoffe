@@ -79,8 +79,10 @@ func main() {
 	source  := rand.NewSource(semilla)
 	rnd := rand.New(source)
 
-	for _, node := range nodes {
+	for {
 		numAleatorio := rnd.Intn(100) // Número aleatorio entre 0 y 99
+		nodoAleatorio := rnd.Intn(len(nodes))
+		node          := nodes[nodoAleatorio]
 		if numAleatorio >= threshold {
 			cmd := exec.Command("sh", "-c", "docker stop -s SIGKILL "+node)
 			output, err := cmd.CombinedOutput()
