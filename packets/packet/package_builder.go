@@ -67,9 +67,8 @@ func NewPacketBuilder(directory_name string, sessionID string, client_ip_port st
 	}
 }
 
-func (pb *PacketBuilder) Send(register string, last_sequence_number int) error {
+func (pb *PacketBuilder) Send(register string) error {
 	if pb.payload_buffer.Len()+len(register) > MAX_BATCH_SIZE {
-		fmt.Printf("Current sequence number: %d\n", pb.currentSequenceNumber)
 		packet, err := pb.createPacket(pb.payload_buffer.String(), false)
 		if err != nil {
 			panic(err)

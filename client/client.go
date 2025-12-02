@@ -59,7 +59,7 @@ func createPackagesFrom(dir string, session_ID string, listen_addr string, send_
 		for csv_reader.Scan() {
 			register := csv_reader.Text() + "\n"
 
-			err = packetBuilder.Send(register, 0) //aca deberia devolver de donde seguir asi se guarda en disco
+			err = packetBuilder.Send(register)
 			if err != nil {
 				panic(err)
 			}
