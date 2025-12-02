@@ -297,10 +297,14 @@ func (pr *SinglePacketReceiver) Clean() {
 	// Antes de borrar, tenemos que ACKEAR. Sino, podria pasar de borrar todo,
 	// morir, y cuando nos re-envian el ultimo paquete, no sabemos que ya
 	// terminamos.
+	pr.checkpointer.checkpoint(ackFinal)
 	pr.last_packet.Message.Ack(false)
+
+	pr.checkpointer.checkpoint(aboutToClean)
 
 	path := pr.path_resolver.resolve_path(root)
 	disk.DeleteDirRecursively(path)
+	pr.checkpointer.checkpoint(clean)
 }
 
 
@@ -721,6 +725,9 @@ const (
 	logAhead
 	laburoParcial
 	logBehind
+	ackFinal
+	aboutToClean
+	clean
 )
 
 func (c *checkpointMoment) toString() string {
@@ -742,6 +749,12 @@ func (c *checkpointMoment) toString() string {
 		repr = "LABUROPARCIAL"
 	case logBehind:
 		repr = "LOGBEHIND"
+	case ackFinal:
+		repr = "ACK-FINAL"
+	case aboutToClean:
+		repr = "ABOUT-TO-CLEAN"
+	case clean:
+		repr = "CLEAN"
 	}
 	return repr
 }
