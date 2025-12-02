@@ -98,7 +98,7 @@ func aggregate_2b_func(accumulated_input string, new_input string) string {
 	return b.String()
 }
 
-func aggregateSessionQuery2b(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+func aggregateSessionQuery2b(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan packet.Packet) {
 	localReceiver := single_packet_receiver.NewSinglePacketReceiver(sessionID, aggregate_2b_func)
 
 	var last_packet packet.Packet
@@ -177,6 +177,8 @@ func aggregateSessionQuery2b(sessionID string, inputChannel <-chan colas.PacketM
 
 	outputChannel <- newPkts[0]
 
+	<-outputChannel
+
 	localReceiver.Clean()
 }
 
@@ -194,6 +196,7 @@ func (g *aggregator2bGlobal) Process() {
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
 			g.exchangeSalida.Send(packetAgregado)
+			g.outputChannel <- packetAgregado
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
 			fmt.Println("GlobalAggregator 2b received healthcheck ping from", IP)
