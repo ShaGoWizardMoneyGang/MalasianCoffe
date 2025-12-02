@@ -2,17 +2,15 @@ package joiner
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_receiver"
+	"malasian_coffe/packets/multiple_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
-	"malasian_coffe/utils/dataset"
 )
 
 type joinerQuery4 struct {
@@ -30,9 +28,8 @@ type joinerQuery4 struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func createUserMap(userReceiver packet_receiver.PacketReceiver) map[string]string {
-	storePkt := userReceiver.GetPayload()
-	lines := strings.Split(storePkt, "\n")
+func createUserMap(userPayload string) map[string]string {
+	lines := strings.Split(userPayload, "\n")
 	lines = lines[:len(lines)-1]
 
 	// Le damos un tamano inicial de lines porque deberia tener un tamano igual
@@ -48,17 +45,18 @@ func createUserMap(userReceiver packet_receiver.PacketReceiver) map[string]strin
 	return storeID2Name
 }
 
+
 func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	storeReceiver := packet_receiver.NewPacketReceiver("store")
+	expected_datasets := []multiple_packet_receiver.NombreDataset {
+		multiple_packet_receiver.NombreDataset("stores"),
+		multiple_packet_receiver.NombreDataset("users"),
+		multiple_packet_receiver.NombreDataset("transactions"),
+	};
 
-	userReceiver := packet_receiver.NewPacketReceiver("user")
-
-	// Aca me guardo todos los packets de transactions que llegaron antes de los
-	// stores. Deberian ser pocos (si es que existen)
-	transactionReceiver := packet_receiver.NewPacketReceiver("transactions")
+	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery4)
 
 	// Resultado final
-	var joinedTransactions strings.Builder
+	var joinedTransactions string
 
 	// Nos guardamos el ultimo paquete para extraer la metadata, la dulce y
 	// jugosa metadata
@@ -68,42 +66,25 @@ func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outpu
 		pktMsg := <-inputChannel
 		pkt := pktMsg.Packet
 
-		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
-		dataset_name, err := dataset.IDtoDataset(packet_id)
-		if err != nil {
-			panic(err)
+		received_all := packet_receiver.ReceivePacket(pktMsg)
+
+		if !received_all {
+			continue
 		}
 
-		if dataset_name == "stores" {
-			storeReceiver.ReceivePacket(pktMsg)
-		} else if dataset_name == "users" {
-			userReceiver.ReceivePacket(pktMsg)
-		} else if dataset_name == "transactions" {
-			transactionReceiver.ReceivePacket(pktMsg)
-
-		} else {
-			bitacora.Error(fmt.Sprintf("JoinerQuery4 received packet from dataset that was not expecting: %s", dataset_name))
-		}
-
-		// No joineamos hasta tenerlo todo.
-		if storeReceiver.ReceivedAll() && userReceiver.ReceivedAll() && transactionReceiver.ReceivedAll() {
-			// jq4.logger.Info("Comienza proceso de join")
-			joinerFunctionQuery4(storeReceiver, userReceiver, transactionReceiver, &joinedTransactions)
-
-			last_packet = pkt
-			break
-		}
+		joinedTransactions = packet_receiver.GetPayload()
+		last_packet = pkt
+		break
 	}
 
-	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"users", "stores", "transactions"}, []string{joinedTransactions.String()})
-
-	// Liberamos
-	joinedTransactions.Reset()
+	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"users", "stores", "transactions"}, []string{joinedTransactions})
 
 	for _, pkt := range pkt_joineado {
 		bitacora.Info(fmt.Sprintf("Envio pkt joineado al sender, session: %s", pkt.GetSessionID()))
 		outputChannel <- pkt
 	}
+
+	packet_receiver.Clean()
 }
 
 func (jq4 *joinerQuery4) Build(rabbitAddr string, routingKey string) {
@@ -150,11 +131,13 @@ func (jq4 *joinerQuery4) Process() {
 	}
 }
 
-func joinerFunctionQuery4(storeReceiver packet_receiver.PacketReceiver, userReceiver packet_receiver.PacketReceiver, transactionReceiver packet_receiver.PacketReceiver, joinedTransactions *strings.Builder) {
-	userMap := createUserMap(userReceiver)
-	storeMap := createStoreMap(storeReceiver)
+func joinerFunctionQuery4(inputs map[multiple_packet_receiver.NombreDataset]multiple_packet_receiver.ContenidoCompleto) string {
+	userMap := createUserMap(string(inputs["user"]))
+	storeMap := createStoreMap(string(inputs["store"]))
+	transactions := string(inputs["transaction"])
 
-	transactions := transactionReceiver.GetPayload()
+	var joinedTransactions strings.Builder
+
 	lines := strings.Split(transactions, "\n")
 	lines = lines[:len(lines)-1]
 	for _, r := range lines {
@@ -172,6 +155,10 @@ func joinerFunctionQuery4(storeReceiver packet_receiver.PacketReceiver, userRece
 		}
 
 		// Necesito algo del estilo: storeName, birthday
-		fmt.Fprintf(joinedTransactions, "%s,%s\n", storeName, userBirthday)
+		fmt.Fprintf(&joinedTransactions, "%s,%s\n", storeName, userBirthday)
 	}
+
+	final_result := joinedTransactions.String()
+
+	return final_result
 }

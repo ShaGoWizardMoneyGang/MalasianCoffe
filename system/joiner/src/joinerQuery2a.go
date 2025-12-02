@@ -3,17 +3,15 @@ package joiner
 import (
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_receiver"
+	"malasian_coffe/packets/multiple_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
 	"malasian_coffe/utils/colas"
-	"malasian_coffe/utils/dataset"
 )
 
 type joinerQuery2a struct {
@@ -31,11 +29,14 @@ type joinerQuery2a struct {
 }
 
 func joinQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	menuItemReceiver := packet_receiver.NewPacketReceiver("menu-items")
+	expected_datasets := []multiple_packet_receiver.NombreDataset {
+		multiple_packet_receiver.NombreDataset("menu_items"),
+		multiple_packet_receiver.NombreDataset("transaction_items"),
+	};
 
-	transactionItemReceiver := packet_receiver.NewPacketReceiver("transaction-items")
+	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery2a)
 
-	var joinedTransactionItems strings.Builder
+	var joinedTransactions string
 
 	var last_packet packet.Packet
 
@@ -43,37 +44,25 @@ func joinQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage, outp
 		pktMsg := <-inputChannel
 		pkt := pktMsg.Packet
 
-		packet_id, err := strconv.ParseUint(pkt.GetDirID(), 10, 64)
-		dataset_name, err := dataset.IDtoDataset(packet_id)
-		if err != nil {
-			panic(err)
+		received_all := packet_receiver.ReceivePacket(pktMsg)
+
+		if !received_all {
+			continue
 		}
 
-		if dataset_name == "menu_items" {
-			menuItemReceiver.ReceivePacket(pktMsg)
-		} else if dataset_name == "transaction_items" {
-			transactionItemReceiver.ReceivePacket(pktMsg)
-		} else {
-			panic(fmt.Errorf("JoinerQuery2a received packet from dataset that was not expecting: %s", dataset_name))
-		}
-
-		if menuItemReceiver.ReceivedAll() && transactionItemReceiver.ReceivedAll() {
-			slog.Info("Comienza proceso de join")
-			joinerFunctionQuery2a(menuItemReceiver, transactionItemReceiver, &joinedTransactionItems)
-
-			last_packet = pkt
-			break
-		}
+		joinedTransactions = packet_receiver.GetPayload()
+		last_packet = pkt
+		break
 	}
 
-	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"menu_items", "transaction_items"}, []string{joinedTransactionItems.String()})
-
-	joinedTransactionItems.Reset()
+	pkt_joineado := packet.ChangePayloadJoin(last_packet, []string{"menu_items", "transaction_items"}, []string{joinedTransactions})
 
 	for _, pkt := range pkt_joineado {
 		bitacora.Info(fmt.Sprintf("Envio pkt joineado al sender, session: %s", pkt.GetSessionID()))
 		outputChannel <- pkt
 	}
+
+	packet_receiver.Clean()
 }
 
 func (jq2a *joinerQuery2a) Build(rabbitAddr string, routingKey string) {
@@ -113,10 +102,12 @@ func (jq2a *joinerQuery2a) Process() {
 	}
 }
 
-func joinerFunctionQuery2a(menuItemReceiver packet_receiver.PacketReceiver, transactionItemReceiver packet_receiver.PacketReceiver, joinedTransactionItems *strings.Builder) {
-	menuItemMap := createMenuItemMap(menuItemReceiver)
+func joinerFunctionQuery2a(inputs map[multiple_packet_receiver.NombreDataset]multiple_packet_receiver.ContenidoCompleto) string {
+	menuItemMap := createMenuItemMap(string(inputs["menu_items"]))
+	transactionItems := string(inputs["transaction_items"])
 
-	transactionItems := transactionItemReceiver.GetPayload()
+	var joinedTransaction strings.Builder
+
 	lines := strings.Split(transactionItems, "\n")
 	lines = lines[:len(lines)-1]
 
@@ -128,6 +119,11 @@ func joinerFunctionQuery2a(menuItemReceiver packet_receiver.PacketReceiver, tran
 		yearMonth, itemID, sellings_qty := cols[0], cols[1], cols[2]
 		itemName := menuItemMap[itemID]
 
-		fmt.Fprintf(joinedTransactionItems, "%s,%s,%s\n", yearMonth, itemName, sellings_qty)
+		fmt.Fprintf(&joinedTransaction, "%s,%s,%s\n", yearMonth, itemName, sellings_qty)
 	}
+
+	final_result := joinedTransaction.String()
+
+	return final_result
 }
+

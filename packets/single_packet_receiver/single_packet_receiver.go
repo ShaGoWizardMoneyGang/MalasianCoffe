@@ -14,9 +14,19 @@ import (
 	"strings"
 )
 
-const (
-	PACKET_WINDOW int = 50
-)
+// =============================================================================
+// ===                                                                       ===
+// ===                                                                       ===
+// ===   ___  ______ _____    ______ _   _______ _     _____ _____   ___     ===
+// ===  / _ \ | ___ \_   _|   | ___ \ | | | ___ \ |   |_   _/  __ \ / _ \    ===
+// === / /_\ \| |_/ / | |     | |_/ / | | | |_/ / |     | | | /  \// /_\ \   ===
+// === |  _  ||  __/  | |     |  __/| | | | ___ \ |     | | | |    |  _  |   ===
+// === | | | || |    _| |_    | |   | |_| | |_/ / |_____| |_| \__/\| | | |   ===
+// === \_| |_/\_|    \___/    \_|    \___/\____/\_____/\___/ \____/\_| |_/   ===
+// ===                                                                       ===
+// ===                                                                       ===
+// ===                                                                       ===
+// =============================================================================
 
 // Este Packet Receiver esta pensado para workers que solo reciben un tipo de paquete,
 // como los global aggregators y el concater.
@@ -70,7 +80,7 @@ type SinglePacketReceiver struct {
 
 	logger logger
 
-	windowFull bool
+	allReceived bool
 
 	checkpointer checkpointer
 
@@ -78,91 +88,590 @@ type SinglePacketReceiver struct {
 	// ACK con la funcion de clean.
 	// OJO AL PIOJO: Arranca como basura hasta que se obtiene el ultimo paquete.
 	last_packet colas.PacketMessage
+
+	// Session UUID
+	identifier string
 }
 
+
+func NewSinglePacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) SinglePacketReceiver {
+	pathResolver := newPathResolver(identifier)
+	packet_receiver_dir := pathResolver.resolve_path(root)
+	if !disk.Exists(packet_receiver_dir) {
+		disk.CreateDir(packet_receiver_dir)
+	}
+
+	metada_dir := pathResolver.resolve_path(metadata)
+	if !disk.Exists(metada_dir) {
+		disk.CreateDir(metada_dir)
+	}
+	received_eof_file := pathResolver.resolve_path(receivedEof)
+	if !disk.Exists(received_eof_file) {
+		disk.CreateFile(received_eof_file)
+	}
+
+	partial_work_file := pathResolver.resolve_path(partialWorkIndicator)
+	if !disk.Exists(partial_work_file) {
+		disk.CreateFile(partial_work_file)
+	}
+	packets_dir := pathResolver.resolve_path(packets)
+	if !disk.Exists(packets_dir) {
+		disk.CreateDir(packets_dir)
+	}
+
+
+	received_eof_s, err := disk.Read(received_eof_file)
+	if err != nil {
+		panic(err)
+	}
+	var received_eof int
+	if received_eof_s == "" {
+		// -1 representa si lo recibi o no
+		received_eof = -1
+	} else {
+		received_eof_i64, err := strconv.ParseInt(received_eof_s, 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		received_eof_i := int(received_eof_i64)
+
+		received_eof = received_eof_i
+	}
+
+	// Tenemos que llamar al logger antes de calcular la ventana, porque este lo
+	// va a modificar.
+	logger := newLogger("BORRAR", "BORRADO",
+		pathResolver.resolve_path(receivedSqns),
+		pathResolver.resolve_path(logFile),
+		pathResolver.resolve_path(packets),
+	)
+
+
+	packets_in_window := []packet.Packet{}
+	entries, err := os.ReadDir(packets_dir)
+	for _, file := range entries {
+		packet_file, err := os.Open(packets_dir + "/" + file.Name())
+		if err != nil {
+			panic(err)
+		}
+		packet_serialized, err := os.ReadFile(packet_file.Name())
+		if err != nil {
+			panic(err)
+		}
+
+		packetReader := bytes.NewReader(packet_serialized)
+		packet, err := packet.DeserializePackage(packetReader)
+
+		packets_in_window = append(packets_in_window, packet)
+	}
+
+
+	checkpointer_root := pathResolver.resolve_path(checkpoint)
+	checkpointer := newCheckpointer(checkpointer_root)
+
+
+	single_packet_receiver := SinglePacketReceiver{
+		packets_in_window:         packets_in_window,
+		transformer:               transformer,
+		EOF:                       received_eof,
+		path_resolver:             pathResolver,
+		logger:                    logger,
+		// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
+		allReceived:                false,
+		checkpointer:              checkpointer,
+		identifier:                identifier,
+	}
+
+	// Chequeo si me quedo pendiente un flush
+	allReceived := single_packet_receiver.checkIfReceivedAll()
+
+	amount_packets_in_window := len(single_packet_receiver.packets_in_window)
+	do_flush_window := amount_packets_in_window >= pACKET_WINDOW
+	if do_flush_window || allReceived {
+		single_packet_receiver.flushWindow()
+	}
+
+	return single_packet_receiver
+}
+
+// Devuelve un booleano que representa si se recivieron todos los paquetes
+// dentro de la ventana. Si este es el caso, se tienen que procesar.
+func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
+	pr.checkpointer.reset_window()
+	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
+	pkt := pktMsg.Packet
+	pr.checkpointer.checkpoint(llegoElPaquete)
+
+	if pkt.GetSessionID() != pr.identifier {
+		panic("Recibi un paquete que no era de mi session.")
+	}
+
+	// Tengo que chequear si ya recibi todo antes de empezar, puede ser que me
+	// haya muerto justo antes de procesar el ultimo paquete.
+	allReceived := pr.checkIfReceivedAll()
+
+	// fmt.Printf("Recibi %s\n", pkt.GetSequenceNumberString())
+	allreadyProcessed := pr.logger.checkIfAlreadyProcessed(pkt.GetSequenceNumber())
+
+	alreadyInWindow := pr.checkIfInWindow(pkt)
+
+	// Guardo el paquete que acabo de recibir en disco si y solo si no lo recibi antes.
+	// Esto quiere decir que ni esta en la ventana ni esta ya procesado.
+	if !alreadyInWindow && !allreadyProcessed && !allReceived {
+		// NOTE: Por convencion, el nombre del archivo es su numero de secuencia
+		pkt_file := pr.path_resolver.resolve_path(packets) + pkt.GetSequenceNumberString()
+		disk.AtomicWrite(pkt.Serialize(), pkt_file)
+		if pkt.IsEOF() {
+			pr.EOF = pkt.GetSequenceNumber()
+			eof_sequence_number := pkt.GetSequenceNumberString()
+			received_eof_file := pr.path_resolver.resolve_path(receivedEof)
+			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+		}
+	}
+
+	// Si el programa se cae antes de anadirlo, no pasa porque se escribe en
+	// disco. Cuando vuelva a iniciarse el programa, va a leer el archivo del
+	// directorio packets y lo va a anadir en el array. Eso si, puede ser que
+	// lo vuelvan a enviar, en ese caso, no lo tengo que anadir dos veces en
+	// la ventana.
+	// Ahora, si ya recibi todo, no necesito anadirlo, incluso si no esta en
+	// la ventana porque ya tengo que enviarlo todo
+	if !alreadyInWindow && !allreadyProcessed && !allReceived {
+		pr.packets_in_window = append(pr.packets_in_window, pkt)
+	}
+
+
+	// NOTE: Me parece que no hace falta ordernarlo, pero lo hago por las dudas.
+	slices.SortFunc(pr.packets_in_window, func(i, j packet.Packet) int {
+			sn_i := i.GetSequenceNumber()
+			sn_j := j.GetSequenceNumber()
+			return sn_i - sn_j
+	})
+
+	allReceivedNow := pr.checkIfReceivedAll()
+	if allReceived == true && allReceivedNow == false {
+		panic("Antes de empezar pense que tenia todo, y ahora que lo re-calculo me figura que no.")
+	}
+	allReceived = allReceivedNow
+
+	// Tengo que procesar la ventana en dos casos:
+	// 1. Si la cantidad de paquetes excede la ventana, tengo que procesarlos
+	//    para liberar la ventana y dar lugar a la proxima tanda.
+	// 2. Si recibi todos los paquetes, entonces tambien tengo que procesar la
+	//    ventana. Lo que puede pasar es que la ventana este llena a medias,
+	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
+	amount_packets_in_window := len(pr.packets_in_window)
+	do_flush_window := amount_packets_in_window >= pACKET_WINDOW
+	if do_flush_window || allReceived {
+		pr.flushWindow()
+	}
+
+	pr.allReceived = allReceived
+
+	pr.checkpointer.checkpoint(preACK)
+	// Hacemos ACK recien al final. Antes lo haciamos apenas guardabamos el paquete en disco.
+	// Pero, haciendolo al final nos aseguramos que el flujo sea mas
+	// consistente. Esto es especialmente util en el caso borde del ultimo
+	// paquete. Si hacemos ACK del ultimo paquete antes de hacer todo el
+	// pipeline de procesamiento, cagamos. Esto pasa porque el SessionHandler
+	// solo instacia un PacketReceiver si recibe un paquete. Entonces, si no
+	// hay paquetes para enviar, no va a instanciarlo nunca y el ultimo cachito
+	// de procesamiento de simplemente enviar lo que tengo nunca se va a
+	// llamar.  Esto tambien implica que el ACK final lo tenemos que hacer
+	// DESPUES de enviar los datos, igual que con los otros nodos. Al final,
+	// terminan siendo mas parecidos de lo que pensamos inicialmente.
+	if allReceived {
+		pr.last_packet = pktMsg
+	} else {
+		pktMsg.Message.Ack(false)
+	}
+	pr.checkpointer.checkpoint(hiceACK)
+
+
+	return allReceived
+}
+
+
+// Funcion que destruye todos los archivos creados por el SinglePacketReceiver
+func (pr *SinglePacketReceiver) Clean() {
+	// Antes de borrar, tenemos que ACKEAR. Sino, podria pasar de borrar todo,
+	// morir, y cuando nos re-envian el ultimo paquete, no sabemos que ya
+	// terminamos.
+	pr.last_packet.Message.Ack(false)
+
+	path := pr.path_resolver.resolve_path(root)
+	disk.DeleteDirRecursively(path)
+}
+
+
+// Devuelve el packet acumulado.
+func (pr *SinglePacketReceiver) GetPayload() string {
+	if pr.allReceived != true {
+		// NOTE: No borrar este panic. Es importante que si en algun momento
+		// se rompe la invariante, que el programa explote para poder debugear
+		// mejor.
+		// Un error no lo solucionaria porque esos son ignorables.
+		panic("Invariante del Single Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
+	}
+
+	// TODO: Optimizacion: Si ya esta cargado en memoria, no lo vuelvo a leer
+	// del disco.
+	partial_work := pr.read_partial_work()
+	finished_work := partial_work.accumulated_work
+
+	return finished_work
+}
+
+
+// =============================================================================
+// ===                                                                       ===
+// ===                                                                       ===
+// ===                      _     ___________                                ===
+// ===                     | |   |_   _| ___ \                               ===
+// ===                     | |     | | | |_/ /                               ===
+// ===                     | |     | | | ___ \                               ===
+// ===                     | |_____| |_| |_/ /                               ===
+// ===                     \_____/\___/\____/                                ===
+// ===                                                                       ===
+// ===                                                                       ===
+// ===                                                                       ===
+// =============================================================================
+
+// Libreria interna del packet receiver.
+
+const (
+	pACKET_WINDOW int = 50
+)
+
+
+// windowContent contiente el contenido de la ventana. Esto normalmente se obtiene
+// con un strings.Builder y el metodo WriteString
+func (pr *SinglePacketReceiver) flushWindow() {
+	var buffer strings.Builder
+	defer buffer.Reset()
+	var pkt_sqn_number []int
+	for _, wind_pkt := range pr.packets_in_window {
+		buffer.WriteString(wind_pkt.GetPayload())
+		pkt_sqn_number = append(pkt_sqn_number, wind_pkt.GetSequenceNumber())
+	}
+
+	pr.checkpointer.checkpoint(preFlushear)
+
+
+
+	// LOG De todos los archivos que voy a borrar: Stage 1.
+	// En la packet window: A, B, C
+	// Voy a borrar A
+	// Voy a borrar B
+	// Voy a borrar C
+	//
+	// NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
+	// log, no pasa nada, porque cuando se levante de vuelta va a ver que
+	// tiene en la ventana mas paquetes de los que esta anotada. Entonces,
+	// solo tiene que anadir los paquetes que le faltan en el log.
+	for _, packet := range pr.packets_in_window {
+		sq_n := packet.GetSequenceNumberString()
+		pr.logger.write_ahead(sq_n)
+	}
+
+	pr.checkpointer.checkpoint(logAhead)
+
+	pr.writePartialWork(buffer.String(), pkt_sqn_number)
+
+	pr.checkpointer.checkpoint(laburoParcial)
+
+	// LOG De todos los archivos que borre: Stage 2.
+	// En la packet window: A, B, C
+	// Voy a borrar A
+	// Voy a borrar B
+	// Voy a borrar C
+	// Borre A
+	// Borre B
+	// Borre C
+
+	// NOTE: Si se muere antes de escribir todos los "borre", no pasa
+	// nada. Porque cuando reviva va a ver que tiene mas "Voy a borrar"
+	// que "Borre", entonces va a poder saber que se murio en el medio del
+	// procesamiento.
+	for _, packet := range pr.packets_in_window {
+		sq_n := packet.GetSequenceNumberString()
+		// Aca tambien se borra el recurso asociado
+		pr.logger.delete_behind(sq_n)
+	}
+	pr.checkpointer.checkpoint(logBehind)
+
+	// Ahora que la ventana esta procesada, y el cambio esta en disco,
+	// actualizamos la memoria.
+	pr.packets_in_window = nil
+	buffer.Reset()
+	pr.logger.clear()
+}
+
+func (pr *SinglePacketReceiver) checkIfInWindow(pkt packet.Packet) bool {
+	is_in := false
+
+	for i := 0; i < len(pr.packets_in_window) && is_in == false ; i++ {
+		curr_pkt := pr.packets_in_window[i]
+		curr_pkt_sqn := curr_pkt.GetSequenceNumber()
+
+		is_in =  curr_pkt_sqn == pkt.GetSequenceNumber()
+	}
+
+	return is_in
+}
+
+func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
+	processed_sequence_number := pr.logger.get_processed_number()
+
+	received_packets := make([]int, len(processed_sequence_number) + len(pr.packets_in_window))
+
+	for i, wind_pkt := range pr.packets_in_window {
+		sq_n     := wind_pkt.GetSequenceNumber()
+		received_packets[i] = sq_n
+	}
+
+	amount_packets_in_window := len(pr.packets_in_window)
+
+	// Chequeamos si recibi todos los paquetes
+	offset := amount_packets_in_window
+	for i, sq_n := range processed_sequence_number {
+		received_packets[i + offset] = sq_n
+	}
+
+	// NOTE: Este si hace falta ordernarlo
+	slices.Sort(received_packets)
+
+	allReceived := true
+	if pr.EOF == -1 {
+		// Si ni me llego el EOF, entonces no hay chance de que haya
+		// llegado todo
+		allReceived = false
+	}
+	for i := 0; i < len(received_packets) && allReceived == true; i++ {
+		// El ultimo paquete recibido tiene que si o si ser el ultimo
+		if i == len(received_packets) - 1 {
+			if i != pr.EOF {
+				allReceived = false
+			}
+
+			// Como es el ultimo, hacemos early break para no pasarnos del
+			// index con las siguientes comparaciones
+			break
+		}
+
+		nxt_pkt_sn := received_packets[i + 1]
+
+		pkt_sn := received_packets[i]
+
+		if pkt_sn + 1  != nxt_pkt_sn {
+			allReceived = false
+			break
+		}
+	}
+
+	return allReceived
+}
+
+func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []int) {
+	received_window_empty := len(ventana) == 0
+	// Si la venta que obtuve es vacia, eso quiere decir que se perdio EL ULTIMO
+	// paquete, en estos casos no quiero realizar trabajo. POTENCIALMENTE, no
+	// cambia nada, ya que tal vez la funcion que lo recibe se podria dar
+	// cuenta que el input es vacio, pero, de todas formas es mas seguro (y
+	// hasta mas eficiente) retornar antes.
+	if received_window_empty {
+		return
+	}
+
+	partial_work := pr.read_partial_work()
+	same_length := len(partial_work.ventana) == len(ventana)
+
+	all_equal := true
+	slices.Sort(ventana)
+	for i := 0; i < len(ventana) && same_length == true; i++ {
+		pkt_in_window  := ventana[i]
+		sqn_in_partial := partial_work.ventana[i]
+
+		same_index := sqn_in_partial == pkt_in_window
+
+		// SANITY CHECK: si en algun momento se detecto que diferian en
+		// alguno, pero despues encontramos que hay dos que son iguales,
+		// entonces tenemos un error.
+		if !all_equal && same_index {
+			panic("ERROR: Se encontro que dos ventanas distintas comparten ALGUNOS paquetes y otros no.")
+		}
+
+		if !same_index {
+			all_equal = false
+		}
+	}
+
+
+	// Yo quiero aplicar la transformacion si o las ventanas son de distinto
+	// tamano, o difieren en algun numero (si diferen en alguno DEBERIAN
+	// diferir en todos).
+	applyTransform := !same_length || !all_equal
+
+	if applyTransform {
+		accumulated_work := partial_work.accumulated_work
+		// Aplico la funcion transformer a todo lo que recibi + lo que acaba
+		// de llegar.
+		transformation := pr.transformer(accumulated_work, input)
+
+		new_partial_work := newPartialWork(ventana, transformation)
+
+		partial_work_s := pr.serialize_partial_work(new_partial_work)
+
+		disk.AtomicWriteString(partial_work_s, pr.path_resolver.resolve_path(partialWorkIndicator))
+	}
+}
+
+type partialWork struct {
+	ventana []int
+	accumulated_work string
+}
+
+func newPartialWork(ventana []int, accumulated_work string) partialWork {
+	return partialWork{
+		ventana: ventana,
+		accumulated_work: accumulated_work,
+	}
+}
+
+// Construye el formato de partial work
+func (pr *SinglePacketReceiver) serialize_partial_work(partial_work partialWork) string {
+	var partial_work_buffer strings.Builder
+	partial_work_buffer.WriteString("VENTANA")
+
+	window_len := len(partial_work.ventana)
+	window_len_buf := [8]byte{}
+	binary.BigEndian.PutUint64(window_len_buf[:], uint64(window_len))
+	window_len_s := string(window_len_buf[:])
+	partial_work_buffer.WriteString(window_len_s)
+
+	for _, number := range partial_work.ventana {
+		number_buffer := [8]byte{}
+		binary.BigEndian.PutUint64(number_buffer[:], uint64(number))
+		number_buffer_s := string(number_buffer[:])
+
+		partial_work_buffer.WriteString(number_buffer_s)
+	}
+
+	partial_work_buffer.WriteString("VENTANA")
+
+	partial_work_buffer.WriteString(partial_work.accumulated_work)
+
+	return partial_work_buffer.String()
+}
+
+// Parsea el archivo de partial work
+func (pr *SinglePacketReceiver) read_partial_work() partialWork {
+	partial_work, err := disk.Read(pr.path_resolver.resolve_path(partialWorkIndicator))
+	if err != nil {
+		panic(err)
+	}
+	if partial_work == "" {
+		return newPartialWork([]int{}, "")
+	}
+
+	accumulated_work_reader := strings.NewReader(partial_work)
+
+	var ventana_indicator_b [7]byte
+	accumulated_work_reader.Read(ventana_indicator_b[:])
+	ventana_indicator := string(ventana_indicator_b[:])
+	if ventana_indicator != "VENTANA" {
+		panic("ERROR: El archivo de trabajo parcial esta mal formateado. No tiene indicador de ventana.")
+	}
+
+	var ventana_tamano_b [8]byte
+	accumulated_work_reader.Read(ventana_tamano_b[:])
+	long_ventana := binary.BigEndian.Uint64(ventana_tamano_b[:])
+
+	var ventana []int
+	for i := 0; i < int(long_ventana) ; i++ {
+		var current_number_b [8]byte
+		accumulated_work_reader.Read(current_number_b[:])
+		current_number_u := binary.BigEndian.Uint64(current_number_b[:])
+		current_number := int(current_number_u)
+		ventana = append(ventana, current_number)
+	}
+
+	var ventana_indicator_end_b [7]byte
+	accumulated_work_reader.Read(ventana_indicator_end_b[:])
+	ventana_indicator_end := string(ventana_indicator_end_b[:])
+	if ventana_indicator_end != "VENTANA" {
+		panic("ERROR: El archivo de trabajo parcial esta mal formateado. No tiene indicador de fin de ventana.")
+	}
+
+	// NOTE: Ordeno por las dudas
+	slices.Sort(ventana)
+
+	remaining := accumulated_work_reader.Len()
+
+	partial_work_b := make([]byte, remaining)
+	accumulated_work_reader.Read(partial_work_b)
+	partial_work_s := string(partial_work_b[:])
+
+	return partialWork {
+		ventana: ventana,
+		accumulated_work: partial_work_s,
+	}
+}
+
+// ============================= PATH RESOLVER ================================
+
+// Estructura para centralizar la resolucion de paths y aprovechar el sistema de
+// tipos para asegurar que no se mezclan los paths con otra cosa.
 type pathResolver struct {
 	root string
 }
 
 // root es el directorio que todos los packet_receiver usan en comun.
-// identifier es el identificador de ESTA INSTANCIA de packet receiver
-func newPathResolver(identifier string) pathResolver {
-	root := "packet_receiver" + "/" + identifier
+func newPathResolver(session_id string) pathResolver {
+	root := "packet_receiver" + "/" + session_id
 	return pathResolver {
 		root: root,
 	}
 }
 
-type KnownFile int
+type knownFile int
 const (
-	Root KnownFile = iota
-	Metadata
-	ReceivedEof
-	ReceivedSqns
-	PartialWork
-	Packets
-	LogFile
-	Checkpoint
+	root knownFile = iota
+	metadata
+	receivedEof
+	receivedSqns
+	partialWorkIndicator
+	packets
+	logFile
+	checkpoint
 )
 
-func (pr *pathResolver) resolve_path(file KnownFile) string {
+func (pr *pathResolver) resolve_path(file knownFile) string {
 	var path string
 	switch file {
-	case Root:
+	case root:
 		path = pr.root
-	case Metadata:
+	case metadata:
 		path = pr.root + "/" + "metadata"
-	case ReceivedEof:
-		path = pr.resolve_path(Metadata) + "/" + "received_eof"
-	case ReceivedSqns:
-		path = pr.resolve_path(Metadata) + "/" + "received_sqns"
-	case PartialWork:
+	case receivedEof:
+		path = pr.resolve_path(metadata) + "/" + "received_eof"
+	case receivedSqns:
+		path = pr.resolve_path(metadata) + "/" + "received_sqns"
+	case partialWorkIndicator:
 		path = pr.root + "/" + "partial_work"
-	case Packets:
+	case packets:
 		// Le pongo un 0 para que sea lo primero que aparece
 		path = pr.root + "/" + "0packets" + "/"
-	case LogFile:
+	case logFile:
 		path = pr.root + "/" + "window_log"
-	case Checkpoint:
+	case checkpoint:
 		path = pr.root + "/" + "checkpoint"
 	}
 	return path
 }
 
-type checkpointMoment int
-const (
-	Cleaned checkpointMoment = iota
-	LlegoElPaquete
-	PreACK
-	HiceACK
-	PreFlushear
-	LogAhead
-	LaburoParcial
-	LogBehind
-)
 
-func (c *checkpointMoment) toString() string {
-	var repr string
-	switch *c {
-	case Cleaned:
-		repr = "CLEANED"
-	case LlegoElPaquete:
-		repr = "LLEGOPAQUETE"
-	case PreACK:
-		repr = "PRE-ACK"
-	case HiceACK:
-		repr = "ACK"
-	case PreFlushear:
-		repr = "PRE-FLUSH"
-	case LogAhead:
-		repr = "LOGAHEAD"
-	case LaburoParcial:
-		repr = "LABUROPARCIAL"
-	case LogBehind:
-		repr = "LOGBEHIND"
-	}
-	return repr
-}
+// ============================== CHECKPOINTER =================================
 
 // Estructura para debugear mejor el Momento en el tiempo en el que se murio la
 // instancia.
@@ -202,6 +711,41 @@ func newCheckpointer(checkpoint_root string) checkpointer {
 	}
 }
 
+type checkpointMoment int
+const (
+	cleaned checkpointMoment = iota
+	llegoElPaquete
+	preACK
+	hiceACK
+	preFlushear
+	logAhead
+	laburoParcial
+	logBehind
+)
+
+func (c *checkpointMoment) toString() string {
+	var repr string
+	switch *c {
+	case cleaned:
+		repr = "CLEANED"
+	case llegoElPaquete:
+		repr = "LLEGOPAQUETE"
+	case preACK:
+		repr = "PRE-ACK"
+	case hiceACK:
+		repr = "ACK"
+	case preFlushear:
+		repr = "PRE-FLUSH"
+	case logAhead:
+		repr = "LOGAHEAD"
+	case laburoParcial:
+		repr = "LABUROPARCIAL"
+	case logBehind:
+		repr = "LOGBEHIND"
+	}
+	return repr
+}
+
 func (c *checkpointer) reset_window() {
 	entries, err := os.ReadDir(c.checkpoint_root_current)
 	if err != nil {
@@ -212,7 +756,7 @@ func (c *checkpointer) reset_window() {
 	}
 	c.uses = 0
 
-	c.checkpoint(Cleaned)
+	c.checkpoint(cleaned)
 }
 
 func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
@@ -223,207 +767,7 @@ func (c *checkpointer) checkpoint(checkpoint checkpointMoment) {
 	disk.CreateFile(full_path)
 }
 
-func NewSinglePacketReceiver(identifier string, transformer func(accumulated_input string, new_input string) string) SinglePacketReceiver {
-	pathResolver := newPathResolver(identifier)
-	packet_receiver_dir := pathResolver.resolve_path(Root)
-	if !disk.Exists(packet_receiver_dir) {
-		disk.CreateDir(packet_receiver_dir)
-	}
-
-	metada_dir := pathResolver.resolve_path(Metadata)
-	if !disk.Exists(metada_dir) {
-		disk.CreateDir(metada_dir)
-	}
-	received_eof_file := pathResolver.resolve_path(ReceivedEof)
-	if !disk.Exists(received_eof_file) {
-		disk.CreateFile(received_eof_file)
-	}
-
-	partial_work_file := pathResolver.resolve_path(PartialWork)
-	if !disk.Exists(partial_work_file) {
-		disk.CreateFile(partial_work_file)
-	}
-	packets_dir := pathResolver.resolve_path(Packets)
-	if !disk.Exists(packets_dir) {
-		disk.CreateDir(packets_dir)
-	}
-
-
-	received_eof_s, err := disk.Read(received_eof_file)
-	if err != nil {
-		panic(err)
-	}
-	var received_eof int
-	if received_eof_s == "" {
-		// -1 representa si lo recibi o no
-		received_eof = -1
-	} else {
-		received_eof_i64, err := strconv.ParseInt(received_eof_s, 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		received_eof_i := int(received_eof_i64)
-
-		received_eof = received_eof_i
-	}
-
-	// Tenemos que llamar al logger antes de calcular la ventana, porque este lo
-	// va a modificar.
-	logger := newLogger("BORRAR", "BORRADO",
-		pathResolver.resolve_path(ReceivedSqns),
-		pathResolver.resolve_path(LogFile),
-		pathResolver.resolve_path(Packets),
-	)
-
-
-	packets_in_window := []packet.Packet{}
-	entries, err := os.ReadDir(packets_dir)
-	for _, file := range entries {
-		packet_file, err := os.Open(packets_dir + "/" + file.Name())
-		if err != nil {
-			panic(err)
-		}
-		packet_serialized, err := os.ReadFile(packet_file.Name())
-		if err != nil {
-			panic(err)
-		}
-
-		packetReader := bytes.NewReader(packet_serialized)
-		packet, err := packet.DeserializePackage(packetReader)
-
-		packets_in_window = append(packets_in_window, packet)
-	}
-
-
-	checkpointer_root := pathResolver.resolve_path(Checkpoint)
-	checkpointer := newCheckpointer(checkpointer_root)
-
-
-	single_packet_receiver := SinglePacketReceiver{
-		packets_in_window:         packets_in_window,
-		transformer:               transformer,
-		EOF:                       received_eof,
-		path_resolver:             pathResolver,
-		logger:                    logger,
-		// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
-		windowFull:                false,
-		checkpointer:              checkpointer,
-	}
-
-	// Chequeo si me quedo pendiente un flush
-	allReceived := single_packet_receiver.checkIfReceivedAll()
-
-	amount_packets_in_window := len(single_packet_receiver.packets_in_window)
-	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
-	if do_flush_window || allReceived {
-		single_packet_receiver.flushWindow()
-	}
-
-	return single_packet_receiver
-}
-
-// Devuelve un booleano que representa si se recivieron todos los paquetes
-// dentro de la ventana. Si este es el caso, se tienen que procesar.
-func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
-	pr.checkpointer.reset_window()
-	// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
-	pkt := pktMsg.Packet
-	pr.checkpointer.checkpoint(LlegoElPaquete)
-
-	// Tengo que chequear si ya recibi todo antes de empezar, puede ser que me
-	// haya muerto justo antes de procesar el ultimo paquete.
-	allReceived := pr.checkIfReceivedAll()
-
-	// fmt.Printf("Recibi %s\n", pkt.GetSequenceNumberString())
-	allreadyProcessed := pr.logger.checkIfAlreadyProcessed(pkt.GetSequenceNumber())
-
-	alreadyInWindow := pr.checkIfInWindow(pkt)
-
-	// Guardo el paquete que acabo de recibir en disco si y solo si no lo recibi antes.
-	// Esto quiere decir que ni esta en la ventana ni esta ya procesado.
-	if !alreadyInWindow && !allreadyProcessed && !allReceived {
-		// NOTE: Por convencion, el nombre del archivo es su numero de secuencia
-		pkt_file := pr.path_resolver.resolve_path(Packets) + pkt.GetSequenceNumberString()
-		disk.AtomicWrite(pkt.Serialize(), pkt_file)
-		if pkt.IsEOF() {
-			pr.EOF = pkt.GetSequenceNumber()
-			eof_sequence_number := pkt.GetSequenceNumberString()
-			received_eof_file := pr.path_resolver.resolve_path(ReceivedEof)
-			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
-		}
-	}
-
-	// Si el programa se cae antes de anadirlo, no pasa porque se escribe en
-	// disco. Cuando vuelva a iniciarse el programa, va a leer el archivo del
-	// directorio packets y lo va a anadir en el array. Eso si, puede ser que
-	// lo vuelvan a enviar, en ese caso, no lo tengo que anadir dos veces en
-	// la ventana.
-	// Ahora, si ya recibi todo, no necesito anadirlo, incluso si no esta en
-	// la ventana porque ya tengo que enviarlo todo
-	if !alreadyInWindow && !allreadyProcessed && !allReceived {
-		pr.packets_in_window = append(pr.packets_in_window, pkt)
-	}
-
-
-	// NOTE: Me parece que no hace falta ordernarlo, pero lo hago por las dudas.
-	slices.SortFunc(pr.packets_in_window, func(i, j packet.Packet) int {
-			sn_i := i.GetSequenceNumber()
-			sn_j := j.GetSequenceNumber()
-			return sn_i - sn_j
-	})
-
-	allReceivedNow := pr.checkIfReceivedAll()
-	if allReceived == true && allReceivedNow == false {
-		panic("Antes de empezar pense que tenia todo, y ahora que lo re-calculo me figura que no.")
-	}
-	allReceived = allReceivedNow
-
-	// Tengo que procesar la ventana en dos casos:
-	// 1. Si la cantidad de paquetes excede la ventana, tengo que procesarlos
-	//    para liberar la ventana y dar lugar a la proxima tanda.
-	// 2. Si recibi todos los paquetes, entonces tambien tengo que procesar la
-	//    ventana. Lo que puede pasar es que la ventana este llena a medias,
-	//    pero como no van a llegar mas paquetes, la tengo que procesar ahora.
-	amount_packets_in_window := len(pr.packets_in_window)
-	do_flush_window := amount_packets_in_window >= PACKET_WINDOW
-	if do_flush_window || allReceived {
-		pr.flushWindow()
-	}
-
-	pr.windowFull = allReceived
-
-	pr.checkpointer.checkpoint(PreACK)
-	// Hacemos ACK recien al final. Antes lo haciamos apenas guardabamos el paquete en disco.
-	// Pero, haciendolo al final nos aseguramos que el flujo sea mas
-	// consistente. Esto es especialmente util en el caso borde del ultimo
-	// paquete. Si hacemos ACK del ultimo paquete antes de hacer todo el
-	// pipeline de procesamiento, cagamos. Esto pasa porque el SessionHandler
-	// solo instacia un PacketReceiver si recibe un paquete. Entonces, si no
-	// hay paquetes para enviar, no va a instanciarlo nunca y el ultimo cachito
-	// de procesamiento de simplemente enviar lo que tengo nunca se va a
-	// llamar.  Esto tambien implica que el ACK final lo tenemos que hacer
-	// DESPUES de enviar los datos, igual que con los otros nodos. Al final,
-	// terminan siendo mas parecidos de lo que pensamos inicialmente.
-	if allReceived {
-		pr.last_packet = pktMsg
-	} else {
-		pktMsg.Message.Ack(false)
-	}
-	pr.checkpointer.checkpoint(HiceACK)
-
-
-	return allReceived
-}
-
-
-// Funcion que destruye todos los archivos creados por el SinglePacketReceiver
-func (pr *SinglePacketReceiver) Clean() {
-	path := pr.path_resolver.resolve_path(Root)
-	disk.DeleteDirRecursively(path)
-
-	// Ahora que ya borramos todo los archivos, podemos ACKear el ultimo mensaje.
-	pr.last_packet.Message.Ack(false)
-}
+// ================================= LOGGER ====================================
 
 // Estructura encargada de escribir logs para trackear operaciones que tienen un
 // par logico de "comienzo" y "fin".
@@ -453,23 +797,6 @@ type logger struct {
 
 	// Resources that are done and should not receive any modifications.
 	done_resources map[string] struct{}
-}
-
-
-type operationType int
-const (
-	Write operationType = iota
-	Delete
-)
-
-type log_entry struct {
-	operation operationType
-	resource string
-}
-
-// If it's not a write, it's a delete
-func (le *log_entry) is_write() bool {
-	return le.operation == Write
 }
 
 // Funcion que crea un logger.
@@ -629,6 +956,24 @@ func newLogger(write_operation string, delete_operation string,
 	return logger
 }
 
+type operationType int
+const (
+	writeResource operationType = iota
+	deleteResource
+)
+
+// Entrada del log
+type log_entry struct {
+	operation operationType
+	resource string
+}
+
+// If it's not a write, it's a delete
+func (le *log_entry) is_write() bool {
+	return le.operation == writeResource
+}
+
+
 func (l *logger) get_processed_number() []int {
 	return l.processed_sequence_number
 }
@@ -651,9 +996,9 @@ func (l *logger) parse_log_entry(log_entry_raw string) log_entry {
 	operation_s := log_entry_split[0]
 	var operation operationType
 	if operation_s == l.write_operation {
-		operation = Write
+		operation = writeResource
 	} else if operation_s == l.delete_operation {
-		operation = Delete
+		operation = deleteResource
 	} else {
 		panic(fmt.Sprintf("Invalid log entry. Expected %s or %s, got: %s", l.write_operation, l.delete_operation, operation_s))
 	}
@@ -772,297 +1117,5 @@ func (l *logger) clear() {
 		if err != nil {
 			panic(err)
 		}
-	}
-}
-
-// Devuelve el packet acumulado.
-func (pr *SinglePacketReceiver) GetPayload() string {
-	if pr.windowFull != true {
-		// NOTE: No borrar este panic. Es importante que si en algun momento
-		// se rompe la invariante, que el programa explote para poder debugear
-		// mejor.
-		// Un error no lo solucionaria porque esos son ignorables.
-		panic("Invariante del Single Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
-	}
-
-	// TODO: Optimizacion: Si ya esta cargado en memoria, no lo vuelvo a leer
-	// del disco.
-	partial_work := pr.read_partial_work()
-	finished_work := partial_work.accumulated_work
-
-	return finished_work
-}
-
-// windowContent contiente el contenido de la ventana. Esto normalmente se obtiene
-// con un strings.Builder y el metodo WriteString
-func (pr *SinglePacketReceiver) flushWindow() {
-	var buffer strings.Builder
-	defer buffer.Reset()
-	var pkt_sqn_number []int
-	for _, wind_pkt := range pr.packets_in_window {
-		buffer.WriteString(wind_pkt.GetPayload())
-		pkt_sqn_number = append(pkt_sqn_number, wind_pkt.GetSequenceNumber())
-	}
-
-	pr.checkpointer.checkpoint(PreFlushear)
-
-
-
-	// LOG De todos los archivos que voy a borrar: Stage 1.
-	// En la packet window: A, B, C
-	// Voy a borrar A
-	// Voy a borrar B
-	// Voy a borrar C
-	//
-	// NOTE: Si se muere antes de escribir todos los "voy a borrar" en el
-	// log, no pasa nada, porque cuando se levante de vuelta va a ver que
-	// tiene en la ventana mas paquetes de los que esta anotada. Entonces,
-	// solo tiene que anadir los paquetes que le faltan en el log.
-	for _, packet := range pr.packets_in_window {
-		sq_n := packet.GetSequenceNumberString()
-		pr.logger.write_ahead(sq_n)
-	}
-
-	pr.checkpointer.checkpoint(LogAhead)
-
-	pr.writePartialWork(buffer.String(), pkt_sqn_number)
-
-	pr.checkpointer.checkpoint(LaburoParcial)
-
-	// LOG De todos los archivos que borre: Stage 2.
-	// En la packet window: A, B, C
-	// Voy a borrar A
-	// Voy a borrar B
-	// Voy a borrar C
-	// Borre A
-	// Borre B
-	// Borre C
-
-	// NOTE: Si se muere antes de escribir todos los "borre", no pasa
-	// nada. Porque cuando reviva va a ver que tiene mas "Voy a borrar"
-	// que "Borre", entonces va a poder saber que se murio en el medio del
-	// procesamiento.
-	for _, packet := range pr.packets_in_window {
-		sq_n := packet.GetSequenceNumberString()
-		// Aca tambien se borra el recurso asociado
-		pr.logger.delete_behind(sq_n)
-	}
-	pr.checkpointer.checkpoint(LogBehind)
-
-	// Ahora que la ventana esta procesada, y el cambio esta en disco,
-	// actualizamos la memoria.
-	pr.packets_in_window = nil
-	buffer.Reset()
-	pr.logger.clear()
-}
-
-func (pr *SinglePacketReceiver) checkIfInWindow(pkt packet.Packet) bool {
-	is_in := false
-
-	for i := 0; i < len(pr.packets_in_window) && is_in == false ; i++ {
-		curr_pkt := pr.packets_in_window[i]
-		curr_pkt_sqn := curr_pkt.GetSequenceNumber()
-
-		is_in =  curr_pkt_sqn == pkt.GetSequenceNumber()
-	}
-
-	return is_in
-}
-
-func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
-	processed_sequence_number := pr.logger.get_processed_number()
-
-	received_packets := make([]int, len(processed_sequence_number) + len(pr.packets_in_window))
-
-	for i, wind_pkt := range pr.packets_in_window {
-		sq_n     := wind_pkt.GetSequenceNumber()
-		received_packets[i] = sq_n
-	}
-
-	amount_packets_in_window := len(pr.packets_in_window)
-
-	// Chequeamos si recibi todos los paquetes
-	offset := amount_packets_in_window
-	for i, sq_n := range processed_sequence_number {
-		received_packets[i + offset] = sq_n
-	}
-
-	// NOTE: Este si hace falta ordernarlo
-	slices.Sort(received_packets)
-
-	allReceived := true
-	if pr.EOF == -1 {
-		// Si ni me llego el EOF, entonces no hay chance de que haya
-		// llegado todo
-		allReceived = false
-	}
-	for i := 0; i < len(received_packets) && allReceived == true; i++ {
-		// El ultimo paquete recibido tiene que si o si ser el ultimo
-		if i == len(received_packets) - 1 {
-			if i != pr.EOF {
-				allReceived = false
-			}
-
-			// Como es el ultimo, hacemos early break para no pasarnos del
-			// index con las siguientes comparaciones
-			break
-		}
-
-		nxt_pkt_sn := received_packets[i + 1]
-
-		pkt_sn := received_packets[i]
-
-		if pkt_sn + 1  != nxt_pkt_sn {
-			allReceived = false
-			break
-		}
-	}
-
-	return allReceived
-}
-
-func (pr *SinglePacketReceiver) writePartialWork(input string, ventana []int) {
-	received_window_empty := len(ventana) == 0
-	// Si la venta que obtuve es vacia, eso quiere decir que se perdio EL ULTIMO
-	// paquete, en estos casos no quiero realizar trabajo. POTENCIALMENTE, no
-	// cambia nada, ya que tal vez la funcion que lo recibe se podria dar
-	// cuenta que el input es vacio, pero, de todas formas es mas seguro (y
-	// hasta mas eficiente) retornar antes.
-	if received_window_empty {
-		return
-	}
-
-	partial_work := pr.read_partial_work()
-	same_length := len(partial_work.ventana) == len(ventana)
-
-	all_equal := true
-	slices.Sort(ventana)
-	for i := 0; i < len(ventana) && same_length == true; i++ {
-		pkt_in_window  := ventana[i]
-		sqn_in_partial := partial_work.ventana[i]
-
-		same_index := sqn_in_partial == pkt_in_window
-
-		// SANITY CHECK: si en algun momento se detecto que diferian en
-		// alguno, pero despues encontramos que hay dos que son iguales,
-		// entonces tenemos un error.
-		if !all_equal && same_index {
-			panic("ERROR: Se encontro que dos ventanas distintas comparten ALGUNOS paquetes y otros no.")
-		}
-
-		if !same_index {
-			all_equal = false
-		}
-	}
-
-
-	// Yo quiero aplicar la transformacion si o las ventanas son de distinto
-	// tamano, o difieren en algun numero (si diferen en alguno DEBERIAN
-	// diferir en todos).
-	applyTransform := !same_length || !all_equal
-
-	if applyTransform {
-		accumulated_work := partial_work.accumulated_work
-		// Aplico la funcion transformer a todo lo que recibi + lo que acaba
-		// de llegar.
-		transformation := pr.transformer(accumulated_work, input)
-
-		new_partial_work := newPartialWork(ventana, transformation)
-
-		partial_work_s := pr.serialize_partial_work(new_partial_work)
-
-		disk.AtomicWriteString(partial_work_s, pr.path_resolver.resolve_path(PartialWork))
-	}
-}
-
-type partialWork struct {
-	ventana []int
-	accumulated_work string
-}
-
-func newPartialWork(ventana []int, accumulated_work string) partialWork {
-	return partialWork{
-		ventana: ventana,
-		accumulated_work: accumulated_work,
-	}
-}
-
-// Construye el formato de partial work
-func (pr *SinglePacketReceiver) serialize_partial_work(partial_work partialWork) string {
-	var partial_work_buffer strings.Builder
-	partial_work_buffer.WriteString("VENTANA")
-
-	window_len := len(partial_work.ventana)
-	window_len_buf := [8]byte{}
-	binary.BigEndian.PutUint64(window_len_buf[:], uint64(window_len))
-	window_len_s := string(window_len_buf[:])
-	partial_work_buffer.WriteString(window_len_s)
-
-	for _, number := range partial_work.ventana {
-		number_buffer := [8]byte{}
-		binary.BigEndian.PutUint64(number_buffer[:], uint64(number))
-		number_buffer_s := string(number_buffer[:])
-
-		partial_work_buffer.WriteString(number_buffer_s)
-	}
-
-	partial_work_buffer.WriteString("VENTANA")
-
-	partial_work_buffer.WriteString(partial_work.accumulated_work)
-
-	return partial_work_buffer.String()
-}
-
-// Parsea el archivo de partial work
-func (pr *SinglePacketReceiver) read_partial_work() partialWork {
-	partial_work, err := disk.Read(pr.path_resolver.resolve_path(PartialWork))
-	if err != nil {
-		panic(err)
-	}
-	if partial_work == "" {
-		return newPartialWork([]int{}, "")
-	}
-
-	accumulated_work_reader := strings.NewReader(partial_work)
-
-	var ventana_indicator_b [7]byte
-	accumulated_work_reader.Read(ventana_indicator_b[:])
-	ventana_indicator := string(ventana_indicator_b[:])
-	if ventana_indicator != "VENTANA" {
-		panic("ERROR: El archivo de trabajo parcial esta mal formateado. No tiene indicador de ventana.")
-	}
-
-	var ventana_tamano_b [8]byte
-	accumulated_work_reader.Read(ventana_tamano_b[:])
-	long_ventana := binary.BigEndian.Uint64(ventana_tamano_b[:])
-
-	var ventana []int
-	for i := 0; i < int(long_ventana) ; i++ {
-		var current_number_b [8]byte
-		accumulated_work_reader.Read(current_number_b[:])
-		current_number_u := binary.BigEndian.Uint64(current_number_b[:])
-		current_number := int(current_number_u)
-		ventana = append(ventana, current_number)
-	}
-
-	var ventana_indicator_end_b [7]byte
-	accumulated_work_reader.Read(ventana_indicator_end_b[:])
-	ventana_indicator_end := string(ventana_indicator_end_b[:])
-	if ventana_indicator_end != "VENTANA" {
-		panic("ERROR: El archivo de trabajo parcial esta mal formateado. No tiene indicador de fin de ventana.")
-	}
-
-	// NOTE: Ordeno por las dudas
-	slices.Sort(ventana)
-
-	remaining := accumulated_work_reader.Len()
-
-	partial_work_b := make([]byte, remaining)
-	accumulated_work_reader.Read(partial_work_b)
-	partial_work_s := string(partial_work_b[:])
-
-	return partialWork {
-		ventana: ventana,
-		accumulated_work: partial_work_s,
 	}
 }

@@ -137,7 +137,9 @@ generate-compose: clean-out
 generate-compose-external:
 	python3 scripts/generar_compose.py EXTERNAL
 
-docker-multi: docker-down clean-out build generate-compose
+stop: docker-down clean-out
+
+docker-multi: stop build generate-compose
 	docker compose -f docker-compose-gen.yml up -d
 	@echo "Docker levantado, usar 'make docker-wait ; make test-outputs-reduced'"
 

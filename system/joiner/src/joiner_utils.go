@@ -2,7 +2,6 @@ package joiner
 
 import (
 	"malasian_coffe/packets/packet"
-	"malasian_coffe/packets/packet_receiver"
 	"strings"
 )
 
@@ -29,9 +28,8 @@ func addStoreToMap(storePkt packet.Packet, storeMap map[string]string) bool {
 	}
 }
 
-func createStoreMap(storeReceiver packet_receiver.PacketReceiver) map[string]string {
-	stores := storeReceiver.GetPayload()
-	lines := strings.Split(stores, "\n")
+func createStoreMap(storePayload string) map[string]string {
+	lines := strings.Split(storePayload, "\n")
 	lines = lines[:len(lines)-1]
 
 	// Le damos un tamano inicial de lines porque deberia tener un tamano igual
@@ -47,9 +45,8 @@ func createStoreMap(storeReceiver packet_receiver.PacketReceiver) map[string]str
 	return storeID2Name
 }
 
-func createMenuItemMap(menuItemReceiver packet_receiver.PacketReceiver) map[string]string {
-	menuItemPkt := menuItemReceiver.GetPayload()
-	lines := strings.Split(menuItemPkt, "\n")
+func createMenuItemMap(menuItems string) map[string]string {
+	lines := strings.Split(menuItems, "\n")
 	lines = lines[:len(lines)-1]
 	itemID2Name := make(map[string]string, len(lines))
 
