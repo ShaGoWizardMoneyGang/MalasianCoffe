@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"malasian_coffe/bitacora"
+	"malasian_coffe/utils/disk"
 	"malasian_coffe/packets/packet"
 	packetanswer "malasian_coffe/packets/packet_answer"
 	"malasian_coffe/protocol"
@@ -74,6 +75,8 @@ func createPackagesFrom(dir string, session_ID string, listen_addr string, send_
 	return nil
 }
 
+const SESSION_PERSISTENCIA = "token.txt"
+
 func main() {
 	dataset_directory := os.Args[1]
 	out_dir := os.Args[2]
@@ -91,6 +94,28 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Me fijo si existe ya un token de antes. Si existe, ignoro lo que me
+	// dijo recien el gateway.
+	// #KeepItSimple
+	// #YAGNI
+	if disk.Exists(SESSION_PERSISTENCIA) {
+		session_id_pre_muerte, err := disk.Read(SESSION_PERSISTENCIA)
+		if err != nil {
+			panic(err)
+		}
+
+		session_id = session_id_pre_muerte
+		println("Detecto que tengo un sessionID previo, sigo con ese.")
+     // Ahora bien, si _NO_ existe, lo guardo pa'l futuro, dijo el Marty McFly.
+	} else {
+		println("Escribo en disco mi session ID")
+		err := disk.AtomicWriteString(session_id, SESSION_PERSISTENCIA)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 
 	client := Client{
 		sessionID:   session_id,

@@ -351,7 +351,7 @@ def client(n, external):
     return f"""
   client{name}:
     container_name: client{name}
-    image: ubuntu:24.04
+    image: client:latest
     working_dir: /app
     entrypoint: ./bin/client ./dataset/ ./out/client{name}/ gateway:9090 client{name}:{port_number}
     volumes:
