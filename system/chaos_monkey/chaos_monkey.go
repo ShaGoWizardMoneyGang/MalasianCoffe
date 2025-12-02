@@ -47,7 +47,7 @@ func main() {
 	threshold_s := os.Args[2]
 	threshold   := 50
 	if threshold_s != "" {
-		prob_minima_nuevo, err := strconv.ParseInt(semilla_s, 10, 64)
+		prob_minima_nuevo, err := strconv.ParseInt(threshold_s, 10, 64)
 		if err != nil {
 			panic(err)
 		}
