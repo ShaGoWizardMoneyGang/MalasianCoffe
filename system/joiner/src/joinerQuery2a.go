@@ -99,7 +99,6 @@ func (jq2a *joinerQuery2a) Process() {
 			jq2a.sessionHandler.PassPacketToSession(ackPkt)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("Joiner Query2a received healthcheck ping from", IP)
 			watchdog.Pong(IP)
 		}
 	}

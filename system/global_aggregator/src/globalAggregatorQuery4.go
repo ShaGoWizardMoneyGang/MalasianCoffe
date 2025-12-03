@@ -209,7 +209,6 @@ func (g *aggregator4Global) Process() {
 			g.sessionHandler.PassPacketToSession(ackPkt)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("GlobalAggregator 4 received healthcheck ping from", IP)
 			watchdog.Pong(IP)
 		}
 	}

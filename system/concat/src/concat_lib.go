@@ -90,7 +90,6 @@ func (c *Concat) Process() {
 			c.sessionHandler.PassPacketToSession(ackPkt)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("Concat received healthcheck ping from", IP)
 			watchdog.Pong(IP)
 		}
 	}

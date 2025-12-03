@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
@@ -101,9 +100,6 @@ func (jq3 *joinerQuery3) Process() {
 			jq3.sessionHandler.PassPacketToSession(ackPkt)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("Joiner Query3 received healthcheck ping from", IP)
-			//PARA SIMULAR QUE NO MANDA PONG DESPUES DE REINTENTAR
-			time.Sleep(5 * time.Second)
 			watchdog.Pong(IP)
 		}
 	}
