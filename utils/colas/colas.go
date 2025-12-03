@@ -20,6 +20,26 @@ type PacketMessage struct {
 	Message amqp.Delivery
 }
 
+func NewAnswerPacket(pck packet.Packet) PacketMessage {
+	pktMess := PacketMessage {
+		Packet: pck,
+	}
+	return pktMess
+}
+
+// Funcion usada justo antes de un Clean(). Esper que se le haga ACK a un paquete.
+// Cualquier paquete que llegue, que no sea el EOF, es un duplicado.
+func WaitForAnswer(inputChannel <-chan PacketMessage) {
+	is_eof := false
+	for {
+		if is_eof == true {
+			break
+		}
+		pktAns := <-inputChannel
+		is_eof = pktAns.Packet.IsEOF()
+	}
+}
+
 // Wrapper function a las colas para hacerlo mas amigable
 
 func ConsumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.ConsumeChannel {
