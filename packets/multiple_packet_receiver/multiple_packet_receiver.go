@@ -323,6 +323,40 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 	if err != nil {
 		panic(err)
 	}
+
+
+	// Anadimos los seq numbers de todos los paquetes recibidos
+	received_sequence_numbers := []int{}
+	entries, err := os.ReadDir(packets_dir)
+	for _, file := range entries {
+		packet_file, err := os.Open(packets_dir + file.Name())
+		if err != nil {
+			panic(err)
+		}
+
+
+		packet_serialized, err := os.ReadFile(packet_file.Name())
+		if err != nil {
+			panic(err)
+		}
+
+		packetReader := bytes.NewReader(packet_serialized)
+		packet, err := packet.DeserializePackage(packetReader)
+		if err != nil {
+			panic(err)
+		}
+
+		packet_sq_num := packet.GetSequenceNumber()
+
+		received_sequence_numbers = append(received_sequence_numbers, packet_sq_num)
+		if packet.IsEOF() {
+			eof_sequence_number := packet.GetSequenceNumberString()
+			received_eof_file := pathResolver.resolve_path(receivedEof)
+			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+		}
+
+	}
+
 	var received_eof int
 	if received_eof_s == "" {
 		// -1 representa si lo recibi o no
@@ -337,26 +371,6 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 		received_eof = received_eof_i
 	}
 
-
-	// Anadimos los seq numbers de todos los paquetes recibidos
-	received_sequence_numbers := []int{}
-	entries, err := os.ReadDir(packets_dir)
-	for _, file := range entries {
-		packet_file, err := os.Open(packets_dir + file.Name())
-		if err != nil {
-			panic(err)
-		}
-
-		file_name := filepath.Base(packet_file.Name())
-		packet_sq_num, err := strconv.ParseInt(file_name, 10, 64)
-		if err != nil {
-			panic(err)
-		}
-
-		received_sequence_numbers = append(received_sequence_numbers, int(packet_sq_num))
-	}
-
-	// TODO: Chequear disco
 	receiver := datasetReceiver {
 		datasetName: datasetName,
 		received_sequence_numbers: received_sequence_numbers,
