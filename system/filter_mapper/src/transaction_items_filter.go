@@ -146,7 +146,6 @@ func (tifm *transactionItemFilterMapper) Process() {
 			message.Ack(false)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("Filter TransactionItems received healthcheck ping from", IP)
 			watchdog.Pong(IP)
 		}
 

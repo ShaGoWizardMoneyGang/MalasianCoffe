@@ -33,7 +33,6 @@ func CreateWatchdogListener() WatchdogListener {
 
 func (wl *WatchdogListener) Pong(responseIP string) {
 	responseAddress := responseIP + ":" + fmt.Sprint(HEALTHCHECK_PORT)
-	fmt.Println(responseAddress)
 	conn, err := net.Dial("udp", responseAddress)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error al conectar con %s: %v\n", responseAddress, err)

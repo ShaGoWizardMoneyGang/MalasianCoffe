@@ -1,7 +1,6 @@
 package filter_mapper
 
 import (
-	"fmt"
 	"log/slog"
 	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
@@ -93,7 +92,6 @@ func (mifm *menuItemFilterMapper) Process() {
 			message.Ack(false)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("Filter MenuItems received healthcheck ping from", IP)
 			watchdog.Pong(IP)
 		}
 	}

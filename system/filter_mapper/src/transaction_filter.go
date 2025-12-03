@@ -183,7 +183,6 @@ func (tfm *transactionFilterMapper) Process() {
 			message.Ack(false)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("Filter Transactions received healthcheck ping from", IP)
 			watchdog.Pong(IP)
 		}
 	}
