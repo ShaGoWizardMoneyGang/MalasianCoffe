@@ -423,7 +423,8 @@ def main():
             lider_id = i + 1
             file.writelines(leader_watchdog_block(lider_id))
 
-        file.writelines(replica_watchdog_block(i) for i in range(2, no_lider_cant + 1))
+        for i in range(2, no_lider_cant + lider_cant + 1):
+            file.writelines(replica_watchdog_block(i))
 
         for i in range(1, configs.get("watchdog", 0) + 1):
             members_list.append(f"watchdog_{i}")
