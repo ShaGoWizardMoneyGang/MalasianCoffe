@@ -12,10 +12,7 @@ import (
 func main() {
 	path := os.Args[1]
 
-	serialized_packet, err := disk.ReadBytes(path)
-	if err != nil {
-		panic(err)
-	}
+	serialized_packet := disk.ReadBytes(path)
 
 	reader := bytes.NewReader(serialized_packet)
 

@@ -110,10 +110,7 @@ func main() {
      // Ahora bien, si _NO_ existe, lo guardo pa'l futuro, dijo el Marty McFly.
 	} else {
 		println("Escribo en disco mi session ID")
-		err := disk.AtomicWriteString(session_id, SESSION_PERSISTENCIA)
-		if err != nil {
-			panic(err)
-		}
+		disk.AtomicWriteString(session_id, SESSION_PERSISTENCIA)
 	}
 
 

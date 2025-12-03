@@ -16,12 +16,12 @@ const (
 )
 
 // Atomic write [data] to [path]
-func AtomicWrite(data []byte, path string) error {
+func AtomicWrite(data []byte, path string) {
 	file_name := filepath.Base(path)
 
 	f, err := os.CreateTemp(TMP_DIR, file_name)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	length := len(data)
@@ -29,38 +29,34 @@ func AtomicWrite(data []byte, path string) error {
 	for offset := 0; offset < length; offset += written {
 		written, err = f.Write(data[offset:])
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 
 	os.Rename(f.Name(), path)
-
-	return nil
 }
 
-func AtomicWriteString(data string, path string) error {
+func AtomicWriteString(data string, path string) {
 	file_name := filepath.Base(path)
 
 	// Por que TMP_DIR y no /tmp? Porque Docker, como siempre
 	f, err := os.CreateTemp(TMP_DIR, file_name)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	_, err = io.WriteString(f, data)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	err = os.Rename(f.Name(), path)
 	if err != nil {
-		return err
+		panic(err)
 	}
-
-	return nil
 }
 
-func AtomicAppend(data string, path string) error {
+func AtomicAppend(data string, path string) {
 	var old_data string
 
 	// "Aguante go"
@@ -76,7 +72,7 @@ func AtomicAppend(data string, path string) error {
 			if err == fs.ErrNotExist {
 				old_data = ""
 			} else {
-				return err
+				panic(err)
 			}
 		} else {
 			old_data = data_in_file
@@ -85,29 +81,27 @@ func AtomicAppend(data string, path string) error {
 
 	new_data := old_data + "\n" + data
 
-	err := AtomicWriteString(new_data, path)
-
-	return err
+	AtomicWriteString(new_data, path)
 }
 
 
 func Read(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	string_r := string(data)
 	return string_r, nil
 }
 
-func ReadBytes(path string) ([]byte, error) {
+func ReadBytes(path string) []byte {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return []byte{}, nil
+		panic(err)
 	}
 
-	return data, nil
+	return data
 }
 
 // Check if file/dir exists
@@ -125,27 +119,25 @@ func Exists(path string) bool {
 	panic(err)
 }
 
-func CreateFile(path string) (*os.File, error) {
+func CreateFile(path string) *os.File {
 	f, err := os.Create(path)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	err = os.Chmod(f.Name(), 0666)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	return f, nil
+	return f
 }
 
-func CreateDir(path string) error {
+func CreateDir(path string) {
 	err := os.Mkdir(path, 0777)
 
 	if err != nil && !os.IsExist(err) {
-		return err
+		panic(err)
 	}
-
-	return nil
 }
 
 func DeleteFile(path string) error {

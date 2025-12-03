@@ -325,8 +325,8 @@ func (pr *SinglePacketReceiver) Clean() {
 	pr.checkpointer.checkpoint(aboutToClean)
 
 	path := pr.path_resolver.resolve_path(root)
-	disk.DeleteDirRecursively(path)
 	pr.checkpointer.checkpoint(clean)
+	disk.DeleteDirRecursively(path)
 }
 
 
@@ -1061,10 +1061,7 @@ func (l *logger) write_ahead(resource string) {
 	log_entry_s := write + " " + resource
 
 
-	err := disk.AtomicAppend(log_entry_s, l.log_file)
-	if err != nil {
-		panic(err)
-	}
+	disk.AtomicAppend(log_entry_s, l.log_file)
 	l.pending_resources[resource] = struct{}{}
 }
 
@@ -1098,16 +1095,11 @@ func (l *logger) delete_behind(resource string) {
 
 			log_entry_s := delete_op + " " + resource
 
-			err := disk.AtomicAppend(log_entry_s, l.log_file)
-			if err != nil {
-				panic(err)
-			}
+			disk.AtomicAppend(log_entry_s, l.log_file)
 
 			// Si me muero aca, no pasa nada. Lo anado al revivir.
-			err = disk.AtomicAppend(resource, l.processed_resource_log)
-			if err != nil {
-				panic(err)
-			}
+			disk.AtomicAppend(resource, l.processed_resource_log)
+
 			resource_i, err := strconv.Atoi(resource)
 			if err != nil {
 				panic(err)
