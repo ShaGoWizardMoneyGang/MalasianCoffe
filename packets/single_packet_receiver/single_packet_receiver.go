@@ -120,23 +120,6 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	}
 
 
-	received_eof_s, err := disk.Read(received_eof_file)
-	if err != nil {
-		panic(err)
-	}
-	var received_eof int
-	if received_eof_s == "" {
-		// -1 representa si lo recibi o no
-		received_eof = -1
-	} else {
-		received_eof_i64, err := strconv.ParseInt(received_eof_s, 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		received_eof_i := int(received_eof_i64)
-
-		received_eof = received_eof_i
-	}
 
 	// Tenemos que llamar al logger antes de calcular la ventana, porque este lo
 	// va a modificar.
@@ -166,7 +149,32 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		}
 
 		packets_in_window = append(packets_in_window, packet)
+		if packet.IsEOF() {
+			eof_sequence_number := packet.GetSequenceNumberString()
+			received_eof_file := pathResolver.resolve_path(receivedEof)
+			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+		}
 	}
+
+	received_eof_s, err := disk.Read(received_eof_file)
+	if err != nil {
+		panic(err)
+	}
+	var received_eof int
+	if received_eof_s == "" {
+		// -1 representa si lo recibi o no
+		received_eof = -1
+	} else {
+		received_eof_i64, err := strconv.ParseInt(received_eof_s, 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		received_eof_i := int(received_eof_i64)
+
+		received_eof = received_eof_i
+		println("Tengo un EOF en disco" + received_eof_s)
+	}
+
 
 
 	checkpointer_root := pathResolver.resolve_path(checkpoint)
@@ -197,6 +205,17 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 	return single_packet_receiver
 }
 
+
+func (pr *SinglePacketReceiver) saveEOF(pkt packet.Packet) {
+	if !pkt.IsEOF() {
+		panic("Tried to save non EOF file as EOF")
+	}
+	pr.EOF = pkt.GetSequenceNumber()
+	eof_sequence_number := pkt.GetSequenceNumberString()
+	received_eof_file := pr.path_resolver.resolve_path(receivedEof)
+	disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+}
+
 // Devuelve un booleano que representa si se recivieron todos los paquetes
 // dentro de la ventana. Si este es el caso, se tienen que procesar.
 func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
@@ -225,10 +244,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		pkt_file := pr.path_resolver.resolve_path(packets) + pkt.GetSequenceNumberString()
 		disk.AtomicWrite(pkt.Serialize(), pkt_file)
 		if pkt.IsEOF() {
-			pr.EOF = pkt.GetSequenceNumber()
-			eof_sequence_number := pkt.GetSequenceNumberString()
-			received_eof_file := pr.path_resolver.resolve_path(receivedEof)
-			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+			pr.saveEOF(pkt)
 		}
 	}
 
@@ -284,6 +300,7 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 	// DESPUES de enviar los datos, igual que con los otros nodos. Al final,
 	// terminan siendo mas parecidos de lo que pensamos inicialmente.
 	if allReceived {
+		fmt.Printf("Recibi el ultimo paquete: %s \n", pr.identifier)
 		pr.last_packet = pktMsg
 	} else {
 		pktMsg.Message.Ack(false)
@@ -301,7 +318,9 @@ func (pr *SinglePacketReceiver) Clean() {
 	// morir, y cuando nos re-envian el ultimo paquete, no sabemos que ya
 	// terminamos.
 	pr.checkpointer.checkpoint(ackFinal)
+	fmt.Printf("Voy a hacer ACK del ultimo paquete: %s", pr.identifier)
 	pr.last_packet.Message.Ack(false)
+	fmt.Printf("Hice ACK del ultimo paquete: %s", pr.identifier)
 
 	pr.checkpointer.checkpoint(aboutToClean)
 
