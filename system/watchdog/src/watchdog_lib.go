@@ -46,7 +46,7 @@ func (wl *WatchdogListener) Pong(responseIP string) {
 		fmt.Fprintf(os.Stderr, "Error al enviar datos: %v\n", err)
 		return
 	}
-	fmt.Printf("PONG recibido de %s\n", responseAddress)
+	// fmt.Printf("PONG recibido de %s\n", responseAddress)
 }
 
 func (wl *WatchdogListener) Listen(infoChan chan<- string) {

@@ -161,6 +161,9 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 
 		packetReader := bytes.NewReader(packet_serialized)
 		packet, err := packet.DeserializePackage(packetReader)
+		if err != nil {
+			panic(err)
+		}
 
 		packets_in_window = append(packets_in_window, packet)
 	}

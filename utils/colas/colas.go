@@ -61,7 +61,10 @@ func InputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- Pa
 	messages := ConsumeInput(colasEntrada)
 	for message := range *messages {
 		packetReader := bytes.NewReader(message.Body)
-		pkt, _ := packet.DeserializePackage(packetReader)
+		pkt, err := packet.DeserializePackage(packetReader)
+		if err != nil {
+			panic(err)
+		}
 
 		//No tenemos que ack dos veces
 		/*err := message.Ack(false)

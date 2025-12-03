@@ -482,6 +482,9 @@ func (dr *datasetReceiver) readStoredPackets() string {
 
 		packetReader := bytes.NewReader(packet_serialized)
 		packet, err := packet.DeserializePackage(packetReader)
+		if err != nil {
+			panic(err)
+		}
 
 		payload := packet.GetPayload()
 		buffer.WriteString(payload)
