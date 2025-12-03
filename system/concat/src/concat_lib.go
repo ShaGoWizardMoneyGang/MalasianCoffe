@@ -56,6 +56,8 @@ func concat(sessionID string, inputChannel <-chan colas.PacketMessage, outputCha
 		outputChannel <- pkt
 	}
 
+
+	colas.WaitForAnswer(inputChannel)
 	localReceiver.Clean()
 }
 
@@ -84,6 +86,8 @@ func (c *Concat) Process() {
 			c.sessionHandler.PassPacketToSession(inputPacket)
 		case packetConcatenado := <-c.outputChannel:
 			c.colaSalida.Send(packetConcatenado)
+			ackPkt := colas.NewAnswerPacket(packetConcatenado)
+			c.sessionHandler.PassPacketToSession(ackPkt)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
 			fmt.Println("Concat received healthcheck ping from", IP)
