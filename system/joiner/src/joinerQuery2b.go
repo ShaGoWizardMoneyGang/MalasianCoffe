@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"malasian_coffe/bitacora"
-	"malasian_coffe/packets/multiple_packet_receiver"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/multiple_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
@@ -28,11 +28,11 @@ type joinerQuery2b struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func joinQuery2b(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan packet.Packet) {
-	expected_datasets := []multiple_packet_receiver.NombreDataset{
+func joinQuery2b(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	expected_datasets := []multiple_packet_receiver.NombreDataset {
 		multiple_packet_receiver.NombreDataset("menu_items"),
 		multiple_packet_receiver.NombreDataset("transaction_items"),
-	}
+	};
 
 	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery2b)
 
@@ -95,7 +95,6 @@ func (jq2b *joinerQuery2b) Process() {
 			jq2b.sessionHandler.PassPacketToSession(inputPacket)
 		case aggregatedPacket := <-jq2b.outputChannel:
 			jq2b.colaSalidaQuery2b.Send(aggregatedPacket)
-			jq2b.outputChannel <- aggregatedPacket
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
 			fmt.Println("Joiner Query2b received healthcheck ping from", IP)

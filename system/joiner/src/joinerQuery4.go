@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"malasian_coffe/bitacora"
-	"malasian_coffe/packets/multiple_packet_receiver"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/multiple_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
@@ -45,12 +45,13 @@ func createUserMap(userPayload string) map[string]string {
 	return storeID2Name
 }
 
-func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan packet.Packet) {
-	expected_datasets := []multiple_packet_receiver.NombreDataset{
+
+func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	expected_datasets := []multiple_packet_receiver.NombreDataset {
 		multiple_packet_receiver.NombreDataset("stores"),
 		multiple_packet_receiver.NombreDataset("users"),
 		multiple_packet_receiver.NombreDataset("transactions"),
-	}
+	};
 
 	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery4)
 
@@ -82,7 +83,7 @@ func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outpu
 		bitacora.Info(fmt.Sprintf("Envio pkt joineado al sender, session: %s", pkt.GetSessionID()))
 		outputChannel <- pkt
 	}
-	<-outputChannel
+
 	packet_receiver.Clean()
 }
 
@@ -120,8 +121,6 @@ func (jq4 *joinerQuery4) Process() {
 			jq4.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq4.outputChannel:
 			jq4.colaSalidaQuery4.Send(packetJoineado)
-
-			jq4.outputChannel <- packetJoineado
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
 			fmt.Println("Joiner Query4 received healthcheck ping from", IP)

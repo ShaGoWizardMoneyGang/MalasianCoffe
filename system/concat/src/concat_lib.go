@@ -29,7 +29,7 @@ func concat_func(accumulated_input string, new_input string) string {
 	return concatenated
 }
 
-func concat(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan packet.Packet) {
+func concat(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
 	localReceiver := single_packet_receiver.NewSinglePacketReceiver(sessionID, concat_func)
 
 	var concatenated_packets string

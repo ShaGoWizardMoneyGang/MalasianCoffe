@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"malasian_coffe/bitacora"
-	"malasian_coffe/packets/multiple_packet_receiver"
 	"malasian_coffe/packets/packet"
+	"malasian_coffe/packets/multiple_packet_receiver"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
@@ -29,11 +29,11 @@ type joinerQuery3 struct {
 	sessionHandler sessionhandler.SessionHandler
 }
 
-func joinQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan packet.Packet) {
-	expected_datasets := []multiple_packet_receiver.NombreDataset{
+func joinQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
+	expected_datasets := []multiple_packet_receiver.NombreDataset {
 		multiple_packet_receiver.NombreDataset("stores"),
 		multiple_packet_receiver.NombreDataset("transactions"),
-	}
+	};
 
 	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery3)
 
@@ -62,7 +62,6 @@ func joinQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outpu
 		bitacora.Info(fmt.Sprintf("Envio pkt joineado al sender, session: %s", pkt.GetSessionID()))
 		outputChannel <- pkt
 	}
-	<-outputChannel
 
 	packet_receiver.Clean()
 }
@@ -97,8 +96,6 @@ func (jq3 *joinerQuery3) Process() {
 			jq3.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq3.outputChannel:
 			jq3.colaSalidaQuery3.Send(packetJoineado)
-
-			jq3.outputChannel <- packetJoineado
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
 			fmt.Println("Joiner Query3 received healthcheck ping from", IP)
