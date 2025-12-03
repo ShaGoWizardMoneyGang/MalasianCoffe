@@ -63,6 +63,7 @@ func joinQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outpu
 		outputChannel <- pkt
 	}
 
+	colas.WaitForAnswer(inputChannel)
 	packet_receiver.Clean()
 }
 
@@ -96,6 +97,8 @@ func (jq3 *joinerQuery3) Process() {
 			jq3.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq3.outputChannel:
 			jq3.colaSalidaQuery3.Send(packetJoineado)
+			ackPkt := colas.NewAnswerPacket(packetJoineado)
+			jq3.sessionHandler.PassPacketToSession(ackPkt)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
 			fmt.Println("Joiner Query3 received healthcheck ping from", IP)

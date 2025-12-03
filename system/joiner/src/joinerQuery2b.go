@@ -62,6 +62,7 @@ func joinQuery2b(sessionID string, inputChannel <-chan colas.PacketMessage, outp
 		outputChannel <- pkt
 	}
 
+	colas.WaitForAnswer(inputChannel)
 	packet_receiver.Clean()
 }
 
@@ -95,6 +96,8 @@ func (jq2b *joinerQuery2b) Process() {
 			jq2b.sessionHandler.PassPacketToSession(inputPacket)
 		case aggregatedPacket := <-jq2b.outputChannel:
 			jq2b.colaSalidaQuery2b.Send(aggregatedPacket)
+			ackPkt := colas.NewAnswerPacket(aggregatedPacket)
+			jq2b.sessionHandler.PassPacketToSession(ackPkt)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
 			fmt.Println("Joiner Query2b received healthcheck ping from", IP)
