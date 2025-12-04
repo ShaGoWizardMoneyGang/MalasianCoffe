@@ -20,6 +20,7 @@ func AtomicWrite(data []byte, path string) {
 
 	// Por que TMP_DIR y no /tmp? Porque Docker, como siempre
 	f, err := os.CreateTemp(TMP_DIR, file_name)
+	err = os.Chmod(f.Name(), 0666)
 	if err != nil {
 		panic(err)
 	}
