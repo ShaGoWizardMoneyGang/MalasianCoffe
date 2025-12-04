@@ -133,7 +133,7 @@ func DeserializeBool(reader *bytes.Reader) (bool, error) {
 	var boolean_indicator [1]byte;
 	reader.Read(boolean_indicator[:])
 	if boolean_indicator[0] != byte(ValueBool) {
-		return false, errors.New("Tried to deserialize bool when not uint64")
+		return false, errors.New(fmt.Sprintf("Tried to deserialize bool when not uint64. Expected: %x, got %x", ValueBool, boolean_indicator[0]))
 	}
 
 	var boolean_length [1]byte;

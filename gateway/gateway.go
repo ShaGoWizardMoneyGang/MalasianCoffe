@@ -23,6 +23,9 @@ func main() {
 	// Rabbit server addr
 	system_addr := os.Args[2]
 	system_conn, err := net.Dial("tcp", system_addr)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create listener. Error: %s", err))
+	}
 
 	list, err := net.Listen("tcp", gateway_addr)
 	if err != nil {

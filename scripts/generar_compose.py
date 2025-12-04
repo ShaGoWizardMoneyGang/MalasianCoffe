@@ -303,14 +303,16 @@ def replica_watchdog_block(n):
       - watchdog_{n-1}
 """
 
-def chaos_monkey_block():
+def chaos_monkey_block(seed, threshold, behaviour):
+    if behaviour != "SIGINT" and behaviour != "SIGKILL":
+        sys.exit(f"{behaviour} is not valid behaviour. Expected: SIGKILL or SIGINT")
     return f"""
   chaos_monkey:
     container_name: chaos_monkey
     hostname: chaos_monkey
     image: chaos_monkey:latest
     working_dir: /app
-    entrypoint: ./bin/chaos_monkey
+    entrypoint: ./bin/chaos_monkey "{seed}" "{threshold}" "{behaviour}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./sheeps.txt:/app/sheeps.txt
@@ -351,7 +353,7 @@ def client(n, external):
     return f"""
   client{name}:
     container_name: client{name}
-    image: ubuntu:24.04
+    image: client:latest
     working_dir: /app
     entrypoint: ./bin/client ./dataset/ ./out/client{name}/ gateway:9090 client{name}:{port_number}
     volumes:
@@ -370,7 +372,10 @@ def read_config_file(config_file_name):
         if line.strip() == "" or line.startswith("#"):
           continue
         key, value = line.strip().split("=", 1)
-        configs[key] = int(value)
+        if key == "monkey-behaviour":
+            configs[key] = value
+        else:
+            configs[key] = int(value)
     return configs
 
 def display_config_table(configs):
@@ -423,7 +428,8 @@ def main():
             lider_id = i + 1
             file.writelines(leader_watchdog_block(lider_id))
 
-        file.writelines(replica_watchdog_block(i) for i in range(2, no_lider_cant + 1))
+        for i in range(2, no_lider_cant + lider_cant + 1):
+            file.writelines(replica_watchdog_block(i))
 
         for i in range(1, configs.get("watchdog", 0) + 1):
             members_list.append(f"watchdog_{i}")
@@ -510,7 +516,11 @@ def main():
         for i in range(1, configs.get("partial-aggregator3", 0) + 1):
             sheeps_list.append(f"partial_aggregator3_{i}")
 
-        file.writelines(chaos_monkey_block())
+        for i in range(configs.get("monkey", 0)):
+            monkey_seed = configs.get("monkey-seed", "")
+            monkey_threshold = configs.get("monkey-threshold", "")
+            monkey_behaviour = configs.get("monkey-behaviour", "SIGKILL")
+            file.writelines(chaos_monkey_block(monkey_seed, monkey_threshold, monkey_behaviour))
 
         for i in range(1, configs.get("cliente", 0) + 1):
             client_line = client(i, external)

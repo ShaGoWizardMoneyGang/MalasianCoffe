@@ -72,11 +72,11 @@ func (node *WatchdogNode) ListenHeartbeats() {
 		if err != nil {
 			//TODO revisar que os.IsTimeout esté bien usado acá
 			if os.IsTimeout(err) && !node.Coordinating { //si no estan coordinando, lo tiro
-				fmt.Fprintf(os.Stderr, "Error: nothing received in 3 seconds, assuming leader died\n")
-				node.startNewElection()
+				fmt.Fprintf(os.Stderr, "Error: nothing received in 3 seconds, assuming leader died. Election begin.\n")
 			} else {
-				fmt.Fprintf(os.Stderr, "Error al recibir heartbeat: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Error al recibir heartbeat: %v\n. Arranca eleccion.", err)
 			}
+			node.startNewElection()
 			continue
 		}
 		payload := string(buffer[:n])

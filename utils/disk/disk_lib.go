@@ -2,7 +2,6 @@ package disk
 
 import (
 	"errors"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -16,12 +15,14 @@ const (
 )
 
 // Atomic write [data] to [path]
-func AtomicWrite(data []byte, path string) error {
+func AtomicWrite(data []byte, path string) {
 	file_name := filepath.Base(path)
 
+	// Por que TMP_DIR y no /tmp? Porque Docker, como siempre
 	f, err := os.CreateTemp(TMP_DIR, file_name)
+	err = os.Chmod(f.Name(), 0666)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	length := len(data)
@@ -29,76 +30,78 @@ func AtomicWrite(data []byte, path string) error {
 	for offset := 0; offset < length; offset += written {
 		written, err = f.Write(data[offset:])
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 
-	os.Rename(f.Name(), path)
-
-	return nil
-}
-
-func AtomicWriteString(data string, path string) error {
-	file_name := filepath.Base(path)
-
-	// Por que TMP_DIR y no /tmp? Porque Docker, como siempre
-	f, err := os.CreateTemp(TMP_DIR, file_name)
-	if err != nil {
-		return err
-	}
-
-	_, err = io.WriteString(f, data)
-	if err != nil {
-		return err
-	}
+	// ⠀⠀⠀⠀⠀⠀⠀⢀⣠⣴⣶⣿⡿⠿⠿⠿⠿⣿⣶⣶⣤⣀⠀⠀⠀⠀⠀⠀⠀⠀
+	// ⠀⠀⠀⠀⢀⣠⣾⡿⠟⠉⠉⠀⠀⠀⠀⠀⠀⠀⠈⠉⠛⠿⣿⣦⣄⠀⠀⠀⠀⠀
+	// ⠀⠀⠀⣴⣿⠟⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⢿⣷⣄⠀⠀⠀
+	// ⠀⢀⣾⡟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⣿⣦⠀⠀
+	// ⠀⣾⠏⠀⠀⠀⢀⡄⣀⣤⣤⣤⣷⡀⠀⢠⣾⣣⣤⣠⣀⣰⣆⠀⠀⠀⠈⢿⣧⠀
+	// ⢸⡿⠀⠀⠀⠀⣾⣿⣿⡿⢻⣿⣿⡅⠀⢸⣿⣿⣿⣿⣿⣿⣿⣤⠀⠀⠀⢈⣿⡆
+	// ⣾⡇⠀⠀⠀⠀⠸⣿⣿⣷⣼⣿⣿⠇⠀⠸⣿⣿⣯⣴⣿⣿⡏⠀⠀⠀⠀⠀⢿⣷
+	// ⣿⡇⠀⠀⠀⠀⠀⠸⣟⣿⣿⠟⠋⠀⠀⠀⠟⠿⢿⣿⣿⣿⡇⠀⠀⠀⠀⠀⣸⣿
+	// ⢻⡇⠀⠀⠀⠀⠀⠀⠈⠉⠀⠀⢀⣀⣀⣴⣶⣆⡉⠙⠛⠉⠀⠀⠀⠀⠀⣐⣿⣿
+	// ⠸⣿⡀⠀⠀⠀⠀⠀⢀⣤⣤⣶⣿⣿⣿⣿⣿⣿⣿⣷⣤⣤⣠⣤⣤⣀⣼⣿⣿⡇
+	// ⠀⢻⣧⡀⠀⠀⢀⣾⣿⣿⡿⠟⠛⠿⠿⠿⠿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠀
+	// ⠀⠀⠻⣿⣴⡔⠀⠀⠁⠀⠀⠀⢠⣶⣷⣶⣶⡄⠈⠻⣿⣿⣿⣿⣿⣿⣿⡿⠁⠀
+	// ⠀⠀⠀⠙⢿⣿⣦⣄⡀⡀⠀⠀⠀⠉⠉⠛⠛⣁⢀⣤⣾⣿⣿⣿⣿⣿⠏⠀⠀⠀
+	// ⠀⠀⠀⠀⠀⠙⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠛⠁⠀⠀⠀⠀
+	// ⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠿⠿⣿⣿⣿⣿⣿⣿⡿⠿⠟⠋⠁⠀⠀⠀⠀⠀⠀⠀
+	f.Sync()
 
 	err = os.Rename(f.Name(), path)
 	if err != nil {
-		return err
+		panic(err)
 	}
-
-	return nil
 }
 
-func AtomicAppend(data string, path string) error {
+func AtomicWriteString(data string, path string) {
+	string_b := []byte(data)
+	AtomicWrite(string_b, path)
+}
+
+func AtomicAppend(data string, path string) {
 	var old_data string
 
 	// "Aguante go"
 	exists := Exists(path)
 	if !exists {
 		old_data = ""
+		println(path)
+		println("No existe, sobre escribo")
 	} else {
-		data_in_file, err := Read(path)
-		if err != nil {
-			// Si el archivo no existe, entonces hacemos de cuenta que el archivo
-			// estaba vacio.  Ligeramente mas ergonomico y recrea el ">>" de la
-			// shell
-			if err == fs.ErrNotExist {
-				old_data = ""
-			} else {
-				return err
-			}
-		} else {
-			old_data = data_in_file
-		}
+		data_in_file := Read(path)
+		old_data = data_in_file
 	}
 
 	new_data := old_data + "\n" + data
 
-	err := AtomicWriteString(new_data, path)
-
-	return err
+	AtomicWriteString(new_data, path)
 }
 
 
-func Read(path string) (string, error) {
+func Read(path string) string {
+	if !Exists(path) {
+		panic("File does not exist")
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", nil
+		panic(err)
 	}
 
 	string_r := string(data)
-	return string_r, nil
+	return string_r
+}
+
+func ReadBytes(path string) []byte {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+
+	return data
 }
 
 // Check if file/dir exists
@@ -116,27 +119,25 @@ func Exists(path string) bool {
 	panic(err)
 }
 
-func CreateFile(path string) (*os.File, error) {
+func CreateFile(path string) *os.File {
 	f, err := os.Create(path)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	err = os.Chmod(f.Name(), 0666)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	return f, nil
+	return f
 }
 
-func CreateDir(path string) error {
+func CreateDir(path string) {
 	err := os.Mkdir(path, 0777)
 
 	if err != nil && !os.IsExist(err) {
-		return err
+		panic(err)
 	}
-
-	return nil
 }
 
 func DeleteFile(path string) error {

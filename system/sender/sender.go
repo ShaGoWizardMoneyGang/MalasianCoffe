@@ -51,7 +51,10 @@ func main() {
 		select {
 		case message, _ := <-*msgs:
 			packetReader := bytes.NewReader(message.Body)
-			pkt, _ := packet.DeserializePackage(packetReader)
+			pkt, err := packet.DeserializePackage(packetReader)
+			if err != nil {
+				panic(err)
+			}
 			client_receiver := pkt.GetClientAddr()
 			print("Client receiver address: ", client_receiver, "\n")
 			var conn net.Conn
@@ -81,7 +84,7 @@ func main() {
 			}
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("Sender received healthcheck ping from", IP)
+			// fmt.Println("Sender received healthcheck ping from", IP)
 			watchdogListener.Pong(IP)
 		}
 	}

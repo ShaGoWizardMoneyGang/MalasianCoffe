@@ -22,6 +22,9 @@ type MessageMiddlewareQueue struct {
 	queueName      string
 	channel        MiddlewareChannel
 	consumerTag    string
+
+	// Canal para asegurar recepcion
+	confirmChannel chan amqp.Confirmation
 }
 
 type MessageMiddlewareExchange struct {
@@ -30,6 +33,8 @@ type MessageMiddlewareExchange struct {
 	QueueAmount   uint64
 	channel        MiddlewareChannel
 	consumerTag    string
+	// Canal para asegurar recepcion
+	confirmChannel chan amqp.Confirmation
 }
 
 type MessageQueue *ConsumeChannel

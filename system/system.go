@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"time"
 
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
@@ -44,7 +45,20 @@ func main() {
 		packet_b, err := network.ReceiveFromNetwork(conn)
 		packet_reader := bytes.NewReader(packet_b)
 		if err != nil {
-			panic(err)
+			ticker := time.NewTicker(1 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				// Continue the loop to attempt receiving the packet again
+				conn, err = list.Accept()
+				if err != nil {
+					panic(fmt.Sprintf("Failed to accept connection. Error: %s", err))
+				}
+				packet_b, err = network.ReceiveFromNetwork(conn)
+				packet_reader = bytes.NewReader(packet_b)
+				if err == nil {
+					break
+				}
+			}
 		}
 		packet, err := packet.DeserializePackage(packet_reader)
 		if err != nil {

@@ -50,7 +50,7 @@ func NewPacketBuilder(directory_name string, sessionID string, client_ip_port st
 	payload_buffer.Grow(MAX_BATCH_SIZE)
 
 	return PacketBuilder{
-		directory_name: directory_name,
+		directory_name:        directory_name,
 		currentSequenceNumber: 0,
 
 		session_id: sessionID,
@@ -71,12 +71,12 @@ func (pb *PacketBuilder) Send(register string) error {
 	if pb.payload_buffer.Len()+len(register) > MAX_BATCH_SIZE {
 		packet, err := pb.createPacket(pb.payload_buffer.String(), false)
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		err = network.SendToNetwork(pb.gatewayIP, packet.Serialize())
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		pb.payload_buffer.Reset()
@@ -105,7 +105,6 @@ func (pb *PacketBuilder) End() error {
 
 	return nil
 }
-
 
 func (pb *PacketBuilder) createPacket(payload string, is_eof bool) (Packet, error) {
 	// Sanity checks

@@ -46,6 +46,16 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 	if err != nil {
 		return nil, fmt.Errorf("Failed to connect to the channel: %w", err)
 	}
+	err = ch.Confirm(false)
+	if err != nil {
+		panic("Failed to create channel")
+	}
+
+	// Prefetch = 1
+	err = ch.Qos(1, 0, false)
+	if err != nil {
+		panic(err)
+	}
 
 	err = ch.ExchangeDeclare(
 		name,
@@ -65,12 +75,15 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 	consumerTag := "ctag-" + name + "-" + uuid.New().String()
 	fmt.Printf("[CreateExchange] ConsumerTag asignado: %s\n", consumerTag)
 
+	confirmation := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+
 	// Aca obtenemos channel
 	return &MessageMiddlewareExchange{
 		exchangeName:   name,
 		QueueAmount: options.QueueAmount,
 		channel:        ch,
 		consumerTag: consumerTag,
+		confirmChannel: confirmation,
 	}, nil
 
 }
@@ -120,6 +133,14 @@ func (e *MessageMiddlewareExchange) Send(pkt packet.Packet) (error MessageMiddle
 	if err != nil {
 		panic(fmt.Errorf("failed to send message: %w", err))
 		return MessageMiddlewareMessageError
+	}
+
+	confirmation, ok := <-e.confirmChannel
+	if !ok {
+		panic(fmt.Errorf("failed to send message: %w", err))
+	}
+	if !confirmation.Ack {
+		panic(fmt.Errorf("failed to send message: %w", err))
 	}
 
 	return 0

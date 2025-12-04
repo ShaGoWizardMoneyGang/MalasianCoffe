@@ -59,7 +59,7 @@ run-global-aggregator: build-global-aggregator
 # Poner en order
 build: docker-build-all build-go-all
 
-build-go-all: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4 build-watchdog build-chaos-monkey
+build-go-all: build-server build-client build-gateway build-filter build-concat build-sender build-counter build-joiner build-partial-aggregator build-global-aggregator build-test-output-query-4 build-watchdog build-chaos-monkey build-cli
 
 build-server:
 	cd system; go build -o ${BINDIR}/server
@@ -99,6 +99,11 @@ build-chaos-monkey:
 	 
 build-test-output-query-4:
 	go build -o ${current_dir}/bin/test_output_query_4 ./test_output_query4/test_output_query4.go
+
+build-cli: build-packet-cli
+
+build-packet-cli:
+	cd cli/packet_cli/; go build -o ${BINDIR}/packet_cli
 #=============================== Test directives ===============================
 
 test-server:

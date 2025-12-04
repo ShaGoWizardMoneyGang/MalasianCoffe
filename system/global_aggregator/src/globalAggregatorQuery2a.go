@@ -182,6 +182,7 @@ func aggregateQuery2a(sessionID string, inputChannel <-chan colas.PacketMessage,
 
 	outputChannel <- newPkts[0]
 
+	colas.WaitForAnswer(inputChannel)
 	localReceiver.Clean()
 }
 
@@ -198,9 +199,10 @@ func (g *aggregator2aGlobal) Process() {
 			g.sessionHandler.PassPacketToSession(inputPacket)
 		case packetAgregado := <-g.outputChannel:
 			g.exchangeSalida.Send(packetAgregado)
+			ackPkt := colas.NewAnswerPacket(packetAgregado)
+			g.sessionHandler.PassPacketToSession(ackPkt)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("GlobalAggregator 2a received healthcheck ping from", IP)
 			watchdog.Pong(IP)
 		}
 	}

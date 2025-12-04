@@ -8,7 +8,6 @@ import (
 	"malasian_coffe/utils/dataset"
 	"malasian_coffe/utils/disk"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -319,10 +318,45 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 		disk.CreateDir(packets_dir)
 	}
 
-	received_eof_s, err := disk.Read(received_eof_file)
+
+	// Anadimos los seq numbers de todos los paquetes recibidos
+	received_sequence_numbers := []int{}
+	entries, err := os.ReadDir(packets_dir)
 	if err != nil {
 		panic(err)
 	}
+	for _, file := range entries {
+		packet_file, err := os.Open(packets_dir + file.Name())
+		if err != nil {
+			panic(err)
+		}
+
+
+		packet_serialized, err := os.ReadFile(packet_file.Name())
+		if err != nil {
+			panic(err)
+		}
+
+		packetReader := bytes.NewReader(packet_serialized)
+		packet, err := packet.DeserializePackage(packetReader)
+		if err != nil {
+			panic(err)
+		}
+
+		packet_sq_num := packet.GetSequenceNumber()
+
+		received_sequence_numbers = append(received_sequence_numbers, packet_sq_num)
+		if packet.IsEOF() {
+			eof_sequence_number := packet.GetSequenceNumberString()
+			received_eof_file := pathResolver.resolve_path(receivedEof)
+			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+		}
+
+	}
+
+
+	received_eof_s := disk.Read(received_eof_file)
+
 	var received_eof int
 	if received_eof_s == "" {
 		// -1 representa si lo recibi o no
@@ -337,26 +371,6 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 		received_eof = received_eof_i
 	}
 
-
-	// Anadimos los seq numbers de todos los paquetes recibidos
-	received_sequence_numbers := []int{}
-	entries, err := os.ReadDir(packets_dir)
-	for _, file := range entries {
-		packet_file, err := os.Open(packets_dir + file.Name())
-		if err != nil {
-			panic(err)
-		}
-
-		file_name := filepath.Base(packet_file.Name())
-		packet_sq_num, err := strconv.ParseInt(file_name, 10, 64)
-		if err != nil {
-			panic(err)
-		}
-
-		received_sequence_numbers = append(received_sequence_numbers, int(packet_sq_num))
-	}
-
-	// TODO: Chequear disco
 	receiver := datasetReceiver {
 		datasetName: datasetName,
 		received_sequence_numbers: received_sequence_numbers,
@@ -420,6 +434,9 @@ func (dr *datasetReceiver) checkIfReceivedAll() bool {
 	// recibido todo.
 	if dr.EOF == -1 {
 		return false
+	} else if len(dr.received_sequence_numbers) == 0{
+		// Es imposible que un datasetReceiver haya recibido todo si tiene 0
+		return false
 	}
 
 	// Incluso con el EOF, puede que lleguen desordenados. Asique los ordenamos.
@@ -428,10 +445,11 @@ func (dr *datasetReceiver) checkIfReceivedAll() bool {
 	// Como los acabamos de ordenar, si recibimos todos los paquetes, deberian
 	// estar ordenamos los IDs.
 	allReceived := true
-	for i, pktSN := range dr.received_sequence_numbers {
+	for i := 0; i < len(dr.received_sequence_numbers) && allReceived == true; i++ {
 
+		pktSN := dr.received_sequence_numbers[i]
 		// Llegue al ultimo packet, tiene que ser el EOF si o si.
-		if i == len(dr.received_sequence_numbers) - 1 {
+		if pktSN == len(dr.received_sequence_numbers) - 1 {
 			allReceived = pktSN == dr.EOF
 			break
 		}
@@ -482,6 +500,9 @@ func (dr *datasetReceiver) readStoredPackets() string {
 
 		packetReader := bytes.NewReader(packet_serialized)
 		packet, err := packet.DeserializePackage(packetReader)
+		if err != nil {
+			panic(err)
+		}
 
 		payload := packet.GetPayload()
 		buffer.WriteString(payload)

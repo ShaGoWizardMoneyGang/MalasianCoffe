@@ -84,6 +84,7 @@ func joinQuery4(sessionID string, inputChannel <-chan colas.PacketMessage, outpu
 		outputChannel <- pkt
 	}
 
+	colas.WaitForAnswer(inputChannel)
 	packet_receiver.Clean()
 }
 
@@ -121,11 +122,10 @@ func (jq4 *joinerQuery4) Process() {
 			jq4.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq4.outputChannel:
 			jq4.colaSalidaQuery4.Send(packetJoineado)
+			ackPkt := colas.NewAnswerPacket(packetJoineado)
+			jq4.sessionHandler.PassPacketToSession(ackPkt)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("Joiner Query4 received healthcheck ping from", IP)
-			//PARA SIMULAR QUE NO MANDA PONG DESPUES DE REINTENTAR
-			//time.Sleep(15 * time.Second)
 			watchdog.Pong(IP)
 		}
 	}

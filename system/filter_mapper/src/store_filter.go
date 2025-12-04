@@ -1,7 +1,6 @@
 package filter_mapper
 
 import (
-	"fmt"
 	"log/slog"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
@@ -92,7 +91,6 @@ func (sfm *storeFilterMapper) Process() {
 			message.Ack(false)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("Filter Stores received healthcheck ping from", IP)
 			watchdog.Pong(IP)
 		}
 	}
