@@ -872,8 +872,9 @@ func newLogger(write_operation string, delete_operation string,
 		already_added := slices.Contains(processed_sequence_numbers, sqn_i)
 		if already_added {
 			bitacora.Info(fmt.Sprintf("Duplicate packet in file. UUID: %s", sqn))
+		} else {
+			processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
 		}
-		processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
 	}
 
 
@@ -1133,6 +1134,14 @@ func (l *logger) checkIfAlreadyProcessed(resourceId int) bool {
 // Clears all the resources in its table, since it finished processing the window.
 func (l *logger) clear() {
 	l.pending_resources = make(map[string]struct{})
+
+	for resource, _ := range l.done_resources {
+		resource_i, err := strconv.Atoi(resource)
+		if err != nil {
+			panic(err)
+		}
+		l.processed_sequence_number = append(l.processed_sequence_number, resource_i)
+	}
 	l.done_resources = make(map[string]struct{})
 
 	// Si por algun motivo el archivo no existia, no pasa nada.
