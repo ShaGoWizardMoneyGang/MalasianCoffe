@@ -156,7 +156,7 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		}
 	}
 
-	received_eof_s, err := disk.Read(received_eof_file)
+	received_eof_s := disk.Read(received_eof_file)
 	if err != nil {
 		panic(err)
 	}
@@ -596,10 +596,8 @@ func (pr *SinglePacketReceiver) serialize_partial_work(partial_work partialWork)
 
 // Parsea el archivo de partial work
 func (pr *SinglePacketReceiver) read_partial_work() partialWork {
-	partial_work, err := disk.Read(pr.path_resolver.resolve_path(partialWorkIndicator))
-	if err != nil {
-		panic(err)
-	}
+	partial_work := disk.Read(pr.path_resolver.resolve_path(partialWorkIndicator))
+
 	if partial_work == "" {
 		return newPartialWork([]int{}, "")
 	}
@@ -858,10 +856,8 @@ func newLogger(write_operation string, delete_operation string,
 		disk.CreateFile(log_file_path)
 	}
 
-	received_sqns_s, err := disk.Read(received_sqns_file)
-	if err != nil {
-		panic(err)
-	}
+	received_sqns_s := disk.Read(received_sqns_file)
+
 	sqns := strings.Split(received_sqns_s, "\n")
 	processed_sequence_numbers := []int{}
 	for _, sqn := range sqns {
@@ -892,10 +888,8 @@ func newLogger(write_operation string, delete_operation string,
 		done_resources: make(map[string]struct{}),
 	}
 
-	log_file, err := disk.Read(log_file_path)
-	if err != nil {
-		panic(err)
-	}
+	log_file := disk.Read(log_file_path)
+
 
 	// Leo todos los logs que quedaron escritos para ya saber cual es el estado
 	// actual.

@@ -322,6 +322,9 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 	// Anadimos los seq numbers de todos los paquetes recibidos
 	received_sequence_numbers := []int{}
 	entries, err := os.ReadDir(packets_dir)
+	if err != nil {
+		panic(err)
+	}
 	for _, file := range entries {
 		packet_file, err := os.Open(packets_dir + file.Name())
 		if err != nil {
@@ -352,10 +355,8 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 	}
 
 
-	received_eof_s, err := disk.Read(received_eof_file)
-	if err != nil {
-		panic(err)
-	}
+	received_eof_s := disk.Read(received_eof_file)
+
 	var received_eof int
 	if received_eof_s == "" {
 		// -1 representa si lo recibi o no

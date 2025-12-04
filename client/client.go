@@ -100,10 +100,7 @@ func main() {
 	// #KeepItSimple
 	// #YAGNI
 	if disk.Exists(SESSION_PERSISTENCIA) {
-		session_id_pre_muerte, err := disk.Read(SESSION_PERSISTENCIA)
-		if err != nil {
-			panic(err)
-		}
+		session_id_pre_muerte := disk.Read(SESSION_PERSISTENCIA)
 
 		session_id = session_id_pre_muerte
 		println("Detecto que tengo un sessionID previo, sigo con ese.")
