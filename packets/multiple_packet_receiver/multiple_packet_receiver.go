@@ -441,10 +441,11 @@ func (dr *datasetReceiver) checkIfReceivedAll() bool {
 	// Como los acabamos de ordenar, si recibimos todos los paquetes, deberian
 	// estar ordenamos los IDs.
 	allReceived := true
-	for i, pktSN := range dr.received_sequence_numbers {
+	for i := 0; i < len(dr.received_sequence_numbers) && allReceived == true; i++ {
 
+		pktSN := dr.received_sequence_numbers[i]
 		// Llegue al ultimo packet, tiene que ser el EOF si o si.
-		if i == len(dr.received_sequence_numbers) - 1 {
+		if pktSN == len(dr.received_sequence_numbers) - 1 {
 			allReceived = pktSN == dr.EOF
 			break
 		}
