@@ -116,6 +116,12 @@ func CreateQueue(name string, options ChannelOptions) (*MessageMiddlewareQueue, 
 		panic("Failed to create channel")
 	}
 
+	// Prefetch = 1
+	err = ch.Qos(1, 0, false)
+	if err != nil {
+		panic(err)
+	}
+
 	q, err := ch.QueueDeclare(
 		name,  // name
 		false, // durable

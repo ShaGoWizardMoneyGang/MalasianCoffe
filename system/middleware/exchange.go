@@ -51,6 +51,12 @@ func CreateExchange(name string, options ExchangeOptions) (*MessageMiddlewareExc
 		panic("Failed to create channel")
 	}
 
+	// Prefetch = 1
+	err = ch.Qos(1, 0, false)
+	if err != nil {
+		panic(err)
+	}
+
 	err = ch.ExchangeDeclare(
 		name,
 		"direct", // Queremos que el exchange envie pkts a ciertas colas nomas.
