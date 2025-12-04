@@ -475,8 +475,8 @@ func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
 	}
 	for i := 0; i < len(received_packets) && allReceived == true; i++ {
 		// El ultimo paquete recibido tiene que si o si ser el ultimo
-		if i == len(received_packets) - 1 {
-			if i != pr.EOF {
+		if received_packets[i] == len(received_packets) - 1 {
+			if received_packets[i] != pr.EOF {
 				allReceived = false
 			}
 
