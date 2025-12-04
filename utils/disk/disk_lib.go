@@ -2,7 +2,6 @@ package disk
 
 import (
 	"errors"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -19,6 +18,7 @@ const (
 func AtomicWrite(data []byte, path string) {
 	file_name := filepath.Base(path)
 
+	// Por que TMP_DIR y no /tmp? Porque Docker, como siempre
 	f, err := os.CreateTemp(TMP_DIR, file_name)
 	if err != nil {
 		panic(err)
@@ -33,27 +33,15 @@ func AtomicWrite(data []byte, path string) {
 		}
 	}
 
-	os.Rename(f.Name(), path)
-}
-
-func AtomicWriteString(data string, path string) {
-	file_name := filepath.Base(path)
-
-	// Por que TMP_DIR y no /tmp? Porque Docker, como siempre
-	f, err := os.CreateTemp(TMP_DIR, file_name)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = io.WriteString(f, data)
-	if err != nil {
-		panic(err)
-	}
-
 	err = os.Rename(f.Name(), path)
 	if err != nil {
 		panic(err)
 	}
+}
+
+func AtomicWriteString(data string, path string) {
+	string_b := []byte(data)
+	AtomicWrite(string_b, path)
 }
 
 func AtomicAppend(data string, path string) {
