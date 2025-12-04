@@ -52,20 +52,11 @@ func AtomicAppend(data string, path string) {
 	exists := Exists(path)
 	if !exists {
 		old_data = ""
+		println(path)
+		println("No existe, sobre escribo")
 	} else {
-		data_in_file, err := Read(path)
-		if err != nil {
-			// Si el archivo no existe, entonces hacemos de cuenta que el archivo
-			// estaba vacio.  Ligeramente mas ergonomico y recrea el ">>" de la
-			// shell
-			if err == fs.ErrNotExist {
-				old_data = ""
-			} else {
-				panic(err)
-			}
-		} else {
-			old_data = data_in_file
-		}
+		data_in_file := Read(path)
+		old_data = data_in_file
 	}
 
 	new_data := old_data + "\n" + data
@@ -74,14 +65,17 @@ func AtomicAppend(data string, path string) {
 }
 
 
-func Read(path string) (string, error) {
+func Read(path string) string {
+	if !Exists(path) {
+		panic("File does not exist")
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
 
 	string_r := string(data)
-	return string_r, nil
+	return string_r
 }
 
 func ReadBytes(path string) []byte {
