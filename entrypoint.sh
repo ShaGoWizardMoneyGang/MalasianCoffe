@@ -10,7 +10,7 @@
 # - Tu odiador secreto
 
 umask 0666
-mkdir /app/packet_receiver/tmp
+mkdir -p /app/packet_receiver/tmp
 
 chown -R user:users /app
 chown -R user:users /app/packet_receiver
