@@ -3,6 +3,7 @@ package colas
 import (
 	"bytes"
 	"fmt"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	"malasian_coffe/utils/network"
@@ -21,7 +22,7 @@ type PacketMessage struct {
 }
 
 func NewAnswerPacket(pck packet.Packet) PacketMessage {
-	pktMess := PacketMessage {
+	pktMess := PacketMessage{
 		Packet: pck,
 	}
 	return pktMess
@@ -76,10 +77,13 @@ func InstanceExchange(exchangeName string, rabbitAddr string, queueAmount uint64
 }
 
 func InputQueue(input *middleware.MessageMiddlewareQueue, inputChannel chan<- PacketMessage) {
+	bitacora.Info("Entered InputQueue function")
 	colasEntrada := input
 
 	messages := ConsumeInput(colasEntrada)
+
 	for message := range *messages {
+		// bitacora.Info("Consumed input InputQueue function")
 		packetReader := bytes.NewReader(message.Body)
 		pkt, err := packet.DeserializePackage(packetReader)
 		if err != nil {

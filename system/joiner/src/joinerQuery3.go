@@ -3,11 +3,12 @@ package joiner
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
 	"malasian_coffe/bitacora"
-	"malasian_coffe/packets/packet"
 	"malasian_coffe/packets/multiple_packet_receiver"
+	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
@@ -29,10 +30,10 @@ type joinerQuery3 struct {
 }
 
 func joinQuery3(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	expected_datasets := []multiple_packet_receiver.NombreDataset {
+	expected_datasets := []multiple_packet_receiver.NombreDataset{
 		multiple_packet_receiver.NombreDataset("stores"),
 		multiple_packet_receiver.NombreDataset("transactions"),
-	};
+	}
 
 	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery3)
 
@@ -89,12 +90,34 @@ func (jq3 *joinerQuery3) Process() {
 	watchdog := watchdog.CreateWatchdogListener()
 	healthcheckChannel := make(chan string)
 	go watchdog.Listen(healthcheckChannel)
+	println("LLEGUE ACA GORDITO")
+
+	path := "/app/packet_receiver"
+	saved_entries, err := os.ReadDir(path)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, file := range saved_entries {
+		if !file.IsDir() {
+			continue
+		}
+		if file.Name() == "tmp" {
+			bitacora.Info("Skipping tmp directory")
+			continue
+		}
+		sessionID := file.Name()
+		println("RECUPERO SESSION ID: ", sessionID)
+
+	}
 
 	for {
 		select {
 		case inputPacket := <-jq3.inputChannel:
+			println("LLEGUE AL INPUT CHANNEL GORDITO")
 			jq3.sessionHandler.PassPacketToSession(inputPacket)
 		case packetJoineado := <-jq3.outputChannel:
+			println("LLEGUE AL OUTPUT CHANNEL GORDITO")
 			jq3.colaSalidaQuery3.Send(packetJoineado)
 			ackPkt := colas.NewAnswerPacket(packetJoineado)
 			jq3.sessionHandler.PassPacketToSession(ackPkt)

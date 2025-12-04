@@ -47,38 +47,39 @@ func CreateQueueUnderExchange(exchangeName string, options ChannelOptions, routi
 
 	queueName := exchangeName + "-" + routingKey
 
-
-
 	err = ch.ExchangeDeclare(
 		exchangeName,
 		"direct", // Queremos que el exchange envie pkts a ciertas colas nomas.
-		false, // durable
-		false, // auto-deleted
-		false, // internal
-		false, // no wait
+		false,    // durable
+		false,    // auto-deleted
+		false,    // internal
+		false,    // no wait
 		nil,
 	)
+
+	ch.Qos(1, 0, false)
 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to declare exchange: %w", err)
 	}
 
-
 	q, err := ch.QueueDeclare(
-		queueName,  // name
-		false, // durable
-		false, // delete when unused
-		false,  // exclusive
-		false, // no-wait
-		nil,   // arguments
+		queueName, // name
+		false,     // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // arguments
 	)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to declareQueue: %w", err)
 	}
 
+	ch.Qos(1, 0, false)
+
 	err = ch.QueueBind(
-		q.Name,        // queue name
-		routingKey,    // routing key
+		q.Name,       // queue name
+		routingKey,   // routing key
 		exchangeName, // exchange
 		false,
 		nil)
@@ -225,7 +226,7 @@ Si ocurre un error interno que no puede resolverse eleva MessageMiddlewareMessag
 */
 func (q *MessageMiddlewareQueue) Send(pkt packet.Packet) (error MessageMiddlewareError) {
 
-	message    := pkt.Serialize()
+	message := pkt.Serialize()
 	err := (*q.channel).Publish(
 		"",          // exchange
 		q.queueName, // routing key

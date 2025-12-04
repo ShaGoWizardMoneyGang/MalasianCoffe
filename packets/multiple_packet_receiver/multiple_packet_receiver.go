@@ -3,6 +3,7 @@ package multiple_packet_receiver
 import (
 	"bytes"
 	"fmt"
+	"malasian_coffe/bitacora"
 	"malasian_coffe/packets/packet"
 	"malasian_coffe/utils/colas"
 	"malasian_coffe/utils/dataset"
@@ -66,10 +67,10 @@ import (
 // - En el directorio "packets/" se guardan todos los paquetes recibidos.
 
 // Nombre del dataset que origino estos datos.
-type NombreDataset string;
+type NombreDataset string
 
 // Todo el contenido recibido.
-type ContenidoCompleto string;
+type ContenidoCompleto string
 
 type MultiplePacketReceiver struct {
 	// Session UUID
@@ -83,7 +84,7 @@ type MultiplePacketReceiver struct {
 	// {
 	//     <nombre_dataset>: contenido_completo del dataset
 	// }
-	transformer func(inputs map[NombreDataset] ContenidoCompleto) string
+	transformer func(inputs map[NombreDataset]ContenidoCompleto) string
 
 	// Ultimo paquete de la session. Este lo guardamos porque damos el ultimo
 	// ACK con la funcion de clean.
@@ -104,19 +105,22 @@ type MultiplePacketReceiver struct {
 type pathResolver struct {
 	root string
 }
+
 // root es el directorio que todos los packet_receiver usan en comun.
 func newPathResolver(session_id string) pathResolver {
 	root := "packet_receiver" + "/" + session_id
 
-	return pathResolver {
+	return pathResolver{
 		root: root,
 	}
 }
 
 type knownFile int
+
 const (
 	root knownFile = iota
 )
+
 func (pr *pathResolver) resolve_path(file knownFile) string {
 	var path string
 	switch file {
@@ -129,7 +133,7 @@ func (pr *pathResolver) resolve_path(file knownFile) string {
 func NewMultiplePacketReceiver(
 	identifier string,
 	expected_datasets []NombreDataset,
-	transformer func(inputs map[NombreDataset] ContenidoCompleto) string,
+	transformer func(inputs map[NombreDataset]ContenidoCompleto) string,
 ) MultiplePacketReceiver {
 	pathResolver := newPathResolver(identifier)
 	packet_receiver_dir := pathResolver.resolve_path(root)
@@ -146,11 +150,11 @@ func NewMultiplePacketReceiver(
 	}
 	// Crea un directorio con el nombre de la session
 	multiple_packet_receiver := MultiplePacketReceiver{
-		identifier:                identifier,
-		receivers:                 receivers,
-		transformer:               transformer,
-		allReceived:               false,
-		pathResolver:              pathResolver,
+		identifier:   identifier,
+		receivers:    receivers,
+		transformer:  transformer,
+		allReceived:  false,
+		pathResolver: pathResolver,
 	}
 
 	return multiple_packet_receiver
@@ -217,13 +221,17 @@ func (pr *MultiplePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool
 	return allReceived
 }
 
-
 // Funcion que destruye todos los archivos creados por el SinglePacketReceiver
 func (pr *MultiplePacketReceiver) Clean() {
 	// Antes de borrar, tenemos que ACKEAR. Sino, podria pasar de borrar todo,
 	// morir, y cuando nos re-envian el ultimo paquete, no sabemos que ya
 	// terminamos.
-	pr.last_packet.Message.Ack(false)
+	bitacora.Info(fmt.Sprintf("Entro a clean: %s", pr.last_packet.Packet.GetSessionID()))
+	error := pr.last_packet.Message.Ack(false)
+	if error != nil {
+		panic(fmt.Sprintf("Failed to ACK last packet in clean: %s", pr.last_packet.Packet.GetSessionID()))
+	}
+	bitacora.Info(fmt.Sprintf("Hice ack en clean: %s", pr.last_packet.Packet.GetSessionID()))
 
 	for i := 0; i < len(pr.receivers); i++ {
 		receiver := &pr.receivers[i]
@@ -246,10 +254,10 @@ func (pr *MultiplePacketReceiver) GetPayload() string {
 		panic("Invariante del Single Packet Receiver rota. Se trato de obtener el payload de un PacketReceiver que todavia no recibio todo.")
 	}
 
-	dataset_map := make(map[NombreDataset] ContenidoCompleto, len(pr.receivers))
+	dataset_map := make(map[NombreDataset]ContenidoCompleto, len(pr.receivers))
 	for i := 0; i < len(pr.receivers); i++ {
-		receiver        :=     &pr.receivers[i]
-		dataset_name    := receiver.getDatasetName()
+		receiver := &pr.receivers[i]
+		dataset_name := receiver.getDatasetName()
 		dataset_content := receiver.getReceivedPackets()
 		dataset_map[dataset_name] = ContenidoCompleto(dataset_content)
 	}
@@ -258,7 +266,6 @@ func (pr *MultiplePacketReceiver) GetPayload() string {
 
 	return finished_work
 }
-
 
 // =============================================================================
 // ===                                                                       ===
@@ -318,7 +325,6 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 		disk.CreateDir(packets_dir)
 	}
 
-
 	// Anadimos los seq numbers de todos los paquetes recibidos
 	received_sequence_numbers := []int{}
 	entries, err := os.ReadDir(packets_dir)
@@ -327,7 +333,6 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 		if err != nil {
 			panic(err)
 		}
-
 
 		packet_serialized, err := os.ReadFile(packet_file.Name())
 		if err != nil {
@@ -351,7 +356,6 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 
 	}
 
-
 	received_eof_s, err := disk.Read(received_eof_file)
 	if err != nil {
 		panic(err)
@@ -370,13 +374,13 @@ func newDatasetReceiver(originalPathResolver *pathResolver, datasetName NombreDa
 		received_eof = received_eof_i
 	}
 
-	receiver := datasetReceiver {
-		datasetName: datasetName,
+	receiver := datasetReceiver{
+		datasetName:               datasetName,
 		received_sequence_numbers: received_sequence_numbers,
-		EOF                      : received_eof,
-		receivedAll: false,
-		path_resolver: pathResolver,
-	 }
+		EOF:                       received_eof,
+		receivedAll:               false,
+		path_resolver:             pathResolver,
+	}
 
 	return receiver
 }
@@ -404,21 +408,20 @@ func (dr *datasetReceiver) receivePacket(pkt packet.Packet) {
 		panic("Dataset receiver recibio paquete que no le correspondia.")
 	}
 
-
 	// fmt.Printf("Recibi %s\n", pkt.GetSequenceNumberString())
 	allreadyProcessed := dr.checkIfAlreadyProcessed(pkt.GetSequenceNumber())
 
 	if !allreadyProcessed {
-	   // Recibo paquete, lo guardo en disco SI no lo recibi antes.
-	   pkt_file := dr.path_resolver.resolve_path(packets) + pkt.GetSequenceNumberString()
-	   disk.AtomicWrite(pkt.Serialize(), pkt_file)
+		// Recibo paquete, lo guardo en disco SI no lo recibi antes.
+		pkt_file := dr.path_resolver.resolve_path(packets) + pkt.GetSequenceNumberString()
+		disk.AtomicWrite(pkt.Serialize(), pkt_file)
 
-	   if pkt.IsEOF() {
-		  dr.EOF = pkt.GetSequenceNumber()
-		  eof_sequence_number := pkt.GetSequenceNumberString()
-		  received_eof_file := dr.path_resolver.resolve_path(receivedEof)
-		  disk.AtomicWriteString(eof_sequence_number, received_eof_file)
-	   }
+		if pkt.IsEOF() {
+			dr.EOF = pkt.GetSequenceNumber()
+			eof_sequence_number := pkt.GetSequenceNumberString()
+			received_eof_file := dr.path_resolver.resolve_path(receivedEof)
+			disk.AtomicWriteString(eof_sequence_number, received_eof_file)
+		}
 	}
 
 	if !allreadyProcessed {
@@ -444,15 +447,15 @@ func (dr *datasetReceiver) checkIfReceivedAll() bool {
 	for i, pktSN := range dr.received_sequence_numbers {
 
 		// Llegue al ultimo packet, tiene que ser el EOF si o si.
-		if i == len(dr.received_sequence_numbers) - 1 {
+		if i == len(dr.received_sequence_numbers)-1 {
 			allReceived = pktSN == dr.EOF
 			break
 		}
 
-		nxt_pkt_sn  := dr.received_sequence_numbers[i + 1]
+		nxt_pkt_sn := dr.received_sequence_numbers[i+1]
 
 		// Mi sq + 1 tiene que ser igual al siguiente, sino, no llego todo.
-		if pktSN + 1 != nxt_pkt_sn {
+		if pktSN+1 != nxt_pkt_sn {
 			allReceived = false
 			break
 		}
@@ -521,12 +524,13 @@ func newDatasetPathResolver(pathResolver *pathResolver, dataset_name NombreDatas
 
 	root_with_dataset := root + "/" + string(dataset_name)
 
-	return datasetPathResolver {
+	return datasetPathResolver{
 		root: root_with_dataset,
 	}
 }
 
 type knownDatasetFile int
+
 const (
 	datasetRoot knownDatasetFile = iota
 	metadata
@@ -552,7 +556,7 @@ func (pr *datasetPathResolver) resolve_path(file knownDatasetFile) string {
 
 func (dr *datasetReceiver) checkIfAlreadyProcessed(resourceId int) bool {
 	alreadyProcessed := false
-	for i := 0; i < len(dr.received_sequence_numbers) && alreadyProcessed == false ; i++ {
+	for i := 0; i < len(dr.received_sequence_numbers) && alreadyProcessed == false; i++ {
 		curr_id := dr.received_sequence_numbers[i]
 		alreadyProcessed = curr_id == resourceId
 	}

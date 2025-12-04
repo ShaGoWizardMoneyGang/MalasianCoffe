@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"malasian_coffe/bitacora"
-	"malasian_coffe/packets/packet"
 	"malasian_coffe/packets/multiple_packet_receiver"
+	"malasian_coffe/packets/packet"
 	"malasian_coffe/system/middleware"
 	sessionhandler "malasian_coffe/system/session_handler"
 	watchdog "malasian_coffe/system/watchdog/src"
@@ -29,10 +29,10 @@ type joinerQuery2b struct {
 }
 
 func joinQuery2b(sessionID string, inputChannel <-chan colas.PacketMessage, outputChannel chan<- packet.Packet) {
-	expected_datasets := []multiple_packet_receiver.NombreDataset {
+	expected_datasets := []multiple_packet_receiver.NombreDataset{
 		multiple_packet_receiver.NombreDataset("menu_items"),
 		multiple_packet_receiver.NombreDataset("transaction_items"),
-	};
+	}
 
 	packet_receiver := multiple_packet_receiver.NewMultiplePacketReceiver(sessionID, expected_datasets, joinerFunctionQuery2b)
 
@@ -62,7 +62,9 @@ func joinQuery2b(sessionID string, inputChannel <-chan colas.PacketMessage, outp
 		outputChannel <- pkt
 	}
 
+	bitacora.Info(fmt.Sprintf("Esperando respuesta, session: %s", last_packet.GetSessionID()))
 	colas.WaitForAnswer(inputChannel)
+	bitacora.Info(fmt.Sprintf("Llegó la respuesta, tiro clean(), session: %s", last_packet.GetSessionID()))
 	packet_receiver.Clean()
 }
 
