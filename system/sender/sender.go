@@ -7,7 +7,10 @@ import (
 	"math/rand/v2"
 	"net"
 	"os"
+	"os/signal"
+	"runtime/pprof"
 	"strings"
+	"syscall"
 	"time"
 
 	"malasian_coffe/bitacora"
@@ -21,6 +24,23 @@ import (
 // Argumentos que recibe
 // 1: Direccion de rabbit
 func main() {
+    c := make(chan os.Signal, 1)
+    signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+
+    go func() {
+        sig := <-c
+        println("Received signal:", sig.String())
+
+        // Dump all goroutine stacks to stderr
+        pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
+
+        os.Exit(1)
+    }()
+
+
+
+
+
 	// TODO: Esto no esta bueno para el sender porque tiene que escuchar de mas
 	// de una cola a la vez, onda regex.
 	rabbit_addr := os.Args[1]

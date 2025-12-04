@@ -5,8 +5,11 @@ import (
 	"malasian_coffe/system/middleware"
 	aggregator "malasian_coffe/system/partial_aggregator/src"
 	"os"
+	"os/signal"
+	"runtime/pprof"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 func consumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.ConsumeChannel {
@@ -18,6 +21,18 @@ func consumeInput(colaEntrada *middleware.MessageMiddlewareQueue) middleware.Con
 }
 
 func main() {
+    c := make(chan os.Signal, 1)
+    signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+
+    go func() {
+        sig := <-c
+        println("Received signal:", sig.String())
+
+        // Dump all goroutine stacks to stderr
+        pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
+
+        os.Exit(1)
+    }()
 
 	rabbitAddr := os.Args[1]
 	function := os.Args[2]
