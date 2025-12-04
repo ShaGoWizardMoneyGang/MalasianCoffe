@@ -145,7 +145,6 @@ func (a *aggregator3Partial) Process() {
 			}
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("PartialAggregator3 received healthcheck ping from", IP)
 			watchdogListener.Pong(IP)
 		}
 	}
