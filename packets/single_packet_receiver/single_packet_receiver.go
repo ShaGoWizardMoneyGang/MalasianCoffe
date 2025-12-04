@@ -305,8 +305,8 @@ func (pr *SinglePacketReceiver) ReceivePacket(pktMsg colas.PacketMessage) bool {
 		pr.last_packet = pktMsg
 	} else {
 		pktMsg.Message.Ack(false)
+		pr.checkpointer.checkpoint(hiceACK)
 	}
-	pr.checkpointer.checkpoint(hiceACK)
 
 
 	return allReceived
