@@ -54,6 +54,8 @@ func main() {
 		threshold = int(prob_minima_nuevo)
 	}
 
+	behaviour := os.Args[3]
+
 	nodes, err := ReadNodes(NODES_FILE)
 	if err != nil {
 		println("Error reading nodes:", err.Error())
@@ -76,6 +78,7 @@ func main() {
 
 	fmt.Printf("Semilla:    %d \n", semilla)
 	fmt.Printf("Threshold: %d \n", threshold)
+	fmt.Printf("Behaviour: %s\n", behaviour)
 	source  := rand.NewSource(semilla)
 	rnd := rand.New(source)
 
@@ -84,12 +87,12 @@ func main() {
 		nodoAleatorio := rnd.Intn(len(nodes))
 		node          := nodes[nodoAleatorio]
 		if numAleatorio >= threshold {
-			cmd := exec.Command("sh", "-c", "docker stop -s SIGKILL "+node)
+			cmd := exec.Command("sh", "-c", "docker stop -s " + behaviour + " " + node)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error al detener el contenedor %s con SIGKILL: %v\n", node, err)
+				fmt.Fprintf(os.Stderr, "Error al detener el contenedor %s con %s: %v\n", node, behaviour, err)
 			} else {
-				fmt.Printf("Se detuvo el container %s con SIGKILL: %s\n", node, string(output))
+				fmt.Printf("Se detuvo el container %s con %s: %s\n", node, string(output), behaviour)
 			}
 		}
 		// Sleep de 10 segundos después de cada nodo para poder observar mejor
