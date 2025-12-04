@@ -40,16 +40,15 @@ func (node *WatchdogNode) BroadcastHeartbeat() {
 
 func (node *WatchdogNode) sendHeartbeatToMember(member string) {
 	if member == node.Addr {
-		return //no me envío a mí mismo
+		return
 	}
 	neighborAddr := net.JoinHostPort(member, strconv.Itoa(HEARTBEAT_PORT))
 	conn, err := net.Dial("udp", neighborAddr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error al conectar con replica %s: %v\n", neighborAddr, err)
+		// fmt.Fprintf(os.Stderr, "Error al conectar con replica %s: %v\n", neighborAddr, err)
 		return
 	}
 	defer conn.Close()
-	fmt.Printf("[%s] Sending heartbeat to %s\n", node.Addr, neighborAddr)
 	msg := fmt.Sprintf("%d,%s", node.ID, node.Addr)
 	conn.Write([]byte(msg))
 }
@@ -63,16 +62,14 @@ func (node *WatchdogNode) ListenHeartbeats() {
 	buffer := make([]byte, 1024)
 	for {
 		if node.AmIMaster() {
-			fmt.Printf("[%s] Soy el líder, no escucho latidos\n", node.Addr)
 			conn.Close()
 			return
 		}
 		conn.SetReadDeadline(time.Now().Add(HEARTBEAT_TIMEOUT * time.Second))
 		n, remote, err := conn.ReadFromUDP(buffer)
 		if err != nil {
-			//TODO revisar que os.IsTimeout esté bien usado acá
-			if os.IsTimeout(err) && !node.Coordinating { //si no estan coordinando, lo tiro
-				fmt.Fprintf(os.Stderr, "Error: nothing received in 3 seconds, assuming leader died. Election begin.\n")
+			if os.IsTimeout(err) && !node.Coordinating {
+				fmt.Fprintf(os.Stderr, "Error: No se recibió nada en 3 segundos. Asumo que el lider murió, arranca elección.\n")
 			} else {
 				fmt.Fprintf(os.Stderr, "Error al recibir heartbeat: %v\n. Arranca eleccion.", err)
 			}
@@ -82,15 +79,11 @@ func (node *WatchdogNode) ListenHeartbeats() {
 		payload := string(buffer[:n])
 		switch {
 		case strings.HasPrefix(payload, "ELECTION"):
-			fmt.Printf("[%s] Election message received: %s\n", node.Addr, payload)
 			node.handleElectionMessage(payload, remote.IP.String())
 		case payload == "OK":
-			fmt.Printf("[%s] Recibí mensaje OK, sé que hay un líder más alto\n", node.Addr)
 		case strings.HasPrefix(payload, "COORDINATOR"):
-			fmt.Printf("[%s] Coordinator message received: %s\n", node.Addr, payload)
 			node.handleCoordinatorMessage(payload)
 		default:
-			fmt.Printf("[%s] Heartbeat received: %s\n", node.Addr, payload)
 		}
 	}
 }
@@ -127,11 +120,10 @@ func (node *WatchdogNode) sendCoordinationMessage() {
 		neighborAddr := net.JoinHostPort(member, strconv.Itoa(HEARTBEAT_PORT))
 		conn, err := net.Dial("udp", neighborAddr)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error al conectar con replica %s: %v\n", neighborAddr, err)
+			// fmt.Fprintf(os.Stderr, "Error al conectar con replica %s: %v\n", neighborAddr, err)
 			continue
 		}
 		defer conn.Close()
-		fmt.Printf("[%s] Sending coordinator message to %s\n", node.Addr, neighborAddr)
 		msg := fmt.Sprintf("COORDINATOR[%d]", node.ID)
 		conn.Write([]byte(msg))
 	}
@@ -143,11 +135,10 @@ func (node *WatchdogNode) sendElectionMessage(member string) bool {
 	neighborAddr := net.JoinHostPort(member, strconv.Itoa(HEARTBEAT_PORT))
 	conn, err := net.Dial("udp", neighborAddr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error al conectar con replica %s: %v\n", neighborAddr, err)
+		// fmt.Fprintf(os.Stderr, "Error al conectar con replica %s: %v\n", neighborAddr, err)
 		return false
 	}
 	defer conn.Close()
-	fmt.Printf("[%s] Sending election message to %s\n", node.Addr, neighborAddr)
 	msg := fmt.Sprintf("ELECTION[%d]", node.ID)
 	conn.Write([]byte(msg))
 	return true
@@ -161,7 +152,6 @@ func (node *WatchdogNode) handleElectionMessage(payload string, senderAddr strin
 		return
 	}
 	if senderID < node.ID {
-		fmt.Printf("[%s] Recibí mensaje de elección de %d, respondo con OK\n", node.Addr, senderID)
 		node.sendOKMessage(senderAddr)
 	}
 }
@@ -182,11 +172,10 @@ func (node *WatchdogNode) sendOKMessage(memberAddr string) {
 	neighborAddr := net.JoinHostPort(memberAddr, strconv.Itoa(HEARTBEAT_PORT))
 	conn, err := net.Dial("udp", neighborAddr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error al conectar con replica %s: %v\n", neighborAddr, err)
+		// fmt.Fprintf(os.Stderr, "Error al conectar con replica %s: %v\n", neighborAddr, err)
 		return
 	}
 	defer conn.Close()
-	fmt.Printf("[%s] Sending OK message to %s\n", node.Addr, neighborAddr)
 	msg := "OK"
 	conn.Write([]byte(msg))
 }

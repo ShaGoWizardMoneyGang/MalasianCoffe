@@ -1,5 +1,7 @@
 # MalasianCoffe
 
+![showcase](images/showcase.png)
+
 ## Docker custom images
 El repositorio usa un par de imagenes de docker custom. Todas estan en el directorio: `docker_images/`.
 
@@ -27,3 +29,9 @@ make build && docker compose -f ./compose-files/queryN/queryN.yml up -d
 ```bash
 make test-outputs-reduced
 ```
+
+# Autores
+La ShaGoWizardMoneyGang:
+
+![magos](images/kir.png)
+

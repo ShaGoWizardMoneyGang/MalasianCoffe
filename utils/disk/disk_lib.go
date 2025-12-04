@@ -69,8 +69,8 @@ func AtomicAppend(data string, path string) {
 	exists := Exists(path)
 	if !exists {
 		old_data = ""
-		println(path)
-		println("No existe, sobre escribo")
+		// println(path)
+		// println("No existe, sobre escribo")
 	} else {
 		data_in_file := Read(path)
 		old_data = data_in_file
@@ -80,7 +80,6 @@ func AtomicAppend(data string, path string) {
 
 	AtomicWriteString(new_data, path)
 }
-
 
 func Read(path string) string {
 	if !Exists(path) {

@@ -5,14 +5,40 @@ import (
 	"malasian_coffe/bitacora"
 	aggregator "malasian_coffe/system/global_aggregator/src"
 	"os"
+	"os/signal"
+	"runtime/pprof"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 // Argumentos:
 // 1) Address de Rabbit
 // 2) Nombre del aggregator global (query2a, query2b, query3, query4)
 func main() {
+    c := make(chan os.Signal, 1)
+    signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+
+    go func() {
+        sig := <-c
+        println("Received signal:", sig.String())
+
+        // Dump all goroutine stacks to stderr
+        pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
+
+        os.Exit(1)
+    }()
+
+
+
+
+
+
+
+
+
+
+
 	rabbitAddr := os.Args[1]
 	aggName := os.Args[2]
 
