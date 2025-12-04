@@ -35,7 +35,7 @@ func (wl *WatchdogListener) Pong(responseIP string) {
 	responseAddress := responseIP + ":" + fmt.Sprint(HEALTHCHECK_PORT)
 	conn, err := net.Dial("udp", responseAddress)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error al conectar con %s: %v\n", responseAddress, err)
+		// fmt.Fprintf(os.Stderr, "Error al conectar con %s: %v\n", responseAddress, err)
 		return
 	}
 	defer conn.Close()
@@ -45,7 +45,6 @@ func (wl *WatchdogListener) Pong(responseIP string) {
 		fmt.Fprintf(os.Stderr, "Error al enviar datos: %v\n", err)
 		return
 	}
-	// fmt.Printf("PONG recibido de %s\n", responseAddress)
 }
 
 func (wl *WatchdogListener) Listen(infoChan chan<- string) {
@@ -68,12 +67,12 @@ func (wl *WatchdogListener) Listen(infoChan chan<- string) {
 func Ping(address string) error {
 	conn, err := net.Dial("udp", address)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error al conectar con %s: %v\n", address, err)
+		// fmt.Fprintf(os.Stderr, "Error al conectar con %s: %v\n", address, err)
 		return err
 	}
 	defer conn.Close()
 
-	fmt.Printf("Conexión UDP establecida con %s\n", address)
+	// fmt.Printf("Conexión UDP establecida con %s\n", address)
 	_, err = conn.Write([]byte{0x01})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error al enviar datos: %v\n", err)
