@@ -89,6 +89,9 @@ func (mifm *menuItemFilterMapper) Process() {
 				packet := outbound.Packet
 				cola.Send(packet)
 			}
+			if pkt.IsEOF() {
+				println("ACK del ultimo paquete de: " + pkt.GetSessionID())
+			}
 			message.Ack(false)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]

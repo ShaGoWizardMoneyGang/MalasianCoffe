@@ -188,19 +188,20 @@ func NewSinglePacketReceiver(identifier string, transformer func(accumulated_inp
 		path_resolver:             pathResolver,
 		logger:                    logger,
 		// TODO: Chequear que pasa si muero despues de recibir el ultimo paquete.
-		allReceived:                false,
+		allReceived:               false,
 		checkpointer:              checkpointer,
 		identifier:                identifier,
 	}
 
 	// Chequeo si me quedo pendiente un flush
 	allReceived := single_packet_receiver.checkIfReceivedAll()
+	single_packet_receiver.allReceived = allReceived;
 
-	amount_packets_in_window := len(single_packet_receiver.packets_in_window)
-	do_flush_window := amount_packets_in_window >= pACKET_WINDOW
-	if do_flush_window || allReceived {
-		single_packet_receiver.flushWindow()
-	}
+	// amount_packets_in_window := len(single_packet_receiver.packets_in_window)
+	// do_flush_window := amount_packets_in_window >= pACKET_WINDOW
+	// if do_flush_window || allReceived {
+	// 	single_packet_receiver.flushWindow()
+	// }
 
 	return single_packet_receiver
 }
@@ -447,6 +448,9 @@ func (pr *SinglePacketReceiver) checkIfInWindow(pkt packet.Packet) bool {
 }
 
 func (pr *SinglePacketReceiver) checkIfReceivedAll() bool {
+	if pr.allReceived == true {
+		return true;
+	}
 	processed_sequence_number := pr.logger.get_processed_number()
 
 	received_packets := make([]int, len(processed_sequence_number) + len(pr.packets_in_window))
