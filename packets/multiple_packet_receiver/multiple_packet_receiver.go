@@ -433,6 +433,9 @@ func (dr *datasetReceiver) checkIfReceivedAll() bool {
 	// recibido todo.
 	if dr.EOF == -1 {
 		return false
+	} else if len(dr.received_sequence_numbers) == 0{
+		// Es imposible que un datasetReceiver haya recibido todo si tiene 0
+		return false
 	}
 
 	// Incluso con el EOF, puede que lleguen desordenados. Asique los ordenamos.
