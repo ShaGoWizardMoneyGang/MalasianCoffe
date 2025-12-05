@@ -93,7 +93,6 @@ func (c *counterQuery4) Process() {
 			message.Ack(false)
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			fmt.Println("CounterQuery4 received healthcheck ping from", IP)
 			watchdogListener.Pong(IP)
 		}
 	}

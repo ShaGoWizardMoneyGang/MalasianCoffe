@@ -104,7 +104,6 @@ func main() {
 			}
 		case responseAddress := <-healthcheckChannel:
 			IP := strings.Split(responseAddress, ":")[0]
-			// fmt.Println("Sender received healthcheck ping from", IP)
 			watchdogListener.Pong(IP)
 		}
 	}

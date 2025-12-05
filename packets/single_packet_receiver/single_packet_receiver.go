@@ -872,8 +872,9 @@ func newLogger(write_operation string, delete_operation string,
 		already_added := slices.Contains(processed_sequence_numbers, sqn_i)
 		if already_added {
 			bitacora.Info(fmt.Sprintf("Duplicate packet in file. UUID: %s", sqn))
+		} else {
+			processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
 		}
-		processed_sequence_numbers = append(processed_sequence_numbers, sqn_i)
 	}
 
 
@@ -1133,7 +1134,24 @@ func (l *logger) checkIfAlreadyProcessed(resourceId int) bool {
 // Clears all the resources in its table, since it finished processing the window.
 func (l *logger) clear() {
 	l.pending_resources = make(map[string]struct{})
+
+	for resource, _ := range l.done_resources {
+		resource_i, err := strconv.Atoi(resource)
+		if err != nil {
+			panic(err)
+		}
+
+		already_added := slices.Contains(l.processed_sequence_number, resource_i)
+		if already_added {
+			bitacora.Info(fmt.Sprintf("Duplicate packet in file. UUID: %d", resource_i))
+		} else {
+			l.processed_sequence_number = append(l.processed_sequence_number, resource_i)
+		}
+	}
 	l.done_resources = make(map[string]struct{})
+
+	slices.Sort(l.processed_sequence_number)
+	l.processed_sequence_number = slices.Compact(l.processed_sequence_number)
 
 	// Si por algun motivo el archivo no existia, no pasa nada.
 	// Es "idempotente", lo unico que nos interesa es que el archivo no este.
