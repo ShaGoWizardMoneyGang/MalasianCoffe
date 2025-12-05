@@ -1140,9 +1140,18 @@ func (l *logger) clear() {
 		if err != nil {
 			panic(err)
 		}
-		l.processed_sequence_number = append(l.processed_sequence_number, resource_i)
+
+		already_added := slices.Contains(l.processed_sequence_number, resource_i)
+		if already_added {
+			bitacora.Info(fmt.Sprintf("Duplicate packet in file. UUID: %d", resource_i))
+		} else {
+			l.processed_sequence_number = append(l.processed_sequence_number, resource_i)
+		}
 	}
 	l.done_resources = make(map[string]struct{})
+
+	slices.Sort(l.processed_sequence_number)
+	l.processed_sequence_number = slices.Compact(l.processed_sequence_number)
 
 	// Si por algun motivo el archivo no existia, no pasa nada.
 	// Es "idempotente", lo unico que nos interesa es que el archivo no este.
